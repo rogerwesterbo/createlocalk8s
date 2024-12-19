@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kubeview
+  namespace: argocd
+spec:
+  destination:
+    namespace: kubeview
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: charts/kubeview
+    repoURL: https://github.com/benc-uk/kubeview.git
+    targetRevision: HEAD
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

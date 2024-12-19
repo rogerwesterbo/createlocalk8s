@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nyancat
+  namespace: argocd
+spec:
+  destination:
+    namespace: nyancat
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    repoURL: https://github.com/rogerwesterbo/nyan-cat.git
+    targetRevision: HEAD
+    path: charts/nyan-cat
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
