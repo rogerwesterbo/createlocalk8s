@@ -18,3 +18,6 @@ Create a kubernetes cluster locally
 ```bash
 ./create-cluster.sh
 ```
+
+Read the steps in
+[./docs/k8s.md](./docs/k8s.md)
