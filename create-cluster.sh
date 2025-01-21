@@ -26,6 +26,8 @@ opencost_argo_app_yaml=$(get_abs_filename "$configDir/opencost-app.yaml")
 argocd_ingress_yaml=$(get_abs_filename "$configDir/argocd-ingress.yaml")
 cert_manager_yaml=$(get_abs_filename "$configDir/cert-manager.yaml")
 kubeview_yaml=$(get_abs_filename "$configDir/kubeview.yaml")
+trivy_app_yaml=$(get_abs_filename "$configDir/trivy-app.yaml")
+metallb_app_yaml=$(get_abs_filename "$configDir/metallb-app.yaml")
 kube_prometheus_stack_yaml=$(get_abs_filename "$configDir/kube_prometheus_stack.yaml")
 cluster_info_file=$(get_abs_filename "$configDir/clusterinfo-$cluster_name.txt")
 argocd_password=""
@@ -73,24 +75,28 @@ function print_logo() {
 function print_help() {
     # Display Help
     echo -e "$yellow"
-    echo "Syntax: ./create-cluster.sh [create|c|help|h]"
-    echo
-    echo "options:"
-    echo "  create                      alias: c            Create a local cluster with kind and docker"
-    echo "  list                        alias: ls           Show kind clusters"
-    echo "  details                     alias: dt           Show details for a cluster"
-    echo "  kubeconfig                  alias: kc           Get kubeconfig for a cluster by name"
-    echo "  delete                      alias: d            Delete a cluster by name"
-    echo "  help                        alias: h            Print this Help"
+    echo "Kind spesific:"    
+    echo "  create                    alias: c       Create a local cluster with kind and docker"
+    echo "  list                      alias: ls      Show kind clusters"
+    echo "  details                   alias: dt      Show details for a cluster"
+    echo "  kubeconfig                alias: kc      Get kubeconfig for a cluster by name"
+    echo "  delete                    alias: d       Delete a cluster by name"
+    echo "  help                      alias: h       Print this Help"
+    echo "  install-nginx-kind        alias: ink     Install Nginx Ingress Controller for kind to current cluster"    
     echo ""
-    echo "Applications:"
-    echo "  install-nginx-kind          alias: ink          Install Nginx Ingress Controller for kind to current cluster"
-    echo "  install-argocd-helm         alias: ia           Install ArgoCD with helm to current cluster"
-    echo "  install-app-nyancat         alias: nyan,cat     Install Nyan-cat ArgoCD application"
-    echo "  install-app-certmanager     alias: icm          Install Cert-manager ArgoCD application"
-    echo "  install-app-prometheus      alias: ip           Install Kube-prometheus-stack ArgoCD application"
-    echo "  install-app-kubeview        alias: ikv          Install Kubeview ArgoCD application"
-    echo "  install-app-opencost        alias: ioc          Install OpenCost ArgoCD application"
+    echo "Helm:"
+    echo "  install-helm-argocd       alias: iha     Install ArgoCD with helm to current cluster"
+    echo "  install-helm-metallb      alias: ihm     Install Metallb ArgoCD application"
+    echo "  install-helm-trivy        alias: iht     Install Trivy Operator ArgoCD application"
+    echo ""
+    echo "ArgoCD Applications:"
+    echo "  install-app-nyancat       alias: iac     Install Nyan-cat ArgoCD application"
+    echo "  install-app-certmanager   alias: iacm    Install Cert-manager ArgoCD application"
+    echo "  install-app-prometheus    alias: iap     Install Kube-prometheus-stack ArgoCD application"
+    echo "  install-app-kubeview      alias: iakv    Install Kubeview ArgoCD application"
+    echo "  install-app-opencost      alias: iaoc    Install OpenCost ArgoCD application"
+    echo "  install-app-metallb       alias: iam     Install Metallb ArgoCD application"
+    echo "  install-app-trivy         alias: iat     Install Trivy Operator ArgoCD application"
     
     echo ""
     echo "dependencies: docker, kind, kubectl, jq, base64 and helm"
@@ -292,7 +298,7 @@ ArgoCD admin GUI url: http://localhost:58080" >> $cluster_info_file
     fi
 }
 
-function install_argocd_helm(){
+function install_helm_argocd(){
     echo -e "$yellow
     Installing ArgoCD
     "
@@ -319,6 +325,40 @@ function install_argocd_helm(){
 
     echo -e "$yellow
     ✅ Done installing ArgoCD"
+}
+
+function install_helm_metallb(){
+    echo -e "$yellow
+    Installing Metallb
+    "
+    helm repo add metallb https://metallb.github.io/metallb
+    (helm install metallb metallb/metallb --namespace metallb --create-namespace|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install metallb into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing Metallb"
+}
+
+function install_helm_trivy(){
+    echo -e "$yellow
+    Installing Trivy-operator
+    "
+    helm repo add aqua https://aquasecurity.github.io/helm-charts/
+    (  helm install trivy-operator aqua/trivy-operator --namespace trivy --create-namespace|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install Trivy-operator into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing Trivy-operator"
 }
 
 function install_nginx_controller_for_kind(){
@@ -370,7 +410,7 @@ function create_cluster() {
     fi
 
     if [ "$install_argocd" == "yes" ]; then
-        install_argocd_helm
+        install_helm_argocd
         argocd_password="$(kubectl get secrets -n argocd argocd-initial-admin-secret -o json | jq -r '.data.password' | base64 -d)"
 
         echo "ArgoCD:"
@@ -411,7 +451,7 @@ function create_cluster() {
     "
     echo -e "$clear"
 
-    get_kubeconfig $cluster_name
+    get_kubeconfig kc $cluster_name
 
     if [ "$install_argocd" == "yes" ]; then
         install_nyancat=""
@@ -563,15 +603,15 @@ function list_clusters() {
 }
 
 function get_kubeconfig() {
-    clusterName=${@: -1}
-
-    if [[ "$#" -lt 2 ]]; then 
-        echo "Missing name of cluster"; 
+    if [ "$#" -ne 2 ]; then
+        echo "Error: This script requires exactly two arguments."
+        echo "Usage: $0 <arg1> <arg2>"
         exit 1
     fi
 
-    if [[ "$#" -gt 2 ]]; then 
-        echo "Too many arguments"; 
+    local clusterName=$2
+    if [ -z "$clusterName" ]; then
+        echo "Missing name of cluster"; 
         exit 1
     fi
 
@@ -659,63 +699,123 @@ function install_opencost_application() {
     echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:9090"
 }
 
-while (($#)); do
-   case $1 in
-        create|c) # create cluster
-            print_logo
-            get_cluster_parameter
-            exit;;
-        help|h) # display Help
+function install_metallb_application() {
+    echo -e "$yellow
+    Installing Metallb ArgoCD application
+    "
+    (kubectl apply -f $metallb_app_yaml|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install Metallb ArgoCD application into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing Metallb ArgoCD application
+    "
+
+    echo "Metallb application installed: yes" >> $cluster_info_file
+}
+
+function install_trivy_application() {
+    echo -e "$yellow
+    Installing Trivy ArgoCD application
+    "
+    (kubectl apply -f $trivy_app_yaml|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install Trivy ArgoCD application into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing Trivy ArgoCD application
+    "
+
+    echo "Trivy application installed: yes" >> $cluster_info_file
+}
+
+perform_action() {
+    local action=$1
+
+    case $action in
+        help|h)
             print_logo
             print_help
             exit;;
-        install-app-nyancat|nyan|cat) # install nyancat application
+        create|c)
             print_logo
-            install_nyancat_application
+            get_cluster_parameter
             exit;;
-        install-nginx-kind|ink) # install nginx controller
-            print_logo
-            install_nginx_controller_for_kind
-            exit;;
-        install-app-opencost|ioc) # install nginx controller
-            print_logo
-            install_opencost_application
-            exit;;
-        install-argocd|ia) # install argocd
-            print_logo
-            install_argocd_helm
-            exit;;
-        install-app-certmanager|icm) # install argocd
-            print_logo
-            install_cert_manager_application
-            exit;;
-        install-app-prometheus|ip) # install argocd
-            print_logo
-            install_kube_prometheus_stack_application
-            exit;;
-        install-app-kubeview|ikv) # install argocd
-            print_logo
-            install_kubeview_application
-            exit;;
-        details|dt) # see details of cluster
+        details|dt)
             print_logo
             see_details_of_cluster
             exit;;
-        info|i) # see details of cluster
+        info|i)
             print_logo
             details_for_cluster $*
             exit;;
-        delete|d) # see details of cluster
+        delete|d)
             print_logo
             delete_cluster $*
             exit;;
-        list|ls) # see details of cluster
+        list|ls)
             print_logo
             list_clusters $*
             exit;;
-        kubeconfig|kc) # see details of cluster
+        kubeconfig|kc)
             get_kubeconfig $*
             exit;;
+        
+        install-nginx-kind|ink)
+            print_logo
+            install_nginx_controller_for_kind
+            exit;;
+        
+        install-helm-argocd|iha)
+            print_logo
+            install_helm_argocd
+            exit;;
+        install-helm-metallb|iha)
+            print_logo
+            install_helm_metallb
+            exit;;
+        install-helm-trivy|iht)
+            print_logo
+            install_helm_trivy
+            exit;;
+
+        install-app-nyancat|iacat)
+            print_logo
+            install_nyancat_application
+            exit;;
+        install-app-certmanager|iacm)
+            print_logo
+            install_cert_manager_application
+            exit;;
+        install-app-prometheus|iap)
+            print_logo
+            install_kube_prometheus_stack_application
+            exit;;
+        install-app-kubeview|iakv)
+            print_logo
+            install_kubeview_application
+            exit;;
+        install-app-opencost|iaoc)
+            print_logo
+            install_opencost_application
+            exit;;
+        install-app-metallb|iam)
+            print_logo
+            install_metallb_application
+            exit;;
+        install-app-trivy|iat)
+            print_logo
+            install_trivy_application
+            exit;;
+        
         *) # Invalid option
             echo -e "$red
             Error: Invalid option
@@ -723,7 +823,9 @@ while (($#)); do
             "
             exit;;
    esac
-done
+}
+
+perform_action $*
 
 print_logo
 print_help
