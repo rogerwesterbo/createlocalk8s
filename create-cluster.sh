@@ -76,19 +76,22 @@ function print_help() {
     echo "Syntax: ./create-cluster.sh [create|c|help|h]"
     echo
     echo "options:"
-    echo "  create              alias: c         Create a local cluster with kind and docker"
-    echo "  install-nginx       alias: in        Install Nginx Ingress Controller to current cluster"
-    echo "  install-argocd      alias: ia        Install ArgoCD to current cluster"
-    echo "  install-nyancat     alias: nyan,cat  Install Nyan-cat ArgoCD application"
-    echo "  install-certmanager alias: icm       Install Cert-manager ArgoCD application"
-    echo "  install-prometheus  alias: ip        Install Kube-prometheus-stack ArgoCD application"
-    echo "  install-kubeview    alias: ikv       Install Kubeview ArgoCD application"
-    echo "  install-opencost    alias: ioc       Install OpenCost ArgoCD application"
-    echo "  list                alias: ls        Show kind clusters"
-    echo "  details             alias: dt        Show details for a cluster"
-    echo "  kubeconfig          alias: kc        Get kubeconfig for a cluster by name"
-    echo "  delete              alias: d         Delete a cluster by name"
-    echo "  help                alias: h         Print this Help"
+    echo "  create                      alias: c            Create a local cluster with kind and docker"
+    echo "  list                        alias: ls           Show kind clusters"
+    echo "  details                     alias: dt           Show details for a cluster"
+    echo "  kubeconfig                  alias: kc           Get kubeconfig for a cluster by name"
+    echo "  delete                      alias: d            Delete a cluster by name"
+    echo "  help                        alias: h            Print this Help"
+    echo ""
+    echo "Applications:"
+    echo "  install-nginx-kind          alias: ink          Install Nginx Ingress Controller for kind to current cluster"
+    echo "  install-argocd-helm         alias: ia           Install ArgoCD with helm to current cluster"
+    echo "  install-app-nyancat         alias: nyan,cat     Install Nyan-cat ArgoCD application"
+    echo "  install-app-certmanager     alias: icm          Install Cert-manager ArgoCD application"
+    echo "  install-app-prometheus      alias: ip           Install Kube-prometheus-stack ArgoCD application"
+    echo "  install-app-kubeview        alias: ikv          Install Kubeview ArgoCD application"
+    echo "  install-app-opencost        alias: ioc          Install OpenCost ArgoCD application"
+    
     echo ""
     echo "dependencies: docker, kind, kubectl, jq, base64 and helm"
     echo ""
@@ -174,14 +177,14 @@ function get_cluster_parameter() {
         fi
     fi
 
-    read -p "Install Nginx Controller? (default: yes) (y/yes | n/no): " install_nginx_controller_new
+    read -p "Install Nginx Controller for kind? (default: yes) (y/yes | n/no): " install_nginx_controller_new
     if [ "$install_nginx_controller_new" == "yes" ] || [ "$install_nginx_controller_new" == "y" ] || [ "$install_nginx_controller_new" == "" ]; then
         install_nginx_controller="yes"
     else
         install_nginx_controller="no"
     fi
 
-    read -p "Install ArgoCD? (default: yes) (y/yes | n/no): " install_argocd_new
+    read -p "Install ArgoCD with helm? (default: yes) (y/yes | n/no): " install_argocd_new
     if [ "$install_argocd_new" == "yes" ] || [ "$install_argocd_new" == "y" ] || [ "$install_argocd_new" == "" ]; then
         install_argocd="yes"
     else
@@ -248,10 +251,10 @@ nodes:" >> $kind_config_file
     echo -en "$yellow\nWhich version of kubernetes?:"
     echo -en "$blue $kindk8sversion"
 
-    echo -en "$yellow\nInstall Nginx ingress controller?:"
+    echo -en "$yellow\nInstall Nginx ingress controller for kind?:"
     echo -en "$blue $install_nginx_controller"
 
-    echo -en "$yellow\nInstall ArgoCD?:"
+    echo -en "$yellow\nInstall ArgoCD with helm?:"
     echo -en "$blue $install_argocd"
 
     cluster_info_file=$(get_abs_filename "$configDir/clusterinfo-$cluster_name.txt")
@@ -289,22 +292,12 @@ ArgoCD admin GUI url: http://localhost:58080" >> $cluster_info_file
     fi
 }
 
-function install_argocd(){
-    echo -e "$yellow
-    Create ArgoCD namespace
-    "        
-    (kubectl create namespace argocd|| 
-    { 
-        echo -e "$red 
-        🛑 Could not namespace argocd in cluster ...
-        "
-        die
-    }) & spinner
-
+function install_argocd_helm(){
     echo -e "$yellow
     Installing ArgoCD
     "
-    (kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml|| 
+    helm repo add argo https://argoproj.github.io/argo-helm
+    (helm install argocd argo/argo-cd --namespace argocd --create-namespace|| 
     { 
         echo -e "$red 
         🛑 Could not install argocd into cluster  ...
@@ -324,24 +317,13 @@ function install_argocd(){
         die
     }) & spinner
 
-    # echo -e "$yellow
-    # Installing ArgoCD Ingress
-    # "
-    # (kubectl apply -n argocd -f $argocd_ingress_yaml|| 
-    # { 
-    #     echo -e "$red 
-    #     🛑 Could not install argocd ingress into cluster  ...
-    #     "
-    #     die
-    # }) & spinner
-
     echo -e "$yellow
     ✅ Done installing ArgoCD"
 }
 
-function install_nginx_controller(){
+function install_nginx_controller_for_kind(){
     echo -e "$yellow
-    Create Nginx Ingress Controller
+    Create Nginx Ingress Controller for kind
     "        
     (kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml|| 
     { 
@@ -352,7 +334,7 @@ function install_nginx_controller(){
     }) & spinner
 
     echo -e "$yellow
-    ⏰ Waiting for Nginx ingress controller to be ready
+    ⏰ Waiting for Nginx ingress controller for kind to be ready
     "
     sleep 7
     (kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s|| 
@@ -384,11 +366,11 @@ function create_cluster() {
     }) & spinner
 
     if [ "$install_nginx_controller" == "yes" ]; then
-        install_nginx_controller
+        install_nginx_controller_for_kind
     fi
 
     if [ "$install_argocd" == "yes" ]; then
-        install_argocd
+        install_argocd_helm
         argocd_password="$(kubectl get secrets -n argocd argocd-initial-admin-secret -o json | jq -r '.data.password' | base64 -d)"
 
         echo "ArgoCD:"
@@ -604,7 +586,7 @@ function get_kubeconfig() {
     echo -e "$yellow\nExample: $blue kubectl get nodes"
 }
 
-function install_cert_manager() {
+function install_cert_manager_application() {
     (kubectl apply -n argocd -f $cert_manager_yaml||
     { 
         echo -e "$red 
@@ -618,7 +600,7 @@ function install_cert_manager() {
     "
 }
 
-function install_kube_prometheus_stack() {
+function install_kube_prometheus_stack_application() {
     (kubectl apply -n argocd -f $kube_prometheus_stack_yaml||
     { 
         echo -e "$red 
@@ -638,7 +620,7 @@ function install_kube_prometheus_stack() {
     echo -e "$yellow\nPassword: prom-operator"
 }
 
-function install_kubeview() {
+function install_kubeview_application() {
     (kubectl apply -n argocd -f $kubeview_yaml||
     { 
         echo -e "$red 
@@ -655,7 +637,7 @@ function install_kubeview() {
     echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:59000"
 }
 
-function install_opencost() {
+function install_opencost_application() {
     echo -e "$yellow
     Installing OpenCost ArgoCD application
     "
@@ -687,33 +669,33 @@ while (($#)); do
             print_logo
             print_help
             exit;;
-        install-nyancat|nyan|cat) # install nyancat application
+        install-app-nyancat|nyan|cat) # install nyancat application
             print_logo
             install_nyancat_application
             exit;;
-        install-nginx|in) # install nginx controller
+        install-nginx-kind|ink) # install nginx controller
             print_logo
-            install_nginx_controller
+            install_nginx_controller_for_kind
             exit;;
-        install-opencost|ioc) # install nginx controller
+        install-app-opencost|ioc) # install nginx controller
             print_logo
-            install_opencost
+            install_opencost_application
             exit;;
         install-argocd|ia) # install argocd
             print_logo
-            install_argocd
+            install_argocd_helm
             exit;;
-        install-certmanager|icm) # install argocd
+        install-app-certmanager|icm) # install argocd
             print_logo
-            install_cert_manager
+            install_cert_manager_application
             exit;;
-        install-prometheus|ip) # install argocd
+        install-app-prometheus|ip) # install argocd
             print_logo
-            install_kube_prometheus_stack
+            install_kube_prometheus_stack_application
             exit;;
-        install-kubeview|ikv) # install argocd
+        install-app-kubeview|ikv) # install argocd
             print_logo
-            install_kubeview
+            install_kubeview_application
             exit;;
         details|dt) # see details of cluster
             print_logo
