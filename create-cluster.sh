@@ -825,7 +825,10 @@ perform_action() {
    esac
 }
 
-perform_action $*
-
-print_logo
-print_help
+if [ "$#" -eq 0 ]; then
+    print_logo
+    print_help
+    exit
+else
+    perform_action $*
+fi
