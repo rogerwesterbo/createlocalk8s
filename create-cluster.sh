@@ -787,7 +787,7 @@ perform_action() {
             install_helm_trivy
             exit;;
 
-        install-app-nyancat|iacat)
+        install-app-nyancat|iac)
             print_logo
             install_nyancat_application
             exit;;
