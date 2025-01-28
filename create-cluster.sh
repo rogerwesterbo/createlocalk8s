@@ -27,6 +27,7 @@ argocd_ingress_yaml=$(get_abs_filename "$configDir/argocd-ingress.yaml")
 cert_manager_yaml=$(get_abs_filename "$configDir/cert-manager.yaml")
 kubeview_yaml=$(get_abs_filename "$configDir/kubeview.yaml")
 trivy_app_yaml=$(get_abs_filename "$configDir/trivy-app.yaml")
+vault_app_yaml=$(get_abs_filename "$configDir/hashicorp-vault-app.yaml")
 metallb_app_yaml=$(get_abs_filename "$configDir/metallb-app.yaml")
 kube_prometheus_stack_yaml=$(get_abs_filename "$configDir/kube_prometheus_stack.yaml")
 cluster_info_file=$(get_abs_filename "$configDir/clusterinfo-$cluster_name.txt")
@@ -85,9 +86,10 @@ function print_help() {
     echo "  install-nginx-kind        alias: ink     Install Nginx Ingress Controller for kind to current cluster"    
     echo ""
     echo "Helm:"
-    echo "  install-helm-argocd       alias: iha     Install ArgoCD with helm to current cluster"
-    echo "  install-helm-metallb      alias: ihm     Install Metallb ArgoCD application"
-    echo "  install-helm-trivy        alias: iht     Install Trivy Operator ArgoCD application"
+    echo "  install-helm-argocd       alias: iha     Install ArgoCD with helm"
+    echo "  install-helm-metallb      alias: ihm     Install Metallb with helm"
+    echo "  install-helm-trivy        alias: iht     Install Trivy Operator with helm"
+    echo "  install-helm-vault        alias: ihv     Install Vault with helm"
     echo ""
     echo "ArgoCD Applications:"
     echo "  install-app-nyancat       alias: iac     Install Nyan-cat ArgoCD application"
@@ -97,7 +99,7 @@ function print_help() {
     echo "  install-app-opencost      alias: iaoc    Install OpenCost ArgoCD application"
     echo "  install-app-metallb       alias: iam     Install Metallb ArgoCD application"
     echo "  install-app-trivy         alias: iat     Install Trivy Operator ArgoCD application"
-    
+    echo "  install-app-vault         alias: iav     Install Hashicorp Vault ArgoCD application"
     echo ""
     echo "dependencies: docker, kind, kubectl, jq, base64 and helm"
     echo ""
@@ -146,11 +148,33 @@ function get_cluster_parameter() {
     prerequisites jq
     prerequisites base64
 
-    echo -e "$clear"
-    read -p "Enter the cluster name: (default: $cluster_name): " cluster_name_new
-    if [ ! -z $cluster_name_new ]; then
-        cluster_name=$cluster_name_new
+    if ! docker info > /dev/null 2>&1; then
+        echo -e "$red This script uses docker, and it isn't running - please start docker and try again!"
+        exit 1
     fi
+
+    clusterName=${@: -1}
+
+    if [[ "$#" -lt 2 ]]; then 
+        # echo "Missing name of cluster"; 
+        # exit 1
+        echo -e "$clear"
+        read -p "Enter the cluster name: (default: $cluster_name): " cluster_name_new
+        if [ ! -z $cluster_name_new ]; then
+            cluster_name=$cluster_name_new
+        fi
+    else
+        cluster_name=$clusterName
+    fi
+
+    if [[ "$#" -gt 2 ]]; then 
+        echo -e  "$red Too many arguments"; 
+        echo -e "$clear"
+        echo -e "$yellow Use the following command to create a cluster: $blue ./create-cluster.sh create|c <cluster-name>"
+        exit 1
+    fi
+
+    echo -e "Cluster name: $cluster_name"
 
     read -p "Enter number of control planes (default: 1): " controlplane_number_new 
     if [ ! -z $controlplane_number_new ]; then
@@ -350,6 +374,45 @@ function install_helm_trivy(){
     "
     helm repo add aqua https://aquasecurity.github.io/helm-charts/
     (  helm install trivy-operator aqua/trivy-operator --namespace trivy --create-namespace|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install Trivy-operator into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing Trivy-operator"
+}
+
+function install_helm_vault(){
+    echo -e "$yellow
+    Installing Hashicorp Vault with helm
+    "
+    
+    helm repo add hashicorp https://helm.releases.hashicorp.com
+    (  helm install vault hashicorp/vault --namespace vault --create-namespace|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install Hashicorp Vault into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing Hashicorp Vault"
+
+    unseal_vault
+
+    show_vault_after_installation
+}
+
+function install_vault_trivy(){
+    echo -e "$yellow
+    Installing Hashicorp Vault
+    "
+    
+    (  helm install vault https://helm.releases.hashicorp.com/vault --namespace vault --create-namespace|| 
     { 
         echo -e "$red 
         🛑 Could not install Trivy-operator into cluster  ...
@@ -737,6 +800,71 @@ function install_trivy_application() {
     echo "Trivy application installed: yes" >> $cluster_info_file
 }
 
+function install_vault_application() {
+    echo -e "$yellow
+    Installing Hashicorp Vault ArgoCD application
+    "
+    (kubectl apply -f $vault_app_yaml|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install Vault ArgoCD application into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing Vault ArgoCD application
+    "
+
+    unseal_vault
+
+    show_vault_after_installation
+}
+
+function show_vault_after_installation() {
+    echo -e "$yellow\nVaut is ready to use"
+    echo -e "$yellow\nTo access the Vault dashboard, type:$blue kubectl port-forward --namespace vault service/vault 8200:8200"
+    echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:8200"
+    echo -e "$yellow\nToken to use: $(jq -cr '.root_token' vault-init.json)"
+    echo -e ""
+}
+
+function unseal_vault() {
+    echo -e "$yellow\n ⏰ Waiting for vault to be running"
+    sleep 3
+    (kubectl wait --namespace vault --for=condition=PodReadyToStartContainers pod/vault-0 --timeout=90s|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install nginx ingress controller into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow\nUnsealing the vault"
+    (kubectl exec -i -n vault vault-0 -- vault operator init -format=json > vault-init.json|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install unseal the vault  ...
+        "
+        die
+    }) & spinner
+    echo -e "$clear"
+
+    echo -e "$yellow\nKeys to unseal the vault"
+    jq -cr '.unseal_keys_b64[]' vault-init.json
+
+    echo -e "$yellow\nRoot token"
+    jq -cr '.root_token' vault-init.json
+
+    echo -e "$yellow\n Unseal progress"
+    keys=$(jq -cr '.unseal_keys_b64[]' vault-init.json)
+    for i in $keys; do
+        echo "\nUnsealing vault with key: $i"
+        echo "kubectl exec -i -n vault vault-0 -- vault operator unseal $i"
+        kubectl exec -i -n vault vault-0 -- vault operator unseal "$i"
+    done
+}
+
 perform_action() {
     local action=$1
 
@@ -747,7 +875,7 @@ perform_action() {
             exit;;
         create|c)
             print_logo
-            get_cluster_parameter
+            get_cluster_parameter $*
             exit;;
         details|dt)
             print_logo
@@ -786,6 +914,10 @@ perform_action() {
             print_logo
             install_helm_trivy
             exit;;
+        install-helm-vault|ihv)
+            print_logo
+            install_helm_vault
+            exit;;
 
         install-app-nyancat|iac)
             print_logo
@@ -814,6 +946,10 @@ perform_action() {
         install-app-trivy|iat)
             print_logo
             install_trivy_application
+            exit;;
+        install-app-vault|iav)
+            print_logo
+            install_vault_application
             exit;;
         
         *) # Invalid option

@@ -1,3 +1,5 @@
 config/configkind.yaml
 config/clusterinfo-*.txt
 config/configkind-*.yaml
+vault-init.json
+kubeconfig-*.config
