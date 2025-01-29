@@ -28,6 +28,7 @@ kubeview_yaml=$(get_abs_filename "$configDir/kubeview.yaml")
 trivy_app_yaml=$(get_abs_filename "$configDir/trivy-app.yaml")
 vault_app_yaml=$(get_abs_filename "$configDir/hashicorp-vault-app.yaml")
 metallb_app_yaml=$(get_abs_filename "$configDir/metallb-app.yaml")
+falco_app_yaml=$(get_abs_filename "$configDir/falco-app.yaml")
 kube_prometheus_stack_yaml=$(get_abs_filename "$configDir/kube_prometheus_stack.yaml")
 cluster_info_file=$(get_abs_filename "$configDir/clusterinfo-$cluster_name.txt")
 argocd_password=""
@@ -86,6 +87,7 @@ function print_help() {
     echo ""
     echo "Helm:"
     echo "  install-helm-argocd       alias: iha     Install ArgoCD with helm"
+    echo "  install-helm-falco        alias: ihf     Install Falco with helm"
     echo "  install-helm-metallb      alias: ihm     Install Metallb with helm"
     echo "  install-helm-trivy        alias: iht     Install Trivy Operator with helm"
     echo "  install-helm-vault        alias: ihv     Install Vault with helm"
@@ -93,6 +95,7 @@ function print_help() {
     echo "ArgoCD Applications:"
     echo "  install-app-nyancat       alias: iac     Install Nyan-cat ArgoCD application"
     echo "  install-app-certmanager   alias: iacm    Install Cert-manager ArgoCD application"
+    echo "  install-app-falco         alias: iaf     Install Falco ArgoCD application"
     echo "  install-app-prometheus    alias: iap     Install Kube-prometheus-stack ArgoCD application"
     echo "  install-app-kubeview      alias: iakv    Install Kubeview ArgoCD application"
     echo "  install-app-opencost      alias: iaoc    Install OpenCost ArgoCD application"
@@ -372,7 +375,7 @@ function install_helm_trivy(){
     Installing Trivy-operator
     "
     helm repo add aqua https://aquasecurity.github.io/helm-charts/
-    (  helm install trivy-operator aqua/trivy-operator --namespace trivy --create-namespace|| 
+    (helm install trivy-operator aqua/trivy-operator --namespace trivy --create-namespace|| 
     { 
         echo -e "$red 
         🛑 Could not install Trivy-operator into cluster  ...
@@ -382,6 +385,26 @@ function install_helm_trivy(){
 
     echo -e "$yellow
     ✅ Done installing Trivy-operator"
+}
+
+function install_helm_falco(){
+    echo -e "$yellow
+    Installing Falco
+    "
+    helm repo add falcosecurity https://falcosecurity.github.io/charts
+
+    (helm install falco falcosecurity/falco --namespace falco --create-namespace --set tty=true --set falcosidekick.enabled=true --set falcosidekick.webui.enabled=true --set falcosidekick.config.webhook.address=http://falco-talon:2803|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install Falco into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing Falco"
+
+    post_falco_installation
 }
 
 function install_helm_vault(){
@@ -799,6 +822,27 @@ function install_trivy_application() {
     echo "Trivy application installed: yes" >> $cluster_info_file
 }
 
+function install_falco_application() {
+    echo -e "$yellow
+    Installing Falco ArgoCD application
+    "
+    (kubectl apply -f $falco_app_yaml|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install Falco ArgoCD application into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing Falco ArgoCD application
+    "
+
+    echo "Falco application installed: yes" >> $cluster_info_file
+
+    post_falco_installation
+}
+
 function install_vault_application() {
     echo -e "$yellow
     Installing Hashicorp Vault ArgoCD application
@@ -826,6 +870,28 @@ function show_vault_after_installation() {
     echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:8200"
     echo -e "$yellow\nToken to use: $(jq -cr '.root_token' vault-init.json)"
     echo -e ""
+}
+
+function post_falco_installation() {
+    echo -e "$yellow\n ⏰ Waiting for Falco to be running"
+    sleep 3
+    (kubectl wait pods --for=condition=Ready --all -n falco --timeout=120s|| 
+    { 
+        echo -e "$red 
+        🛑 Falco is not running, and is not ready to use ...
+        "
+        die
+    }) & spinner
+
+
+    echo -e "$yellow\nFalco is ready to use"
+    echo -e "$yellow\nTo access the Falco dashboard, type:$blue kubectl port-forward --namespace falco services/falco-falcosidekick-ui 2802:2802"
+    echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:2803"
+    echo -e "$yellow\nDefault credentials: admin/admin"
+    echo ""
+    echo -e "$yellow\nTrigger an event to test Falco by executing: $blue kubectl exec -it -n falco pods/<a pod name> -- /bin/bash"
+    echo -e "$yellow\nCheck the logs by executing:$blue kubectl logs -n falco -l app.kubernetes.io/name=falco"
+    echo -e "$yellow\nOr check the dashboard at: http://localhost:2803"
 }
 
 function unseal_vault() {
@@ -917,6 +983,10 @@ perform_action() {
             print_logo
             install_helm_vault
             exit;;
+        install-helm-falco|ihf)
+            print_logo
+            install_helm_falco
+            exit;;
 
         install-app-nyancat|iac)
             print_logo
@@ -941,6 +1011,10 @@ perform_action() {
         install-app-metallb|iam)
             print_logo
             install_metallb_application
+            exit;;
+        install-app-falco|iaf)
+            print_logo
+            install_falco_application
             exit;;
         install-app-trivy|iat)
             print_logo
