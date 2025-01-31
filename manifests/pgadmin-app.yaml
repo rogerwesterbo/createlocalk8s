@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pgadmin
+  namespace: argocd
+spec:
+  destination:
+    namespace: pgadmin
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: pgadmin4
+    repoURL: https://helm.runix.net
+    targetRevision: '*'
+    # helm:
+    #   parameters:
+    #     - name: env.password
+    #       value: SuperSecret
+    #     - name: env.username
+    #       value: pg@pg.io
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

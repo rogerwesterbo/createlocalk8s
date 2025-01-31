@@ -11,26 +11,30 @@ function die () {
 
 # global variables
 scriptDir=$(dirname -- "$(readlink -f -- "$BASH_SOURCE")")
-configDir=$(get_abs_filename "$scriptDir/config")
+manifestDir=$(get_abs_filename "$scriptDir/manifests")
+clustersDir=$(get_abs_filename "$scriptDir/clusters")
 cluster_name="testcluster"
 worker_number=0
 controlplane_number=1
 install_nginx_controller="yes"
 install_argocd="yes"
-kind_config_path=$(get_abs_filename "$configDir/kindconfig.yaml")
-kind_config_template_path=$(get_abs_filename "$configDir/kindconfig-template.yaml")
-kind_config_file=$(get_abs_filename "$configDir/configkind-$cluster_name.yaml")
-nyancat_argo_app_yaml=$(get_abs_filename "$configDir/nyancat-argo-app.yaml")
-opencost_argo_app_yaml=$(get_abs_filename "$configDir/opencost-app.yaml")
-argocd_ingress_yaml=$(get_abs_filename "$configDir/argocd-ingress.yaml")
-cert_manager_yaml=$(get_abs_filename "$configDir/cert-manager.yaml")
-kubeview_yaml=$(get_abs_filename "$configDir/kubeview.yaml")
-trivy_app_yaml=$(get_abs_filename "$configDir/trivy-app.yaml")
-vault_app_yaml=$(get_abs_filename "$configDir/hashicorp-vault-app.yaml")
-metallb_app_yaml=$(get_abs_filename "$configDir/metallb-app.yaml")
-falco_app_yaml=$(get_abs_filename "$configDir/falco-app.yaml")
-kube_prometheus_stack_yaml=$(get_abs_filename "$configDir/kube_prometheus_stack.yaml")
-cluster_info_file=$(get_abs_filename "$configDir/clusterinfo-$cluster_name.txt")
+kind_config_path=$(get_abs_filename "$manifestDir/kindconfig.yaml")
+kind_config_template_path=$(get_abs_filename "$manifestDir/kindconfig-template.yaml")
+kind_config_file=$(get_abs_filename "$clustersDir/configkind-$cluster_name.yaml")
+nyancat_argo_app_yaml=$(get_abs_filename "$manifestDir/nyancat-argo-app.yaml")
+opencost_argo_app_yaml=$(get_abs_filename "$manifestDir/opencost-app.yaml")
+argocd_ingress_yaml=$(get_abs_filename "$manifestDir/argocd-ingress.yaml")
+cert_manager_yaml=$(get_abs_filename "$manifestDir/cert-manager.yaml")
+kubeview_yaml=$(get_abs_filename "$manifestDir/kubeview.yaml")
+trivy_app_yaml=$(get_abs_filename "$manifestDir/trivy-app.yaml")
+vault_app_yaml=$(get_abs_filename "$manifestDir/hashicorp-vault-app.yaml")
+metallb_app_yaml=$(get_abs_filename "$manifestDir/metallb-app.yaml")
+falco_app_yaml=$(get_abs_filename "$manifestDir/falco-app.yaml")
+kube_prometheus_stack_yaml=$(get_abs_filename "$manifestDir/kube_prometheus_stack.yaml")
+cnpg_app_yaml=$(get_abs_filename "$manifestDir/cnpg-app.yaml")
+cnpg_cluster_app_yaml=$(get_abs_filename "$manifestDir/cnpg-cluster-app.yaml")
+pgadmin_app_yaml=$(get_abs_filename "$manifestDir/pgadmin-app.yaml")
+cluster_info_file=$(get_abs_filename "$clustersDir/clusterinfo-$cluster_name.txt")
 argocd_password=""
 
 declare -a kindk8sversions=(
@@ -89,16 +93,20 @@ function print_help() {
     echo "  install-helm-argocd       alias: iha     Install ArgoCD with helm"
     echo "  install-helm-falco        alias: ihf     Install Falco with helm"
     echo "  install-helm-metallb      alias: ihm     Install Metallb with helm"
+    echo "  install-helm-postgres     alias: ihp     Install Cloud Native Postgres Operator with helm"
+    echo "  install-helm-pgadmin      alias: ihpa    Install PgAdmin4 with helm"
     echo "  install-helm-trivy        alias: iht     Install Trivy Operator with helm"
     echo "  install-helm-vault        alias: ihv     Install Vault with helm"
     echo ""
     echo "ArgoCD Applications:"
-    echo "  install-app-nyancat       alias: iac     Install Nyan-cat ArgoCD application"
     echo "  install-app-certmanager   alias: iacm    Install Cert-manager ArgoCD application"
     echo "  install-app-falco         alias: iaf     Install Falco ArgoCD application"
-    echo "  install-app-prometheus    alias: iap     Install Kube-prometheus-stack ArgoCD application"
     echo "  install-app-kubeview      alias: iakv    Install Kubeview ArgoCD application"
+    echo "  install-app-nyancat       alias: iac     Install Nyan-cat ArgoCD application"
     echo "  install-app-opencost      alias: iaoc    Install OpenCost ArgoCD application"
+    echo "  install-app-postgres      alias: iapg    Install Cloud Native Postgres Operator ArgoCD application"
+    echo "  install-app-pgadmin       alias: iapga   Install PgAdmin4 ArgoCD application"
+    echo "  install-app-prometheus    alias: iap     Install Kube-prometheus-stack ArgoCD application"
     echo "  install-app-metallb       alias: iam     Install Metallb ArgoCD application"
     echo "  install-app-trivy         alias: iat     Install Trivy Operator ArgoCD application"
     echo "  install-app-vault         alias: iav     Install Hashicorp Vault ArgoCD application"
@@ -156,10 +164,7 @@ function get_cluster_parameter() {
     fi
 
     clusterName=${@: -1}
-
     if [[ "$#" -lt 2 ]]; then 
-        # echo "Missing name of cluster"; 
-        # exit 1
         echo -e "$clear"
         read -p "Enter the cluster name: (default: $cluster_name): " cluster_name_new
         if [ ! -z $cluster_name_new ]; then
@@ -223,8 +228,10 @@ function get_cluster_parameter() {
         install_argocd="no"
     fi
 
-    kind_config_file=$(get_abs_filename "$configDir/configkind-$cluster_name.yaml")
-    if [ -f "$kind_config_file" ]; then
+    kind_config_file=$(get_abs_filename "$clustersDir/configkind-$cluster_name.yaml")
+    if [ -e "$kind_config_file" ] && [ -r "$kind_config_file" ] && [ -w "$kind_config_file" ]; then
+
+    #if [ -f "$kind_config_file" ]; then
         truncate -s 0 "$kind_config_file"
     fi
 
@@ -289,9 +296,9 @@ nodes:" >> $kind_config_file
     echo -en "$yellow\nInstall ArgoCD with helm?:"
     echo -en "$blue $install_argocd"
 
-    cluster_info_file=$(get_abs_filename "$configDir/clusterinfo-$cluster_name.txt")
-
-    if [ -f "$cluster_info_file" ]; then
+    cluster_info_file=$(get_abs_filename "$clustersDir/clusterinfo-$cluster_name.txt")
+    ##if [ -f "$cluster_info_file" ]; then
+    if [ -e "$cluster_info_file" ] && [ -r "$cluster_info_file" ] && [ -w "$cluster_info_file" ]; then
         truncate -s 0 "$cluster_info_file"
     fi
 
@@ -413,7 +420,7 @@ function install_helm_vault(){
     "
     
     helm repo add hashicorp https://helm.releases.hashicorp.com
-    (  helm install vault hashicorp/vault --namespace vault --create-namespace|| 
+    (helm install vault hashicorp/vault --namespace vault --create-namespace|| 
     { 
         echo -e "$red 
         🛑 Could not install Hashicorp Vault into cluster  ...
@@ -427,6 +434,67 @@ function install_helm_vault(){
     unseal_vault
 
     show_vault_after_installation
+}
+
+function install_helm_postgres(){
+    echo -e "$yellow
+    Installing Cloud Native Postgres Operator with helm
+    "
+    
+    helm repo add cnpg https://cloudnative-pg.github.io/charts
+    (helm upgrade --install postgres-operator \
+  --namespace postgres-operator \
+  --create-namespace \
+  cnpg/cloudnative-pg|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install Postgres Operator into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing Postgres Operator"
+
+    echo -e "$yellow
+    Installing Postgres Cluster with helm
+    "
+    
+    helm repo add cnpg https://cloudnative-pg.github.io/charts
+    (helm upgrade --install postgres-cluster \
+  --namespace postgres-cluster \
+  --create-namespace \
+  cnpg/cluster --set name=postgres-cluster --set version=17 --set instances=3 --set cluster.storage.size=3Gi|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install Postgres Cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing Postgres Cluster"
+
+    post_postgres_installation
+}
+
+function install_helm_pgadmin(){
+    echo -e "$yellow
+    Installing PgAdmin4 with helm
+    "
+    helm repo add runix https://helm.runix.net
+    (helm install pgadmin runix/pgadmin4 --namespace pgadmin --create-namespace || 
+    { 
+        echo -e "$red 
+        🛑 Could not install PgAdmin4 into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing PgAdmin4"
+
+    post_pgadmin_install
 }
 
 function install_vault_trivy(){
@@ -700,7 +768,7 @@ function get_kubeconfig() {
         exit 1
     fi
 
-    echo "$(kind get kubeconfig --name $clusterName)" > kubeconfig-$clusterName.config
+    echo "$(kind get kubeconfig --name $clusterName)" > $clustersDir/kubeconfig-$clusterName.config
 
     echo -e "$yellow\nKubeconfig saved to kubeconfig-$clusterName.config"
     echo -e "$clear"
@@ -864,11 +932,120 @@ function install_vault_application() {
     show_vault_after_installation
 }
 
+function install_postgres_application() {
+    echo -e "$yellow
+    Installing Postgres ArgoCD application
+    "
+    (kubectl apply -f $cnpg_app_yaml|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install Cloud Native Postgres ArgoCD application into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing Cloud Native Postgres ArgoCD application
+    "
+
+    echo -e "$yellow\n ⏰ Waiting for Cloud Native Postgres to be running"
+    sleep 6
+    (kubectl wait --namespace postgres-operator --for=condition=ready pod --selector=app.kubernetes.io/name=cloudnative-pg --timeout=120s|| 
+    { 
+        echo -e "$red 
+        🛑 Postgres Operator is not running, and is not ready to use ...
+        "
+        die
+    }) & spinner
+    echo -e "$yellow\nPostgres Operator is ready to use"
+
+    (kubectl apply -f $cnpg_cluster_app_yaml|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install Cloud Native Postgres Cluster ArgoCD application into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing Cloud Native Postgres Cluster ArgoCD application
+    "
+    sleep 6
+    (kubectl wait pods --for=condition=Ready --all -n postgres-cluster --timeout=120s|| 
+    { 
+        echo -e "$red 
+        🛑 Postgres Cluster is not running, and is not ready to use ...
+        "
+        die
+    }) & spinner
+    echo -e "$yellow\nPostgres Cluster is ready to use"
+
+    post_postgres_installation
+}
+
+function install_pgadmin_application() {
+    echo -e "$yellow
+    Installing PgAdmin4 ArgoCD application
+    "
+    (kubectl apply -f $pgadmin_app_yaml|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install PgAdmin4 ArgoCD application into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing PgAdmin4 ArgoCD application
+    "
+
+    post_pgadmin_install
+}
+
+function post_pgadmin_install() {
+    echo -e "$yellow\n ⏰ Waiting for Pgadmin4 to be running"
+    sleep 3
+    (kubectl wait pods --for=condition=Ready --all -n pgadmin --timeout=120s|| 
+    { 
+        echo -e "$red 
+        🛑 Falco is not running, and is not ready to use ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    PgAdmin4 is ready to use
+    "
+    echo -e "$yellow
+    PgAdmin4 admin GUI portforwarding:$blue kubectl port-forward -n pgadmin services/pgadmin-pgadmin4 5050:80
+    PgAdmin4 admin GUI url: http://localhost:5050
+    "
+    echo -e "$yellow
+    PgAdmin4 username: chart@domain.com
+    PgAdmin4 password: SuperSecret
+    "
+
+    echo -e "$yellow
+    Get available services by typing$blue kubectl get services -A
+    Use the ip to the service when connecting to the postgres instance 
+    "
+}
+
 function show_vault_after_installation() {
     echo -e "$yellow\nVaut is ready to use"
     echo -e "$yellow\nTo access the Vault dashboard, type:$blue kubectl port-forward --namespace vault service/vault 8200:8200"
     echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:8200"
     echo -e "$yellow\nToken to use: $(jq -cr '.root_token' vault-init.json)"
+    echo -e ""
+}
+
+function post_postgres_installation() {    
+    echo -e "$yellow\n Port forward to access the database:$blue kubectl port-forward -n postgres-cluster services/postgres-cluster-rw 5432:5432"
+    echo -e "$yellow\n Use your favorite database client to connect to the database"
+    echo -e "$yellow User: postgres"
+    postgres_password=$(kubectl get secrets -n postgres-cluster postgres-cluster-superuser -o json | jq -r '.data.password' | base64 -d)
+    echo -e "$yellow Password: $postgres_password"
+    echo -e "$yellow\n Example:$blue pgcli -h localhost -U postgres -p 5432"
     echo -e ""
 }
 
@@ -882,7 +1059,6 @@ function post_falco_installation() {
         "
         die
     }) & spinner
-
 
     echo -e "$yellow\nFalco is ready to use"
     echo -e "$yellow\nTo access the Falco dashboard, type:$blue kubectl port-forward --namespace falco services/falco-falcosidekick-ui 2802:2802"
@@ -943,19 +1119,15 @@ perform_action() {
             get_cluster_parameter $*
             exit;;
         details|dt)
-            print_logo
             see_details_of_cluster
             exit;;
         info|i)
-            print_logo
             details_for_cluster $*
             exit;;
         delete|d)
-            print_logo
             delete_cluster $*
             exit;;
         list|ls)
-            print_logo
             list_clusters $*
             exit;;
         kubeconfig|kc)
@@ -963,69 +1135,72 @@ perform_action() {
             exit;;
         
         install-nginx-kind|ink)
-            print_logo
             install_nginx_controller_for_kind
             exit;;
         
         install-helm-argocd|iha)
-            print_logo
             install_helm_argocd
             exit;;
         install-helm-metallb|iha)
-            print_logo
             install_helm_metallb
             exit;;
         install-helm-trivy|iht)
-            print_logo
             install_helm_trivy
             exit;;
         install-helm-vault|ihv)
-            print_logo
             install_helm_vault
             exit;;
         install-helm-falco|ihf)
-            print_logo
             install_helm_falco
+            exit;;
+        install-helm-postgres|ihpg)
+            install_helm_postgres
+            exit;;
+        install-helm-postgres-ui|ihpgu)
+            install_helm_postgres_ui
+            exit;;
+        install-helm-pgadmin|ihpga)
+            install_helm_pgadmin
             exit;;
 
         install-app-nyancat|iac)
-            print_logo
             install_nyancat_application
             exit;;
         install-app-certmanager|iacm)
-            print_logo
             install_cert_manager_application
             exit;;
         install-app-prometheus|iap)
-            print_logo
             install_kube_prometheus_stack_application
             exit;;
         install-app-kubeview|iakv)
-            print_logo
             install_kubeview_application
             exit;;
         install-app-opencost|iaoc)
-            print_logo
             install_opencost_application
             exit;;
         install-app-metallb|iam)
-            print_logo
             install_metallb_application
             exit;;
         install-app-falco|iaf)
-            print_logo
             install_falco_application
             exit;;
         install-app-trivy|iat)
-            print_logo
             install_trivy_application
             exit;;
         install-app-vault|iav)
-            print_logo
             install_vault_application
             exit;;
-        
+        install-app-postgres|iapg)
+            install_postgres_application
+            exit;;
+        install-app-postgres-ui|iapgu)
+            install_postgres_ui_application
+            exit;;
+        install-app-pgadmin|iapga)
+            install_pgadmin_application
+            exit;;
         *) # Invalid option
+            print_logo
             echo -e "$red
             Error: Invalid option
             $clear

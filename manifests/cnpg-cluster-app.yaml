@@ -1,0 +1,39 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: postgres-cluster
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '1'
+spec:
+  destination:
+    namespace: postgres-cluster
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: cluster
+    repoURL: https://cloudnative-pg.github.io/charts
+    targetRevision: '*'
+    helm:
+      parameters:
+        - name: type
+          value: postgresql
+        - name: mode
+          value: standalone
+        - name: name
+          value: postgres-cluster
+        - name: cluster.instances
+          value: '3'
+        - name: cluster.storage.size
+          value: '3Gi'
+        - name: cluster.backup.enabled
+          value: 'false'
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
