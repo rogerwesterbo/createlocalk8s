@@ -93,7 +93,7 @@ function print_help() {
     echo "  install-helm-argocd       alias: iha     Install ArgoCD with helm"
     echo "  install-helm-falco        alias: ihf     Install Falco with helm"
     echo "  install-helm-metallb      alias: ihm     Install Metallb with helm"
-    echo "  install-helm-postgres     alias: ihp     Install Cloud Native Postgres Operator with helm"
+    echo "  install-helm-postgres     alias: ihpg    Install Cloud Native Postgres Operator with helm"
     echo "  install-helm-pgadmin      alias: ihpa    Install PgAdmin4 with helm"
     echo "  install-helm-trivy        alias: iht     Install Trivy Operator with helm"
     echo "  install-helm-vault        alias: ihv     Install Vault with helm"
@@ -464,7 +464,7 @@ function install_helm_postgres(){
     (helm upgrade --install postgres-cluster \
   --namespace postgres-cluster \
   --create-namespace \
-  cnpg/cluster --set name=postgres-cluster --set version=17 --set instances=3 --set cluster.storage.size=3Gi|| 
+  cnpg/cluster --set name=postgres-cluster --set cluster.instances='3' --set cluster.storage.size=3Gi|| 
     { 
         echo -e "$red 
         🛑 Could not install Postgres Cluster  ...
@@ -1156,9 +1156,6 @@ perform_action() {
         install-helm-postgres|ihpg)
             install_helm_postgres
             exit;;
-        install-helm-postgres-ui|ihpgu)
-            install_helm_postgres_ui
-            exit;;
         install-helm-pgadmin|ihpga)
             install_helm_pgadmin
             exit;;
@@ -1192,9 +1189,6 @@ perform_action() {
             exit;;
         install-app-postgres|iapg)
             install_postgres_application
-            exit;;
-        install-app-postgres-ui|iapgu)
-            install_postgres_ui_application
             exit;;
         install-app-pgadmin|iapga)
             install_pgadmin_application
