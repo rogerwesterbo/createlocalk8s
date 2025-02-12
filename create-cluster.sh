@@ -29,6 +29,7 @@ kubeview_yaml=$(get_abs_filename "$manifestDir/kubeview.yaml")
 trivy_app_yaml=$(get_abs_filename "$manifestDir/trivy-app.yaml")
 vault_app_yaml=$(get_abs_filename "$manifestDir/hashicorp-vault-app.yaml")
 metallb_app_yaml=$(get_abs_filename "$manifestDir/metallb-app.yaml")
+mongodb_app_yaml=$(get_abs_filename "$manifestDir/mongodb-app.yaml")
 falco_app_yaml=$(get_abs_filename "$manifestDir/falco-app.yaml")
 kube_prometheus_stack_yaml=$(get_abs_filename "$manifestDir/kube_prometheus_stack.yaml")
 cnpg_app_yaml=$(get_abs_filename "$manifestDir/cnpg-app.yaml")
@@ -93,6 +94,7 @@ function print_help() {
     echo "  install-helm-argocd       alias: iha     Install ArgoCD with helm"
     echo "  install-helm-falco        alias: ihf     Install Falco with helm"
     echo "  install-helm-metallb      alias: ihm     Install Metallb with helm"
+    echo "  install-helm-mongodb      alias: ihmdb   Install Mongodb with helm"
     echo "  install-helm-postgres     alias: ihpg    Install Cloud Native Postgres Operator with helm"
     echo "  install-helm-pgadmin      alias: ihpa    Install PgAdmin4 with helm"
     echo "  install-helm-trivy        alias: iht     Install Trivy Operator with helm"
@@ -103,6 +105,7 @@ function print_help() {
     echo "  install-app-falco         alias: iaf     Install Falco ArgoCD application"
     echo "  install-app-kubeview      alias: iakv    Install Kubeview ArgoCD application"
     echo "  install-app-nyancat       alias: iac     Install Nyan-cat ArgoCD application"
+    echo "  install-app-mongodb       alias: iamdb   Install Mongodb ArgoCD application"
     echo "  install-app-opencost      alias: iaoc    Install OpenCost ArgoCD application"
     echo "  install-app-postgres      alias: iapg    Install Cloud Native Postgres Operator ArgoCD application"
     echo "  install-app-pgadmin       alias: iapga   Install PgAdmin4 ArgoCD application"
@@ -347,7 +350,7 @@ function install_helm_argocd(){
     echo -e "$yellow
     ⏰ Waiting for ArgoCD to be ready
     "
-    sleep 7
+    sleep 10
     (kubectl wait --namespace argocd --for=condition=ready pod --selector=app.kubernetes.io/name=argocd-server --timeout=90s|| 
     { 
         echo -e "$red 
@@ -434,6 +437,36 @@ function install_helm_vault(){
     unseal_vault
 
     show_vault_after_installation
+}
+
+function install_helm_mongodb(){
+    echo -e "$yellow
+    Installing Mongodb with helm
+    "
+    
+    helm repo add bitnami https://charts.bitnami.com/bitnami
+    (helm install mongodb bitnami/mongodb --namespace mongodb --create-namespace --values "$manifestDir/mongodb-values.yaml"|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install Mongodb into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing Mongodb"
+
+    echo -e "$yellow\n ⏰ Waiting for Mongodb to be running"
+    sleep 10
+    (kubectl wait pods --for=condition=Ready --all -n mongodb --timeout=120s|| 
+    { 
+        echo -e "$red 
+        🛑 Mongodb is not running, and is not ready to use ...
+        "
+        die
+    }) & spinner
+
+    show_mongodb_after_installation
 }
 
 function install_helm_postgres(){
@@ -529,7 +562,7 @@ function install_nginx_controller_for_kind(){
     echo -e "$yellow
     ⏰ Waiting for Nginx ingress controller for kind to be ready
     "
-    sleep 7
+    sleep 10
     (kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s|| 
     { 
         echo -e "$red 
@@ -949,7 +982,7 @@ function install_postgres_application() {
     "
 
     echo -e "$yellow\n ⏰ Waiting for Cloud Native Postgres to be running"
-    sleep 6
+    sleep 10
     (kubectl wait --namespace postgres-operator --for=condition=ready pod --selector=app.kubernetes.io/name=cloudnative-pg --timeout=120s|| 
     { 
         echo -e "$red 
@@ -970,7 +1003,7 @@ function install_postgres_application() {
     echo -e "$yellow
     ✅ Done installing Cloud Native Postgres Cluster ArgoCD application
     "
-    sleep 6
+    sleep 10
     (kubectl wait pods --for=condition=Ready --all -n postgres-cluster --timeout=120s|| 
     { 
         echo -e "$red 
@@ -1002,9 +1035,40 @@ function install_pgadmin_application() {
     post_pgadmin_install
 }
 
+function install_mongodb_application() {
+    echo -e "$yellow
+    Installing Mongodb ArgoCD application
+    "
+    (kubectl apply -f $mongodb_app_yaml|| 
+    { 
+        echo -e "$red 
+        🛑 Could not install Mongodb ArgoCD application into cluster  ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow
+    ✅ Done installing Mongodb ArgoCD application
+    "
+
+    echo -e "$yellow\n ⏰ Waiting for Mongodb to be running"
+    sleep 10
+    (kubectl wait pods --for=condition=Ready --all -n mongodb --timeout=120s|| 
+    { 
+        echo -e "$red 
+        🛑 Mongodb is not running, and is not ready to use ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow\nMongodb is ready to use"
+
+    show_mongodb_after_installation
+}
+
 function post_pgadmin_install() {
     echo -e "$yellow\n ⏰ Waiting for Pgadmin4 to be running"
-    sleep 3
+    sleep 10
     (kubectl wait pods --for=condition=Ready --all -n pgadmin --timeout=120s|| 
     { 
         echo -e "$red 
@@ -1051,7 +1115,7 @@ function post_postgres_installation() {
 
 function post_falco_installation() {
     echo -e "$yellow\n ⏰ Waiting for Falco to be running"
-    sleep 3
+    sleep 10
     (kubectl wait pods --for=condition=Ready --all -n falco --timeout=120s|| 
     { 
         echo -e "$red 
@@ -1072,7 +1136,7 @@ function post_falco_installation() {
 
 function unseal_vault() {
     echo -e "$yellow\n ⏰ Waiting for vault to be running"
-    sleep 3
+    sleep 10
     (kubectl wait --namespace vault --for=condition=PodReadyToStartContainers pod/vault-0 --timeout=90s|| 
     { 
         echo -e "$red 
@@ -1104,6 +1168,17 @@ function unseal_vault() {
         echo "kubectl exec -i -n vault vault-0 -- vault operator unseal $i"
         kubectl exec -i -n vault vault-0 -- vault operator unseal "$i"
     done
+}
+
+function show_mongodb_after_installation() {
+    echo -e "$yellow\nMongodb is ready to use"
+    echo -e "$yellow\nTo access the Mongodb dashboard, type:$blue kubectl port-forward --namespace mongodb service/mongodb 27017:27017"
+    echo -e "$yellow\nUse mongosh to connect to the database"
+    echo -e "$yellow\nExample:$blue mongosh mongodb://localhost:27017"
+    echo -e "$yellow\nOr with credentials:$blue mongosh mongodb://root:SuperSecret@localhost:27017"
+    echo -e "$yellow\nUsername: root"
+    echo -e "$yellow\nPassword: SuperSecret"
+    echo -e "$clear"
 }
 
 perform_action() {
@@ -1144,6 +1219,9 @@ perform_action() {
         install-helm-metallb|iha)
             install_helm_metallb
             exit;;
+        install-helm-mongodb|ihmdb)
+            install_helm_mongodb
+            exit;;
         install-helm-trivy|iht)
             install_helm_trivy
             exit;;
@@ -1177,6 +1255,9 @@ perform_action() {
             exit;;
         install-app-metallb|iam)
             install_metallb_application
+            exit;;
+        install-app-mongodb|iamdb)
+            install_mongodb_application
             exit;;
         install-app-falco|iaf)
             install_falco_application

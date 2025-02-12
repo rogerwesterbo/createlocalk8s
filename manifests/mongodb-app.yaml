@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mongodb
+  namespace: argocd
+spec:
+  destination:
+    namespace: mongodb
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: mongodb
+    repoURL: registry-1.docker.io/bitnamicharts
+    targetRevision: '*'
+    helm:
+      values: |
+        architecture: standalone
+        image:
+          repository: mongo
+          tag: 8
+          registry: docker.io
+        extraEnvVars:
+          - name: MONGO_INITDB_ROOT_USERNAME
+            value: root
+          - name: MONGO_INITDB_ROOT_PASSWORD
+            value: SuperSecret
+          - name: MONGO_INITDB_DATABASE
+            value: test
+        externalAccess:
+          enabled: true
+          service:
+            type: LoadBalancer
+          autoDiscovery:
+            enabled: true
+        serviceAccount:
+          create: true
+        automountServiceAccountToken: true
+        rbac:
+          create: true
+        enableJournal: false
+        persistence:
+          enabled: true
+          size: 10Gi
+          mountPath: /data/db
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

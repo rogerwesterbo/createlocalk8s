@@ -1,0 +1,28 @@
+architecture: standalone
+image:
+  repository: mongo
+  tag: 8
+  registry: docker.io
+extraEnvVars:
+  - name: MONGO_INITDB_ROOT_USERNAME
+    value: root
+  - name: MONGO_INITDB_ROOT_PASSWORD
+    value: SuperSecret
+  - name: MONGO_INITDB_DATABASE
+    value: test
+externalAccess:
+  enabled: true
+  service:
+    type: LoadBalancer
+  autoDiscovery:
+    enabled: true
+serviceAccount:
+  create: true
+automountServiceAccountToken: true
+rbac:
+  create: true
+enableJournal: false
+persistence:
+  enabled: true
+  size: 10Gi
+  mountPath: /data/db
