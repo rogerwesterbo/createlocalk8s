@@ -12,9 +12,27 @@ spec:
     repoURL: https://github.com/rogerwesterbo/nyan-cat.git
     targetRevision: HEAD
     path: charts/nyan-cat
+    helm:
+      values: |
+        ingress:
+          enabled: true
+          className: 'nginx'
+          annotations:
+            kubernetes.io/ingress.class: nginx
+            nginx.ingress.kubernetes.io/rewrite-target: /
+            # kubernetes.io/ingress.class: nginx
+            # kubernetes.io/tls-acme: "true"
+          hosts:
+            - host: nyancat.localtest.me
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls: []
+
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true

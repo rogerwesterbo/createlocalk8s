@@ -34,6 +34,7 @@ falco_app_yaml=$(get_abs_filename "$manifestDir/falco-app.yaml")
 kube_prometheus_stack_yaml=$(get_abs_filename "$manifestDir/kube_prometheus_stack.yaml")
 cnpg_app_yaml=$(get_abs_filename "$manifestDir/cnpg-app.yaml")
 cnpg_cluster_app_yaml=$(get_abs_filename "$manifestDir/cnpg-cluster-app.yaml")
+core_dns_yaml=$(get_abs_filename "$manifestDir/core-dns.yaml")
 pgadmin_app_yaml=$(get_abs_filename "$manifestDir/pgadmin-app.yaml")
 cluster_info_file=$(get_abs_filename "$clustersDir/clusterinfo-$cluster_name.txt")
 argocd_password=""
@@ -310,6 +311,8 @@ Cluster name: $cluster_name
 Controlplane number: $controlplane_number
 Worker number: $worker_number
 Kubernetes version: $kindk8sversion
+Controlplane port http: $controlplane_port_http
+Controlplane port https: $controlplane_port_https
 Install Nginx ingress controller: $install_nginx_controller
 Install ArgoCD: $install_argocd
 ArgoCD admin GUI portforwarding: kubectl port-forward -n argocd services/argocd-server 58080:443
@@ -575,6 +578,35 @@ function install_nginx_controller_for_kind(){
     ✅ Done installing Nginx Ingress Controller"
 }
 
+function modify_coredns() {
+    echo -e "$yellow\nSetting up CoreDNS"
+    (kubectl apply -f "$core_dns_yaml" || 
+    { 
+        echo -e "$red 
+        🛑 Could not setup CoreDNS ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow\nRestarting CoreDNS"
+    (kubectl -n kube-system rollout restart deployment/coredns || 
+    { 
+        echo -e "$red 
+        🛑 Could not restart CoreDNS ...
+        "
+        die
+    }) & spinner
+
+    echo -e "$yellow\nWaiting for CoreDNS"
+    (kubectl -n kube-system rollout status --timeout 5m deployment/coredns || 
+    { 
+        echo -e "$red 
+        🛑 Something went wrong waiting for CoreDNS ...
+        "
+        die
+    }) & spinner
+}
+
 function create_cluster() {
     if [ -z $cluster_name ]  || [ $controlplane_number -lt 1 ] || [ $worker_number -lt 0 ]; then
         echo "Not all parameters good ... quitting"
@@ -590,6 +622,8 @@ function create_cluster() {
         "
         die
     }) & spinner
+
+    modify_coredns
 
     if [ "$install_nginx_controller" == "yes" ]; then
         install_nginx_controller_for_kind
@@ -671,6 +705,9 @@ function install_nyancat_application(){
     "
 
     echo "Nyancat argocd application installed: yes" >> $cluster_info_file
+
+    echo -e "$yellow\nTo access the Nyancat application:"
+    echo -e "$yellow\nOpen the following URL in your browser:$blue http://nyancat.localtest.me:<controlplane http port>"
 }
 
 function find_free_port() {
