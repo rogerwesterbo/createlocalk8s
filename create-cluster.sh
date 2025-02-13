@@ -378,7 +378,7 @@ function install_helm_argocd(){
         die
     }) & spinner
 
-    echo -e "$yellow ⏰ Waiting for ArgoCD to be ready"
+    echo -e "$yellow\n⏰ Waiting for ArgoCD to be ready"
     sleep 10
     (kubectl wait deployment -n argocd argocd-server --for condition=Available=True --timeout=180s || 
     { 
@@ -464,7 +464,7 @@ function install_helm_mongodb(){
 
     echo -e "$yellow ✅ Done installing Mongodb"
 
-    echo -e "$yellow\n ⏰ Waiting for Mongodb to be running"
+    echo -e "$yellow\n⏰ Waiting for Mongodb to be running"
     sleep 10
     (kubectl wait pods --for=condition=Ready --all -n mongodb --timeout=120s || 
     { 
@@ -541,7 +541,7 @@ function install_nginx_controller_for_kind(){
         die
     }) & spinner
 
-    echo -e "$yellow ⏰ Waiting for Nginx ingress controller for kind to be ready"
+    echo -e "$yellow\n⏰ Waiting for Nginx ingress controller for kind to be ready"
     sleep 10
     (kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s || 
     { 
@@ -567,7 +567,7 @@ function modify_coredns() {
         die
     }) & spinner
 
-    echo -e "$yellow\n ⏰ Waiting for CoreDNS"
+    echo -e "$yellow\n⏰ Waiting for CoreDNS"
     (kubectl -n kube-system rollout status --timeout 5m deployment/coredns || 
     { 
         echo -e "$red 🛑 Something went wrong waiting for CoreDNS ..."
@@ -581,7 +581,7 @@ function create_cluster() {
         die
     fi
 
-    echo -e "$yellow ⏰ Creating Kind cluster"
+    echo -e "$yellow\n⏰ Creating Kind cluster"
     echo -e "$clear"
     (kind create cluster --name "$cluster_name" --config "$kind_config_file" || 
     { 
@@ -613,8 +613,8 @@ function create_cluster() {
     echo -e "$yellow\nOpen the ArgoCD UI in your browser: http://argocd.localtest.me"
     fi
     
-    echo -e "$yellow\n🔑  Argocd Username:$blue admin"
-    echo -e "$yellow 🔑  Argocd Password:$blue $argocd_password"
+    echo -e "$yellow\n 🔑 Argocd Username:$blue admin"
+    echo -e "$yellow 🔑 Argocd Password:$blue $argocd_password"
     fi
 
     if [[ "$(is_running_more_than_one_cluster)" == "yes" ]]; then
@@ -657,7 +657,7 @@ function install_nyancat_application(){
     }) & spinner
 
     echo -e "$yellow ✅ Done installing Nyan-cat ArgoCD application"
-    echo -e "$yellow\n ⏰ Waiting for Nyancat ArgoCD application to be ready"
+    echo -e "$yellow ⏰ Waiting for Nyancat ArgoCD application to be ready"
     sleep 10
     (kubectl wait --namespace nyancat --for=condition=ready pod --selector=app.kubernetes.io/name=nyan-cat --timeout=90s || 
     { 
@@ -1022,7 +1022,7 @@ function install_postgres_application() {
 
     echo -e "$yellow ✅ Done installing Cloud Native Postgres ArgoCD application"
 
-    echo -e "$yellow\n ⏰ Waiting for Cloud Native Postgres to be running"
+    echo -e "$yellow\n⏰ Waiting for Cloud Native Postgres to be running"
     sleep 10
     (kubectl wait --namespace postgres-operator --for=condition=ready pod --selector=app.kubernetes.io/name=cloudnative-pg --timeout=120s || 
     { 
@@ -1041,9 +1041,7 @@ function install_postgres_application() {
     sleep 10
     (kubectl wait pods --for=condition=Ready --all -n postgres-cluster --timeout=120s || 
     { 
-        echo -e "$red 
-        🛑 Postgres Cluster is not running, and is not ready to use ...
-        "
+        echo -e "$red 🛑 Postgres Cluster is not running, and is not ready to use ..."
         die
     }) & spinner
     echo -e "$yellow\nPostgres Cluster is ready to use"
@@ -1073,7 +1071,7 @@ function install_mongodb_application() {
 
     echo -e "$yellow ✅ Done installing Mongodb ArgoCD application"
 
-    echo -e "$yellow\n ⏰ Waiting for Mongodb to be running"
+    echo -e "$yellow\n⏰ Waiting for Mongodb to be running"
     sleep 10
     (kubectl wait pods --for=condition=Ready --all -n mongodb --timeout=120s || 
     { 
@@ -1087,7 +1085,7 @@ function install_mongodb_application() {
 }
 
 function post_pgadmin_install() {
-    echo -e "$yellow\n ⏰ Waiting for Pgadmin4 to be running"
+    echo -e "$yellow\n⏰ Waiting for Pgadmin4 to be running"
     sleep 10
     (kubectl wait pods --for=condition=Ready --all -n pgadmin --timeout=120s || 
     { 
@@ -1151,7 +1149,7 @@ function post_falco_installation() {
 }
 
 function unseal_vault() {
-    echo -e "$yellow\n ⏰ Waiting for vault to be running"
+    echo -e "$yellow\n⏰ Waiting for vault to be running"
     sleep 10
     (kubectl wait --namespace vault --for=condition=PodReadyToStartContainers pod/vault-0 --timeout=90s || 
     { 
