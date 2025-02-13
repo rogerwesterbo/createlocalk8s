@@ -9,13 +9,13 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - host: localhost
+    - host: argocd.localtest.me
       http:
         paths:
-          - path: /argocd
+          - path: /
             pathType: Prefix
             backend:
               service:
                 name: argocd-server
                 port:
-                  name: http
+                  name: https

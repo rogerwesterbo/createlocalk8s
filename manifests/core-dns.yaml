@@ -24,6 +24,11 @@ data:
         loadbalance
         hosts {
             10.244.0.1 nyancat.localtest.me
+            10.244.0.1 argocd.localtest.me
+            10.244.0.1 grafana.localtest.me
+            10.244.0.1 pgadmin.localtest.me
+            10.244.0.1 opencost.localtest.me
+            10.244.0.1 kubeview.localtest.me
             fallthrough
         }
     }

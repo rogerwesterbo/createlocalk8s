@@ -89,7 +89,7 @@ function print_help() {
     echo "  kubeconfig                alias: kc      Get kubeconfig for a cluster by name"
     echo "  delete                    alias: d       Delete a cluster by name"
     echo "  help                      alias: h       Print this Help"
-    echo "  install-nginx-kind        alias: ink     Install Nginx Ingress Controller for kind to current cluster"    
+    #echo "  install-nginx-kind        alias: ink     Install Nginx Ingress Controller for kind to current cluster"    
     echo ""
     echo "Helm:"
     echo "  install-helm-argocd       alias: iha     Install ArgoCD with helm"
@@ -155,6 +155,7 @@ function prerequisites() {
 }
 
 function get_cluster_parameter() {
+    detect_os
     prerequisites docker
     prerequisites kind
     prerequisites kubectl
@@ -177,6 +178,8 @@ function get_cluster_parameter() {
     else
         cluster_name=$clusterName
     fi
+
+    cluster_name=$(echo $cluster_name | tr '[:upper:]' '[:lower:]')
 
     if [[ "$#" -gt 2 ]]; then 
         echo -e  "$red Too many arguments"; 
@@ -211,19 +214,18 @@ function get_cluster_parameter() {
         done
 
         if [ -z $check_k8s_version ]; then
-            echo -e "$red
-            🛑 Kubernetes version $selected_k8s_version is not available. Next time, please select from the available versions: $kindk8spossibilities
-            "
+            echo -e "$red 🛑 Kubernetes version $selected_k8s_version is not available. Next time, please select from the available versions: $kindk8spossibilities"
             die
         fi
     fi
 
-    read -p "Install Nginx Controller for kind? (default: yes) (y/yes | n/no): " install_nginx_controller_new
-    if [ "$install_nginx_controller_new" == "yes" ] || [ "$install_nginx_controller_new" == "y" ] || [ "$install_nginx_controller_new" == "" ]; then
-        install_nginx_controller="yes"
-    else
-        install_nginx_controller="no"
-    fi
+    # read -p "Install Nginx Controller for kind? (default: yes) (y/yes | n/no): " install_nginx_controller_new
+    # if [ "$install_nginx_controller_new" == "yes" ] || [ "$install_nginx_controller_new" == "y" ] || [ "$install_nginx_controller_new" == "" ]; then
+    #     install_nginx_controller="yes"
+    # else
+    #     install_nginx_controller="no"
+    # fi
+    install_nginx_controller="yes"
 
     read -p "Install ArgoCD with helm? (default: yes) (y/yes | n/no): " install_argocd_new
     if [ "$install_argocd_new" == "yes" ] || [ "$install_argocd_new" == "y" ] || [ "$install_argocd_new" == "" ]; then
@@ -234,10 +236,23 @@ function get_cluster_parameter() {
 
     kind_config_file=$(get_abs_filename "$clustersDir/configkind-$cluster_name.yaml")
     if [ -e "$kind_config_file" ] && [ -r "$kind_config_file" ] && [ -w "$kind_config_file" ]; then
-
-    #if [ -f "$kind_config_file" ]; then
         truncate -s 0 "$kind_config_file"
     fi
+
+    controlplane_port_http=80
+    controlplane_port_https=443
+
+    if [[ "$(is_running_more_than_one_cluster)" == "yes" ]]; then
+        echo -e "$yellow\n🚨 You are running more than one kind cluster at once."
+        local http=$(find_free_port)
+        local https=$(find_free_port)
+
+        controlplane_port_http=$http
+        controlplane_port_https=$https
+    fi
+
+    first_controlplane_port_http=$controlplane_port_http
+    first_controlplane_port_https=$controlplane_port_https
 
     echo "
 kind: Cluster
@@ -246,8 +261,6 @@ networking:
   ipFamily: dual
 nodes:" >> $kind_config_file
 
-    controlplane_port_http=$(find_free_port)
-    controlplane_port_https=$(find_free_port)
     for i in $(seq 1 $controlplane_number); do
         echo "  - role: control-plane
     image: $kindk8simage
@@ -300,8 +313,13 @@ nodes:" >> $kind_config_file
     echo -en "$yellow\nInstall ArgoCD with helm?:"
     echo -en "$blue $install_argocd"
 
+    echo -en "$yellow\nCluster http port:"
+    echo -en "$blue $first_controlplane_port_http"
+    
+    echo -en "$yellow\nCluster https port:"
+    echo -en "$blue $first_controlplane_port_https"
+
     cluster_info_file=$(get_abs_filename "$clustersDir/clusterinfo-$cluster_name.txt")
-    ##if [ -f "$cluster_info_file" ]; then
     if [ -e "$cluster_info_file" ] && [ -r "$cluster_info_file" ] && [ -w "$cluster_info_file" ]; then
         truncate -s 0 "$cluster_info_file"
     fi
@@ -311,8 +329,8 @@ Cluster name: $cluster_name
 Controlplane number: $controlplane_number
 Worker number: $worker_number
 Kubernetes version: $kindk8sversion
-Controlplane port http: $controlplane_port_http
-Controlplane port https: $controlplane_port_https
+Cluster http port: $first_controlplane_port_http
+Cluster https port: $first_controlplane_port_https
 Install Nginx ingress controller: $install_nginx_controller
 Install ArgoCD: $install_argocd
 ArgoCD admin GUI portforwarding: kubectl port-forward -n argocd services/argocd-server 58080:443
@@ -338,104 +356,96 @@ ArgoCD admin GUI url: http://localhost:58080" >> $cluster_info_file
 }
 
 function install_helm_argocd(){
-    echo -e "$yellow
-    Installing ArgoCD
-    "
+    echo -e "$yellow Installing ArgoCD "
     helm repo add argo https://argoproj.github.io/argo-helm
-    (helm install argocd argo/argo-cd --namespace argocd --create-namespace|| 
+    (helm install argocd argo/argo-cd --namespace argocd --create-namespace --set configs.params.server.insecure=true || 
     { 
-        echo -e "$red 
-        🛑 Could not install argocd into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install argocd into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ⏰ Waiting for ArgoCD to be ready
-    "
+    echo -e "$yellow\nPatch ArgoCD to allow insecure server"
+    (kubectl patch configmaps -n argocd argocd-cmd-params-cm --type merge -p '{"data": { "server.insecure": "true" }}' || 
+    { 
+        echo -e "$red 🛑 Could not install argocd into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow\nRestarting ArgoCD server"
+    (kubectl -n argocd rollout restart deployment argocd-server || 
+    { 
+        echo -e "$red 🛑 Could not restart argocd server ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ⏰ Waiting for ArgoCD to be ready"
     sleep 10
-    (kubectl wait --namespace argocd --for=condition=ready pod --selector=app.kubernetes.io/name=argocd-server --timeout=90s|| 
+    (kubectl wait deployment -n argocd argocd-server --for condition=Available=True --timeout=180s || 
     { 
-        echo -e "$red 
-        🛑 Could not install argocd into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install argocd into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing ArgoCD"
+    echo -e "$yellow\nInstalling ArgoCd Ingress"
+    (kubectl apply -f $argocd_ingress_yaml || 
+    { 
+        echo -e "$red 🛑 Could not install argocd ingress into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing ArgoCD"
 }
 
 function install_helm_metallb(){
-    echo -e "$yellow
-    Installing Metallb
-    "
+    echo -e "$yellow Installing Metallb"
     helm repo add metallb https://metallb.github.io/metallb
-    (helm install metallb metallb/metallb --namespace metallb --create-namespace|| 
+    (helm install metallb metallb/metallb --namespace metallb --create-namespace || 
     { 
-        echo -e "$red 
-        🛑 Could not install metallb into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install metallb into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Metallb"
+    echo -e "$yellow ✅ Done installing Metallb"
 }
 
 function install_helm_trivy(){
-    echo -e "$yellow
-    Installing Trivy-operator
-    "
+    echo -e "$yellow Installing Trivy-operator"
     helm repo add aqua https://aquasecurity.github.io/helm-charts/
-    (helm install trivy-operator aqua/trivy-operator --namespace trivy --create-namespace|| 
+    (helm install trivy-operator aqua/trivy-operator --namespace trivy --create-namespace || 
     { 
-        echo -e "$red 
-        🛑 Could not install Trivy-operator into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install Trivy-operator into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Trivy-operator"
+    echo -e "$yellow ✅ Done installing Trivy-operator"
 }
 
 function install_helm_falco(){
-    echo -e "$yellow
-    Installing Falco
-    "
+    echo -e "$yellow Installing Falco"
     helm repo add falcosecurity https://falcosecurity.github.io/charts
 
-    (helm install falco falcosecurity/falco --namespace falco --create-namespace --set tty=true --set falcosidekick.enabled=true --set falcosidekick.webui.enabled=true --set falcosidekick.config.webhook.address=http://falco-talon:2803|| 
+    (helm install falco falcosecurity/falco --namespace falco --create-namespace --set tty=true --set falcosidekick.enabled=true --set falcosidekick.webui.enabled=true --set falcosidekick.config.webhook.address=http://falco-talon:2803 || 
     { 
-        echo -e "$red 
-        🛑 Could not install Falco into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install Falco into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Falco"
+    echo -e "$yellow ✅ Done installing Falco"
 
     post_falco_installation
 }
 
 function install_helm_vault(){
-    echo -e "$yellow
-    Installing Hashicorp Vault with helm
-    "
+    echo -e "$yellow Installing Hashicorp Vault with helm"
     
     helm repo add hashicorp https://helm.releases.hashicorp.com
-    (helm install vault hashicorp/vault --namespace vault --create-namespace|| 
+    (helm install vault hashicorp/vault --namespace vault --create-namespace || 
     { 
-        echo -e "$red 
-        🛑 Could not install Hashicorp Vault into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install Hashicorp Vault into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Hashicorp Vault"
+    echo -e "$yellow ✅ Done installing Hashicorp Vault"
 
     unseal_vault
 
@@ -443,29 +453,22 @@ function install_helm_vault(){
 }
 
 function install_helm_mongodb(){
-    echo -e "$yellow
-    Installing Mongodb with helm
-    "
+    echo -e "$yellow Installing Mongodb with helm"
     
     helm repo add bitnami https://charts.bitnami.com/bitnami
-    (helm install mongodb bitnami/mongodb --namespace mongodb --create-namespace --values "$manifestDir/mongodb-values.yaml"|| 
+    (helm install mongodb bitnami/mongodb --namespace mongodb --create-namespace --values "$manifestDir/mongodb-values.yaml" || 
     { 
-        echo -e "$red 
-        🛑 Could not install Mongodb into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install Mongodb into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Mongodb"
+    echo -e "$yellow ✅ Done installing Mongodb"
 
     echo -e "$yellow\n ⏰ Waiting for Mongodb to be running"
     sleep 10
-    (kubectl wait pods --for=condition=Ready --all -n mongodb --timeout=120s|| 
+    (kubectl wait pods --for=condition=Ready --all -n mongodb --timeout=120s || 
     { 
-        echo -e "$red 
-        🛑 Mongodb is not running, and is not ready to use ...
-        "
+        echo -e "$red 🛑 Mongodb is not running, and is not ready to use ..."
         die
     }) & spinner
 
@@ -473,136 +476,101 @@ function install_helm_mongodb(){
 }
 
 function install_helm_postgres(){
-    echo -e "$yellow
-    Installing Cloud Native Postgres Operator with helm
-    "
+    echo -e "$yellow Installing Cloud Native Postgres Operator with helm"
     
     helm repo add cnpg https://cloudnative-pg.github.io/charts
     (helm upgrade --install postgres-operator \
   --namespace postgres-operator \
   --create-namespace \
-  cnpg/cloudnative-pg|| 
+  cnpg/cloudnative-pg || 
     { 
-        echo -e "$red 
-        🛑 Could not install Postgres Operator into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install Postgres Operator into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Postgres Operator"
+    echo -e "$yellow ✅ Done installing Postgres Operator"
 
-    echo -e "$yellow
-    Installing Postgres Cluster with helm
-    "
+    echo -e "$yellow Installing Postgres Cluster with helm"
     
     helm repo add cnpg https://cloudnative-pg.github.io/charts
     (helm upgrade --install postgres-cluster \
   --namespace postgres-cluster \
   --create-namespace \
-  cnpg/cluster --set name=postgres-cluster --set cluster.instances='3' --set cluster.storage.size=3Gi|| 
+  cnpg/cluster --set name=postgres-cluster --set cluster.instances='3' --set cluster.storage.size=3Gi || 
     { 
-        echo -e "$red 
-        🛑 Could not install Postgres Cluster  ...
-        "
+        echo -e "$red 🛑 Could not install Postgres Cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Postgres Cluster"
+    echo -e "$yellow ✅ Done installing Postgres Cluster"
 
     post_postgres_installation
 }
 
 function install_helm_pgadmin(){
-    echo -e "$yellow
-    Installing PgAdmin4 with helm
-    "
+    echo -e "$yellow Installing PgAdmin4 with helm"
     helm repo add runix https://helm.runix.net
     (helm install pgadmin runix/pgadmin4 --namespace pgadmin --create-namespace || 
     { 
-        echo -e "$red 
-        🛑 Could not install PgAdmin4 into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install PgAdmin4 into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing PgAdmin4"
+    echo -e "$yellow ✅ Done installing PgAdmin4"
 
     post_pgadmin_install
 }
 
 function install_vault_trivy(){
-    echo -e "$yellow
-    Installing Hashicorp Vault
-    "
+    echo -e "$yellow Installing Hashicorp Vault"
     
     (  helm install vault https://helm.releases.hashicorp.com/vault --namespace vault --create-namespace|| 
     { 
-        echo -e "$red 
-        🛑 Could not install Trivy-operator into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install Trivy-operator into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Trivy-operator"
+    echo -e "$yellow ✅ Done installing Trivy-operator"
 }
 
 function install_nginx_controller_for_kind(){
-    echo -e "$yellow
-    Create Nginx Ingress Controller for kind
-    "        
+    echo -e "$yellow Create Nginx Ingress Controller for kind"
     (kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml|| 
     { 
-        echo -e "$red 
-        Could not install nginx controller in cluster ...
-        "
+        echo -e "$red 🛑 Could not install nginx controller in cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ⏰ Waiting for Nginx ingress controller for kind to be ready
-    "
+    echo -e "$yellow ⏰ Waiting for Nginx ingress controller for kind to be ready"
     sleep 10
-    (kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s|| 
+    (kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s || 
     { 
-        echo -e "$red 
-        🛑 Could not install nginx ingress controller into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install nginx ingress controller into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Nginx Ingress Controller"
+    echo -e "$yellow ✅ Done installing Nginx Ingress Controller"
 }
 
 function modify_coredns() {
     echo -e "$yellow\nSetting up CoreDNS"
     (kubectl apply -f "$core_dns_yaml" || 
     { 
-        echo -e "$red 
-        🛑 Could not setup CoreDNS ...
-        "
+        echo -e "$red 🛑 Could not setup CoreDNS ..."
         die
     }) & spinner
 
     echo -e "$yellow\nRestarting CoreDNS"
     (kubectl -n kube-system rollout restart deployment/coredns || 
     { 
-        echo -e "$red 
-        🛑 Could not restart CoreDNS ...
-        "
+        echo -e "$red 🛑 Could not restart CoreDNS ..."
         die
     }) & spinner
 
-    echo -e "$yellow\nWaiting for CoreDNS"
+    echo -e "$yellow\n ⏰ Waiting for CoreDNS"
     (kubectl -n kube-system rollout status --timeout 5m deployment/coredns || 
     { 
-        echo -e "$red 
-        🛑 Something went wrong waiting for CoreDNS ...
-        "
+        echo -e "$red 🛑 Something went wrong waiting for CoreDNS ..."
         die
     }) & spinner
 }
@@ -617,58 +585,50 @@ function create_cluster() {
     echo -e "$clear"
     (kind create cluster --name "$cluster_name" --config "$kind_config_file" || 
     { 
-        echo -e "$red 
-        🛑 Could not create cluster ...
-        "
+        echo -e "$red 🛑 Could not create cluster ..."
         die
     }) & spinner
 
     modify_coredns
 
-    if [ "$install_nginx_controller" == "yes" ]; then
+    #if [ "$install_nginx_controller" == "yes" ]; then
         install_nginx_controller_for_kind
-    fi
+    #fi
 
     if [ "$install_argocd" == "yes" ]; then
         install_helm_argocd
         argocd_password="$(kubectl get secrets -n argocd argocd-initial-admin-secret -o json | jq -r '.data.password' | base64 -d)"
 
-        echo "ArgoCD:"
-        echo "Username: admin"
         echo "ArgoCD password: $argocd_password" >> $cluster_info_file
     fi
 
-    echo -e "$yellow
-    ✅ Done creating kind cluster
-    "
+    echo -e "$yellow ✅ Done creating kind cluster"
 
     if [ "$install_argocd" == "yes" ]; then
-
-    echo -e "$yellow
-    🚀 ArgoCD is ready to use
-    Port forward the ArgoCD server to access the UI:
-    "
-    echo -e "$white
-    https (self-signed certificate):
-    kubectl port-forward -n argocd services/argocd-server 58080:443
-    "
+    echo -e "$yellow 🚀 ArgoCD is ready to use"
     
-    echo -e "$yellow
-    Open the ArgoCD UI in your browser: http://localhost:58080
+    if [[ "$(is_running_more_than_one_cluster)" == "yes" ]]; then
+    echo -e "$yellow\nOpen the ArgoCD UI in your browser: http://argocd.localtest.me:$first_controlplane_port_http"
+    else
+    echo -e "$yellow\nOpen the ArgoCD UI in your browser: http://argocd.localtest.me"
+    fi
     
-    🔑  Argocd Username: admin
-    🔑  Argocd Password: $argocd_password
-
-    "
+    echo -e "$yellow\n🔑  Argocd Username:$blue admin"
+    echo -e "$yellow 🔑  Argocd Password:$blue $argocd_password"
     fi
 
-    echo -e "$yellow
-    To see all kind clusters , type: $red kind get clusters
-    "
+    if [[ "$(is_running_more_than_one_cluster)" == "yes" ]]; then
+    echo -e "$yellow\n 🚀 Cluster default ports have been changed "
+    echo -e "$yellow Cluster http port: $first_controlplane_port_http"
+    echo -e "$yellow Cluster https port: $first_controlplane_port_https"
 
-    echo -e "$yellow
-    To delete cluster, type: $red kind delete cluster --name $cluster_name
-    "
+    echo -e "$yellow\n To access a application add the controlplane port to the application as follows:"
+    echo -e "$yellow http://<application>.localtest.me:<controlplane http port>"
+    echo -e "$yellow Example: http://nyancat.localtest.me:$first_controlplane_port_http"
+    fi
+
+    echo -e "$yellow\n To see all kind clusters , type: $red kind get clusters"
+    echo -e "$yellow To delete cluster, type: $red kind delete cluster --name $cluster_name"
     echo -e "$clear"
 
     get_kubeconfig kc $cluster_name
@@ -689,10 +649,17 @@ function create_cluster() {
 }
 
 function install_nyancat_application(){
-    echo -e "$yellow
-    Installing Nyan-cat ArgoCD application
-    "
+    echo -e "$yellow Installing Nyan-cat ArgoCD application"
     (kubectl apply -f $nyancat_argo_app_yaml|| 
+    { 
+        echo -e "$red 🛑 Could not install Nyan-cat ArgoCD application into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Nyan-cat ArgoCD application"
+    echo -e "$yellow\n ⏰ Waiting for Nyancat ArgoCD application to be ready"
+    sleep 10
+    (kubectl wait --namespace nyancat --for=condition=ready pod --selector=app.kubernetes.io/name=nyan-cat --timeout=90s || 
     { 
         echo -e "$red 
         🛑 Could not install Nyan-cat ArgoCD application into cluster  ...
@@ -700,14 +667,15 @@ function install_nyancat_application(){
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Nyan-cat ArgoCD application
-    "
-
     echo "Nyancat argocd application installed: yes" >> $cluster_info_file
 
-    echo -e "$yellow\nTo access the Nyancat application:"
-    echo -e "$yellow\nOpen the following URL in your browser:$blue http://nyancat.localtest.me:<controlplane http port>"
+    echo -e "$yellow To access the Nyancat application:"
+    if [[ $(is_running_more_than_one_cluster) == "yes" ]]; then
+        echo -e "$yellow Open the following URL in your browser:$blue http://nyancat.localtest.me:<cluster http port>"
+        echo -e "$yellow Find the cluster http port in file: $cluster_info_file)"
+    else
+        echo -e "$yellow Open the following URL in your browser:$blue http://nyancat.localtest.me"
+    fi
 }
 
 function find_free_port() {
@@ -778,6 +746,96 @@ function details_for_cluster() {
     cat $kind_config_file
 }
 
+function is_running_more_than_one_cluster() {
+    local clusters=$(kind get clusters)
+
+    if [ -z "$clusters" ]; then
+        echo "no"
+    fi
+
+    if [[ "$clusters" == "No kind clusters found." ]]; then
+        echo "no"
+    fi
+
+    if [[ $(echo "$clusters" | wc -l) -ge 1 ]]; then
+        echo "yes"
+    # else
+    #     echo "yes - one cluster"
+    fi
+}
+
+function detect_arch {
+    local host_arch
+
+    case "$(uname -m)" in
+      x86_64*)
+        host_arch=amd64
+        ;;
+      i?86_64*)
+        host_arch=amd64
+        ;;
+      amd64*)
+        host_arch=amd64
+        ;;
+      aarch64*)
+        host_arch=arm64
+        ;;
+      arm64*)
+        host_arch=arm64
+        ;;
+      arm*)
+        host_arch=arm
+        ;;
+      i?86*)
+        host_arch=x86
+        ;;
+      s390x*)
+        host_arch=s390x
+        ;;
+      ppc64le*)
+        host_arch=ppc64le
+        ;;
+      *)
+        echo "Unsupported host arch. Must be x86_64, 386, arm, arm64, s390x or ppc64le." >&2
+        exit 1
+        ;;
+    esac
+
+  if [[ -z "${host_arch}" ]]; then
+    return
+  fi
+  echo -n "${host_arch}"
+}
+
+function detect_os {
+    local host_os
+
+    case "$(uname -s)" in
+      Darwin)
+        host_os=darwin
+        ;;
+      Linux)
+        host_os=linux
+        ;;
+      *)
+        echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
+        exit 1
+        ;;
+    esac
+
+  if [[ -z "${host_os}" ]]; then
+    return
+  fi
+  #echo -n "${host_os}"
+}
+
+function detect_binary {
+    host_arch=$(detect_arch)
+    host_os=$(detect_os)
+
+    GO_OUT="${KUBE_ROOT}/_output/local/bin/${host_os}/${host_arch}"
+}
+
 function delete_cluster() {
     clusterName=${@: -1}
 
@@ -790,6 +848,8 @@ function delete_cluster() {
         echo "Too many arguments"; 
         exit 1
     fi
+
+    clusterName=$(echo $clusterName | tr '[:upper:]' '[:lower:]')
 
     read -p "Sure you want to delete?! (n | no | y | yes)? " ok
 
@@ -810,15 +870,11 @@ function delete_cluster() {
 
     (kind delete cluster --name $clusterName|| 
     { 
-        echo -e "$red 
-        🛑 Could not delete cluster with name $clusterName
-        "
+        echo -e "$red 🛑 Could not delete cluster with name $clusterName"
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done deleting cluster
-    "
+    echo -e "$yellow ✅ Done deleting cluster"
 }
 
 function list_clusters() {
@@ -840,44 +896,34 @@ function get_kubeconfig() {
 
     echo "$(kind get kubeconfig --name $clusterName)" > $clustersDir/kubeconfig-$clusterName.config
 
-    echo -e "$yellow\nKubeconfig saved to kubeconfig-$clusterName.config"
-    echo -e "$clear"
-    echo -e "$yellow\nTo use the kubeconfig, type: $red export KUBECONFIG=kubeconfig-$clusterName.config"
-    echo -e ""
-    echo -e "$yellow\nAnd then you can use $blue kubectl $yellow to interact with the cluster"
-    echo -e ""
-    echo -e "$yellow\nExample: $blue kubectl get nodes"
+    echo -e "$yellow Kubeconfig saved to kubeconfig-$clusterName.config"
+    echo -e "$yellow To use the kubeconfig, type:$red export KUBECONFIG=kubeconfig-$clusterName.config"
+    echo -e "$yellow And then you can use $blue kubectl $yellow to interact with the cluster"
+    echo -e "$yellow Example: $blue kubectl get nodes"
+    echo ""
 }
 
 function install_cert_manager_application() {
     (kubectl apply -n argocd -f $cert_manager_yaml||
     { 
-        echo -e "$red 
-        🛑 Could not install cert-manager to cluster
-        "
+        echo -e "$red 🛑 Could not install cert-manager to cluster"
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing cert-manager
-    "
+    echo -e "$yellow ✅ Done installing cert-manager"
 }
 
 function install_kube_prometheus_stack_application() {
     (kubectl apply -n argocd -f $kube_prometheus_stack_yaml||
     { 
-        echo -e "$red 
-        🛑 Could not install kube-prometheus-stack to cluster
-        "
+        echo -e "$red 🛑 Could not install kube-prometheus-stack to cluster"
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing kube-prometheus-stack
-    "
+    echo -e "$yellow ✅ Done installing kube-prometheus-stack"
 
-    echo -e "$yellow\nTo access the kube-prometheus-stack dashboard, type: $red kubectl port-forward -n prometheus services/prometheus-grafana 30000:80"
-    echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:30000"
+    echo -e "$yellow To access the kube-prometheus-stack dashboard, type: $red kubectl port-forward -n prometheus services/prometheus-grafana 30000:80"
+    echo -e "$yellow\n Open the dashboard in your browser: http://localhost:30000"
 
     echo -e "$yellow\nUsername: admin"
     echo -e "$yellow\nPassword: prom-operator"
@@ -886,35 +932,24 @@ function install_kube_prometheus_stack_application() {
 function install_kubeview_application() {
     (kubectl apply -n argocd -f $kubeview_yaml||
     { 
-        echo -e "$red 
-        🛑 Could not install kubeview to cluster
-        "
+        echo -e "$red 🛑 Could not install kubeview to cluster"
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing kubeview
-    "
-
+    echo -e "$yellow ✅ Done installing kubeview"
     echo -e "$yellow\nTo access the kube-prometheus-stack dashboard, type: $red kubectl port-forward -n kubeview pods/<the pod name> 59000:8000"
-    echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:59000"
+    echo -e "$yellow Open the dashboard in your browser: http://localhost:59000"
 }
 
 function install_opencost_application() {
-    echo -e "$yellow
-    Installing OpenCost ArgoCD application
-    "
+    echo -e "$yellow Installing OpenCost ArgoCD application"
     (kubectl apply -f $opencost_argo_app_yaml|| 
     { 
-        echo -e "$red 
-        🛑 Could not install OpenCost ArgoCD application into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install OpenCost ArgoCD application into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing OpenCost ArgoCD application
-    "
+    echo -e "$yellow ✅ Done installing OpenCost ArgoCD application"
 
     echo "OpenCost argocd application installed: yes" >> $cluster_info_file
 
@@ -923,58 +958,39 @@ function install_opencost_application() {
 }
 
 function install_metallb_application() {
-    echo -e "$yellow
-    Installing Metallb ArgoCD application
-    "
+    echo -e "$yellow Installing Metallb ArgoCD application"
     (kubectl apply -f $metallb_app_yaml|| 
     { 
-        echo -e "$red 
-        🛑 Could not install Metallb ArgoCD application into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install Metallb ArgoCD application into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Metallb ArgoCD application
-    "
-
+    echo -e "$yellow ✅ Done installing Metallb ArgoCD application"
     echo "Metallb application installed: yes" >> $cluster_info_file
 }
 
 function install_trivy_application() {
-    echo -e "$yellow
-    Installing Trivy ArgoCD application
-    "
+    echo -e "$yellow Installing Trivy ArgoCD application "
     (kubectl apply -f $trivy_app_yaml|| 
     { 
-        echo -e "$red 
-        🛑 Could not install Trivy ArgoCD application into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install Trivy ArgoCD application into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Trivy ArgoCD application
-    "
+    echo -e "$yellow ✅ Done installing Trivy ArgoCD application "
 
     echo "Trivy application installed: yes" >> $cluster_info_file
 }
 
 function install_falco_application() {
-    echo -e "$yellow
-    Installing Falco ArgoCD application
-    "
+    echo -e "$yellow Installing Falco ArgoCD application "
     (kubectl apply -f $falco_app_yaml|| 
     { 
-        echo -e "$red 
-        🛑 Could not install Falco ArgoCD application into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install Falco ArgoCD application into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Falco ArgoCD application
-    "
+    echo -e "$yellow ✅ Done installing Falco ArgoCD application"
 
     echo "Falco application installed: yes" >> $cluster_info_file
 
@@ -982,20 +998,14 @@ function install_falco_application() {
 }
 
 function install_vault_application() {
-    echo -e "$yellow
-    Installing Hashicorp Vault ArgoCD application
-    "
+    echo -e "$yellow Installing Hashicorp Vault ArgoCD application"
     (kubectl apply -f $vault_app_yaml|| 
     { 
-        echo -e "$red 
-        🛑 Could not install Vault ArgoCD application into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install Vault ArgoCD application into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Vault ArgoCD application
-    "
+    echo -e "$yellow ✅ Done installing Vault ArgoCD application "
 
     unseal_vault
 
@@ -1003,45 +1013,33 @@ function install_vault_application() {
 }
 
 function install_postgres_application() {
-    echo -e "$yellow
-    Installing Postgres ArgoCD application
-    "
+    echo -e "$yellow Installing Postgres ArgoCD application"
     (kubectl apply -f $cnpg_app_yaml|| 
     { 
-        echo -e "$red 
-        🛑 Could not install Cloud Native Postgres ArgoCD application into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install Cloud Native Postgres ArgoCD application into cluster  ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Cloud Native Postgres ArgoCD application
-    "
+    echo -e "$yellow ✅ Done installing Cloud Native Postgres ArgoCD application"
 
     echo -e "$yellow\n ⏰ Waiting for Cloud Native Postgres to be running"
     sleep 10
-    (kubectl wait --namespace postgres-operator --for=condition=ready pod --selector=app.kubernetes.io/name=cloudnative-pg --timeout=120s|| 
+    (kubectl wait --namespace postgres-operator --for=condition=ready pod --selector=app.kubernetes.io/name=cloudnative-pg --timeout=120s || 
     { 
-        echo -e "$red 
-        🛑 Postgres Operator is not running, and is not ready to use ...
-        "
+        echo -e "$red 🛑 Postgres Operator is not running, and is not ready to use ..."
         die
     }) & spinner
     echo -e "$yellow\nPostgres Operator is ready to use"
 
     (kubectl apply -f $cnpg_cluster_app_yaml|| 
     { 
-        echo -e "$red 
-        🛑 Could not install Cloud Native Postgres Cluster ArgoCD application into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install Cloud Native Postgres Cluster ArgoCD application into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Cloud Native Postgres Cluster ArgoCD application
-    "
+    echo -e "$yellow ✅ Done installing Cloud Native Postgres Cluster ArgoCD application"
     sleep 10
-    (kubectl wait pods --for=condition=Ready --all -n postgres-cluster --timeout=120s|| 
+    (kubectl wait pods --for=condition=Ready --all -n postgres-cluster --timeout=120s || 
     { 
         echo -e "$red 
         🛑 Postgres Cluster is not running, and is not ready to use ...
@@ -1054,47 +1052,32 @@ function install_postgres_application() {
 }
 
 function install_pgadmin_application() {
-    echo -e "$yellow
-    Installing PgAdmin4 ArgoCD application
-    "
+    echo -e "$yellow Installing PgAdmin4 ArgoCD application"
     (kubectl apply -f $pgadmin_app_yaml|| 
     { 
-        echo -e "$red 
-        🛑 Could not install PgAdmin4 ArgoCD application into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install PgAdmin4 ArgoCD application into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing PgAdmin4 ArgoCD application
-    "
-
+    echo -e "$yellow ✅ Done installing PgAdmin4 ArgoCD application"
     post_pgadmin_install
 }
 
 function install_mongodb_application() {
-    echo -e "$yellow
-    Installing Mongodb ArgoCD application
-    "
+    echo -e "$yellow Installing Mongodb ArgoCD application"
     (kubectl apply -f $mongodb_app_yaml|| 
     { 
-        echo -e "$red 
-        🛑 Could not install Mongodb ArgoCD application into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install Mongodb ArgoCD application into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow
-    ✅ Done installing Mongodb ArgoCD application
-    "
+    echo -e "$yellow ✅ Done installing Mongodb ArgoCD application"
 
     echo -e "$yellow\n ⏰ Waiting for Mongodb to be running"
     sleep 10
-    (kubectl wait pods --for=condition=Ready --all -n mongodb --timeout=120s|| 
+    (kubectl wait pods --for=condition=Ready --all -n mongodb --timeout=120s || 
     { 
-        echo -e "$red 
-        🛑 Mongodb is not running, and is not ready to use ...
-        "
+        echo -e "$red 🛑 Mongodb is not running, and is not ready to use ..."
         die
     }) & spinner
 
@@ -1106,11 +1089,9 @@ function install_mongodb_application() {
 function post_pgadmin_install() {
     echo -e "$yellow\n ⏰ Waiting for Pgadmin4 to be running"
     sleep 10
-    (kubectl wait pods --for=condition=Ready --all -n pgadmin --timeout=120s|| 
+    (kubectl wait pods --for=condition=Ready --all -n pgadmin --timeout=120s || 
     { 
-        echo -e "$red 
-        🛑 Falco is not running, and is not ready to use ...
-        "
+        echo -e "$red 🛑 Falco is not running, and is not ready to use ..."
         die
     }) & spinner
 
@@ -1153,11 +1134,9 @@ function post_postgres_installation() {
 function post_falco_installation() {
     echo -e "$yellow\n ⏰ Waiting for Falco to be running"
     sleep 10
-    (kubectl wait pods --for=condition=Ready --all -n falco --timeout=120s|| 
+    (kubectl wait pods --for=condition=Ready --all -n falco --timeout=120s || 
     { 
-        echo -e "$red 
-        🛑 Falco is not running, and is not ready to use ...
-        "
+        echo -e "$red 🛑 Falco is not running, and is not ready to use ..."
         die
     }) & spinner
 
@@ -1174,20 +1153,16 @@ function post_falco_installation() {
 function unseal_vault() {
     echo -e "$yellow\n ⏰ Waiting for vault to be running"
     sleep 10
-    (kubectl wait --namespace vault --for=condition=PodReadyToStartContainers pod/vault-0 --timeout=90s|| 
+    (kubectl wait --namespace vault --for=condition=PodReadyToStartContainers pod/vault-0 --timeout=90s || 
     { 
-        echo -e "$red 
-        🛑 Could not install nginx ingress controller into cluster  ...
-        "
+        echo -e "$red 🛑 Could not install nginx ingress controller into cluster ..."
         die
     }) & spinner
 
     echo -e "$yellow\nUnsealing the vault"
-    (kubectl exec -i -n vault vault-0 -- vault operator init -format=json > vault-init.json|| 
+    (kubectl exec -i -n vault vault-0 -- vault operator init -format=json > vault-init.json || 
     { 
-        echo -e "$red 
-        🛑 Could not install unseal the vault  ...
-        "
+        echo -e "$red 🛑 Could not install unseal the vault ..."
         die
     }) & spinner
     echo -e "$clear"
@@ -1246,9 +1221,9 @@ perform_action() {
             get_kubeconfig $*
             exit;;
         
-        install-nginx-kind|ink)
-            install_nginx_controller_for_kind
-            exit;;
+        # install-nginx-kind|ink)
+        #     install_nginx_controller_for_kind
+        #     exit;;
         
         install-helm-argocd|iha)
             install_helm_argocd
@@ -1322,9 +1297,12 @@ perform_action() {
 }
 
 if [ "$#" -eq 0 ]; then
+    detect_os
     print_logo
     print_help
+
     exit
 else
+    detect_os
     perform_action $*
 fi
