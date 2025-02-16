@@ -1228,7 +1228,7 @@ perform_action() {
         install-helm-argocd|iha)
             install_helm_argocd
             exit;;
-        install-helm-metallb|iha)
+        install-helm-metallb|ihm)
             install_helm_metallb
             exit;;
         install-helm-mongodb|ihmdb)
