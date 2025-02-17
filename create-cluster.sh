@@ -851,7 +851,8 @@ function delete_cluster() {
 
     clusterName=$(echo $clusterName | tr '[:upper:]' '[:lower:]')
 
-    read -p "Sure you want to delete?! (n | no | y | yes)? " ok
+    echo -e "$yellow\nDeleting cluster $clusterName"
+    read -p "Sure you want to delete ?! (n | no | y | yes)? " ok
 
     if [ "$ok" == "yes" ] ;then
             echo -e "$yellow\nDeleting cluster ..."
