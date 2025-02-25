@@ -1,11 +1,11 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: nyancat
+  name: nyan-cat
   namespace: argocd
 spec:
   destination:
-    namespace: nyancat
+    namespace: nyan-cat
     server: https://kubernetes.default.svc
   project: default
   source:
@@ -20,8 +20,6 @@ spec:
           annotations:
             kubernetes.io/ingress.class: nginx
             nginx.ingress.kubernetes.io/rewrite-target: /
-            # kubernetes.io/ingress.class: nginx
-            # kubernetes.io/tls-acme: "true"
           hosts:
             - host: nyancat.localtest.me
               paths:
