@@ -11,7 +11,7 @@ spec:
   source:
     chart: pgadmin4
     repoURL: https://helm.runix.net
-    targetRevision: '*'
+    targetRevision: "*"
     # helm:
     #   parameters:
     #     - name: env.password
@@ -24,3 +24,4 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true

@@ -4,27 +4,28 @@ metadata:
   name: cert-manager
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: '-10'
+    argocd.argoproj.io/sync-wave: "-10"
 spec:
   destination:
     namespace: cert-manager
     server: https://kubernetes.default.svc
   project: default
   source:
-    repoURL: 'https://charts.jetstack.io'
-    targetRevision: '*'
+    repoURL: "https://charts.jetstack.io"
+    targetRevision: "*"
     chart: cert-manager
     helm:
       parameters:
         - name: global.podSecurityPolicy.enabled
-          value: 'false'
+          value: "false"
         - name: installCRDs
-          value: 'true'
+          value: "true"
         - name: prometheus.servicemonitor.enabled
-          value: 'true'
+          value: "true"
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true

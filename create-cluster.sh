@@ -36,6 +36,8 @@ cnpg_app_yaml=$(get_abs_filename "$manifestDir/cnpg-app.yaml")
 cnpg_cluster_app_yaml=$(get_abs_filename "$manifestDir/cnpg-cluster-app.yaml")
 core_dns_yaml=$(get_abs_filename "$manifestDir/core-dns.yaml")
 pgadmin_app_yaml=$(get_abs_filename "$manifestDir/pgadmin-app.yaml")
+rook_ceph_operator_app_yaml=$(get_abs_filename "$manifestDir/rook-ceph-operator-app.yaml")
+rook_ceph_cluster_app_yaml=$(get_abs_filename "$manifestDir/rook-ceph-cluster-app.yaml")
 cluster_info_file=$(get_abs_filename "$clustersDir/clusterinfo-$cluster_name.txt")
 argocd_password=""
 
@@ -92,14 +94,16 @@ function print_help() {
     #echo "  install-nginx-kind        alias: ink     Install Nginx Ingress Controller for kind to current cluster"    
     echo ""
     echo "Helm:"
-    echo "  install-helm-argocd       alias: iha     Install ArgoCD with helm"
-    echo "  install-helm-falco        alias: ihf     Install Falco with helm"
-    echo "  install-helm-metallb      alias: ihm     Install Metallb with helm"
-    echo "  install-helm-mongodb      alias: ihmdb   Install Mongodb with helm"
-    echo "  install-helm-postgres     alias: ihpg    Install Cloud Native Postgres Operator with helm"
-    echo "  install-helm-pgadmin      alias: ihpa    Install PgAdmin4 with helm"
-    echo "  install-helm-trivy        alias: iht     Install Trivy Operator with helm"
-    echo "  install-helm-vault        alias: ihv     Install Vault with helm"
+    echo "  install-helm-argocd        alias: iha     Install ArgoCD with helm"
+    echo "  install-helm-falco         alias: ihf     Install Falco with helm"
+    echo "  install-helm-metallb       alias: ihm     Install Metallb with helm"
+    echo "  install-helm-mongodb       alias: ihmdb   Install Mongodb with helm"
+    echo "  install-helm-postgres      alias: ihpg    Install Cloud Native Postgres Operator with helm"
+    echo "  install-helm-pgadmin       alias: ihpa    Install PgAdmin4 with helm"
+    echo "  install-helm-ceph-operator alias: ihrco   Install Rook Ceph Operator with helm"
+    echo "  install-helm-ceph-cluster  alias: ihrcc   Install Rook Ceph Cluster with helm"
+    echo "  install-helm-trivy         alias: iht     Install Trivy Operator with helm"
+    echo "  install-helm-vault         alias: ihv     Install Vault with helm"
     echo ""
     echo "ArgoCD Applications:"
     echo "  install-app-certmanager   alias: iacm    Install Cert-manager ArgoCD application"
@@ -111,6 +115,8 @@ function print_help() {
     echo "  install-app-postgres      alias: iapg    Install Cloud Native Postgres Operator ArgoCD application"
     echo "  install-app-pgadmin       alias: iapga   Install PgAdmin4 ArgoCD application"
     echo "  install-app-prometheus    alias: iap     Install Kube-prometheus-stack ArgoCD application"
+    echo "  install-app-ceph-operator alias: iarco   Install Rook Ceph Operator ArgoCD application"
+    echo "  install-app-ceph-cluster  alias: iarcc   Install Rook Ceph Cluster ArgoCD application"
     echo "  install-app-metallb       alias: iam     Install Metallb ArgoCD application"
     echo "  install-app-trivy         alias: iat     Install Trivy Operator ArgoCD application"
     echo "  install-app-vault         alias: iav     Install Hashicorp Vault ArgoCD application"
@@ -519,6 +525,30 @@ function install_helm_pgadmin(){
     echo -e "$yellow ✅ Done installing PgAdmin4"
 
     post_pgadmin_install
+}
+
+function install_helm_rook_ceph_operator(){
+    echo -e "$yellow Installing Rook Ceph Operator via helm"
+    helm repo add rook-release https://charts.rook.io/release
+    (helm install --create-namespace --namespace rook-ceph rook-ceph rook-release/rook-ceph || 
+    { 
+        echo -e "$red 🛑 Could not install Rook Ceph Operator into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Rook Ceph Operator"
+}
+
+function install_helm_rook_ceph_cluster(){
+    echo -e "$yellow Installing Rook Ceph Cluster via helm"
+    helm repo add rook-release https://charts.rook.io/release
+    (helm install --create-namespace --namespace rook-ceph rook-ceph-cluster --set operatorNamespace=rook-ceph rook-release/rook-ceph-cluster || 
+    { 
+        echo -e "$red 🛑 Could not install Rook Ceph Cluster into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Rook Ceph Cluster"
 }
 
 function install_vault_trivy(){
@@ -1085,6 +1115,29 @@ function install_mongodb_application() {
     show_mongodb_after_installation
 }
 
+function install_rook_ceph_operator_application() {
+    echo -e "$yellow Installing Rook Ceph Operator ArgoCD application"
+    (kubectl apply -f $rook_ceph_operator_app_yaml|| 
+    { 
+        echo -e "$red 🛑 Could not install Rook Ceph Operator ArgoCD application into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Rook Ceph Operator ArgoCD application"
+}
+
+function install_rook_ceph_cluster_application() {
+    echo -e "$yellow Installing Rook Ceph Cluster ArgoCD application"
+    (kubectl apply -f $rook_ceph_cluster_app_yaml|| 
+    { 
+        echo -e "$red 🛑 Could not install Rook Ceph Cluster ArgoCD application into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Rook Ceph Cluster ArgoCD application"
+}
+
+
 function post_pgadmin_install() {
     echo -e "$yellow\n⏰ Waiting for Pgadmin4 to be running"
     sleep 10
@@ -1248,6 +1301,12 @@ perform_action() {
         install-helm-pgadmin|ihpga)
             install_helm_pgadmin
             exit;;
+        install-helm-rook_ceph_operator|ihrco)
+            install_helm_rook_ceph_operator
+            exit;;
+        install-helm-rook_ceph_cluster|ihrcc)
+            install_helm_rook_ceph_cluster
+            exit;;
 
         install-app-nyancat|iac)
             install_nyancat_application
@@ -1284,6 +1343,12 @@ perform_action() {
             exit;;
         install-app-pgadmin|iapga)
             install_pgadmin_application
+            exit;;
+        install-app-rook-ceph-operator|iarco)
+            install_rook_ceph_operator_application
+            exit;;
+        install-app-rook-ceph-cluster|iarcc)
+            install_rook_ceph_cluster_application
             exit;;
         *) # Invalid option
             print_logo

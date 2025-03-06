@@ -1,16 +1,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: metallb
+  name: rook-ceph-cluster
   namespace: argocd
 spec:
   destination:
-    namespace: metallb
+    namespace: rook-ceph
     server: https://kubernetes.default.svc
   project: default
   source:
-    chart: metallb
-    repoURL: https://metallb.github.io/metallb
+    chart: rook-ceph-cluster
+    repoURL: https://charts.rook.io/release
     targetRevision: "*"
   syncPolicy:
     automated:

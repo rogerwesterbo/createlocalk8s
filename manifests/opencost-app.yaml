@@ -17,12 +17,13 @@ spec:
         - name: opencost.prometheus.internal.serviceName
           value: prometheus-kube-prometheus-prometheus
         - name: opencost.prometheus.internal.port
-          value: '9090'
+          value: "9090"
     repoURL: https://opencost.github.io/opencost-helm-chart
-    targetRevision: '*'
+    targetRevision: "*"
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true

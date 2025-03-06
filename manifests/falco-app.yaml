@@ -11,18 +11,19 @@ spec:
   source:
     chart: falco
     repoURL: https://falcosecurity.github.io/charts
-    targetRevision: '*'
+    targetRevision: "*"
     helm:
       parameters:
         - name: falcosidekick.enabled
-          value: 'true'
+          value: "true"
         - name: falcosidekick.webui.enabled
-          value: 'true'
+          value: "true"
         - name: falcosidekick.config.talon.address
-          value: 'http://falco-talon:2803'
+          value: "http://falco-talon:2803"
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - ServerSideApply=true
