@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: postgres-operator-ui
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
   destination:
     namespace: postgres
@@ -11,7 +13,7 @@ spec:
   source:
     chart: postgres-operator-ui
     repoURL: https://opensource.zalando.com/postgres-operator/charts/postgres-operator-ui
-    targetRevision: "*"
+    targetRevision: '*'
   syncPolicy:
     automated:
       prune: true

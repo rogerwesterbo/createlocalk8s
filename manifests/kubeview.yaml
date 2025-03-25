@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: kubeview
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
   destination:
     namespace: kubeview

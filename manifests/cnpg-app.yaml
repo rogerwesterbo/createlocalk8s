@@ -5,6 +5,7 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: '2'
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
   destination:
     namespace: postgres-operator

@@ -5,6 +5,7 @@ metadata:
   namespace: argocd # Namespace in which ArgoCD is deployed
   annotations:
     argocd.argoproj.io/sync-wave: '-8'
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
   destination:
     namespace: prometheus
@@ -14,6 +15,13 @@ spec:
     chart: kube-prometheus-stack
     repoURL: https://prometheus-community.github.io/helm-charts
     targetRevision: '*'
+    helm:
+      values: |
+        prometheusOperator:
+          admissionWebhooks:
+            patch:
+              podAnnotations:
+                sidecar.istio.io/inject: "false"
   syncPolicy:
     automated:
       prune: true

@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: trivy
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
   destination:
     namespace: trivy
@@ -11,7 +13,7 @@ spec:
   source:
     chart: trivy-operator
     repoURL: https://aquasecurity.github.io/helm-charts/
-    targetRevision: "*"
+    targetRevision: '*'
   syncPolicy:
     automated:
       prune: true

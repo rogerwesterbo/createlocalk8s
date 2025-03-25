@@ -2,17 +2,17 @@
 
 ## Prerequisites
 
-- Linux based terminal, Git bash, MacOs terminal or of course a terminal in a unix-system. Windows command prompt or Powershell does not work!
-- kubectl (https://kubernetes.io/docs/tasks/tools/)
-- docker
-- kind
-- helm
-- jq
-- base64
+-   Linux based terminal, Git bash, MacOs terminal or of course a terminal in a unix-system. Windows command prompt or Powershell does not work!
+-   kubectl (https://kubernetes.io/docs/tasks/tools/)
+-   docker
+-   kind
+-   helm
+-   jq
+-   base64
 
 Optional:
 
-- k9s (https://github.com/derailed/k9s) / lens (https://k8slens.dev/)
+-   k9s (https://github.com/derailed/k9s) / lens (https://k8slens.dev/)
 
 ## Create a cluster with 1 controle plane and three workers:
 
@@ -97,21 +97,21 @@ If `condition met` all good :white_check_mark:
 # Install Nyan-cat test app with argocd application:
 
 1. reuse portforward from previous and to to http://localhost:58080
-   - or go to section "Port forward to argocd webpage
+    - or go to section "Port forward to argocd webpage
 2. click the "+ NEW APP" or the "Create application" in the middle of the start page
 3. inputs:
-   - Application name: "nyan-cat"
-   - Project name -> select "default"
-   - Sync policy -> Automatic
-   - Check off
-     - :white_check_mark: Prune resources
-     - :white_check_mark: Self heal
-     - :white_check_mark: Set default finalizer
-     - :white_check_mark: Auto-Create Namespace
-   - Repository url: https://github.com/rogerwesterbo/nyan-cat.git
-   - Path: charts/nyan-cat
-   - Cluster Url -> "https://kubernetes.default.svc"
-   - Namespace: "nyan-cat"
+    - Application name: "nyan-cat"
+    - Project name -> select "default"
+    - Sync policy -> Automatic
+    - Check off
+        - :white_check_mark: Prune resources
+        - :white_check_mark: Self heal
+        - :white_check_mark: Set default finalizer
+        - :white_check_mark: Auto-Create Namespace
+    - Repository url: https://github.com/rogerwesterbo/nyan-cat.git
+    - Path: charts/nyan-cat
+    - Cluster Url -> "https://kubernetes.default.svc"
+    - Namespace: "nyan-cat"
 4. Click "create" button on top
 5. Application will be create, and argocd will install the helm chart
 6. :white_check_mark:

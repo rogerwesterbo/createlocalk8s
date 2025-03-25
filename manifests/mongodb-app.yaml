@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: mongodb
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
   destination:
     namespace: mongodb

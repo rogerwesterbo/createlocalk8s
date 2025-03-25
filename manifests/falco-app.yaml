@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: falco
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
   destination:
     namespace: falco
@@ -11,15 +13,15 @@ spec:
   source:
     chart: falco
     repoURL: https://falcosecurity.github.io/charts
-    targetRevision: "*"
+    targetRevision: '*'
     helm:
       parameters:
         - name: falcosidekick.enabled
-          value: "true"
+          value: 'true'
         - name: falcosidekick.webui.enabled
-          value: "true"
+          value: 'true'
         - name: falcosidekick.config.talon.address
-          value: "http://falco-talon:2803"
+          value: 'http://falco-talon:2803'
   syncPolicy:
     automated:
       prune: true

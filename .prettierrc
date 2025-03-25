@@ -1,0 +1,21 @@
+{
+    "singleQuote": true,
+    "trailingComma": "all",
+    "endOfLine": "auto",
+    "printWidth": 150,
+    "tabWidth": 4,
+    "overrides": [
+        {
+            "files": "*.yml",
+            "options": {
+                "tabWidth": 2
+            }
+        },
+        {
+            "files": "*.yaml",
+            "options": {
+                "tabWidth": 2
+            }
+        }
+    ]
+}
