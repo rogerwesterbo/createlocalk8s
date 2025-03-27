@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openebs
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  destination:
+    namespace: openebs
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: openebs
+    repoURL: https://openebs.github.io/openebs
+    targetRevision: '*'
+    helm:
+      values: |
+        lvm-localpv:
+          lvmNode:
+            kubeletDir: /var/lib/kubelet
+        zfs-localpv:
+          zfsNode:
+            kubeletDir: /var/lib/kubelet
+        mayastor:
+          crds:
+            enabled: true
+          csi:
+            node:
+              kubeletDir: /var/lib/kubelet
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

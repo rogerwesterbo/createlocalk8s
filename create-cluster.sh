@@ -39,6 +39,7 @@ pgadmin_app_yaml=$(get_abs_filename "$manifestDir/pgadmin-app.yaml")
 rook_ceph_operator_app_yaml=$(get_abs_filename "$manifestDir/rook-ceph-operator-app.yaml")
 rook_ceph_cluster_app_yaml=$(get_abs_filename "$manifestDir/rook-ceph-cluster-app.yaml")
 cluster_info_file=$(get_abs_filename "$clustersDir/clusterinfo-$cluster_name.txt")
+openebs_app_yaml=$(get_abs_filename "$manifestDir/openebs-app.yaml")
 argocd_password=""
 
 declare -a kindk8sversions=(
@@ -91,32 +92,34 @@ function print_help() {
     echo "  kubeconfig                alias: kc      Get kubeconfig for a cluster by name"
     echo "  delete                    alias: d       Delete a cluster by name"
     echo "  help                      alias: h       Print this Help"
-    #echo "  install-nginx-kind        alias: ink     Install Nginx Ingress Controller for kind to current cluster"    
     echo ""
     echo "Helm:"
     echo "  install-helm-argocd        alias: iha     Install ArgoCD with helm"
+    echo "  install-helm-ceph-operator alias: ihrco   Install Rook Ceph Operator with helm"
+    echo "  install-helm-ceph-cluster  alias: ihrcc   Install Rook Ceph Cluster with helm"
     echo "  install-helm-falco         alias: ihf     Install Falco with helm"
     echo "  install-helm-metallb       alias: ihm     Install Metallb with helm"
     echo "  install-helm-mongodb       alias: ihmdb   Install Mongodb with helm"
+    echo "  install-helm-openebs       alias: ihoe     Install OpenEBS with helm"
     echo "  install-helm-postgres      alias: ihpg    Install Cloud Native Postgres Operator with helm"
     echo "  install-helm-pgadmin       alias: ihpa    Install PgAdmin4 with helm"
-    echo "  install-helm-ceph-operator alias: ihrco   Install Rook Ceph Operator with helm"
-    echo "  install-helm-ceph-cluster  alias: ihrcc   Install Rook Ceph Cluster with helm"
     echo "  install-helm-trivy         alias: iht     Install Trivy Operator with helm"
     echo "  install-helm-vault         alias: ihv     Install Vault with helm"
     echo ""
     echo "ArgoCD Applications:"
+    echo "  install-app-ceph-operator alias: iarco   Install Rook Ceph Operator ArgoCD application"
+    echo "  install-app-ceph-cluster  alias: iarcc   Install Rook Ceph Cluster ArgoCD application"
     echo "  install-app-certmanager   alias: iacm    Install Cert-manager ArgoCD application"
     echo "  install-app-falco         alias: iaf     Install Falco ArgoCD application"
     echo "  install-app-kubeview      alias: iakv    Install Kubeview ArgoCD application"
-    echo "  install-app-nyancat       alias: iac     Install Nyan-cat ArgoCD application"
     echo "  install-app-mongodb       alias: iamdb   Install Mongodb ArgoCD application"
+    echo "  install-app-nyancat       alias: iac     Install Nyan-cat ArgoCD application"
+    echo "  install-app-openebs       alias: iaoe    Install OpenEBS ArgoCD application"
     echo "  install-app-opencost      alias: iaoc    Install OpenCost ArgoCD application"
     echo "  install-app-postgres      alias: iapg    Install Cloud Native Postgres Operator ArgoCD application"
     echo "  install-app-pgadmin       alias: iapga   Install PgAdmin4 ArgoCD application"
     echo "  install-app-prometheus    alias: iap     Install Kube-prometheus-stack ArgoCD application"
-    echo "  install-app-ceph-operator alias: iarco   Install Rook Ceph Operator ArgoCD application"
-    echo "  install-app-ceph-cluster  alias: iarcc   Install Rook Ceph Cluster ArgoCD application"
+    
     echo "  install-app-metallb       alias: iam     Install Metallb ArgoCD application"
     echo "  install-app-trivy         alias: iat     Install Trivy Operator ArgoCD application"
     echo "  install-app-vault         alias: iav     Install Hashicorp Vault ArgoCD application"
@@ -525,6 +528,21 @@ function install_helm_pgadmin(){
     echo -e "$yellow ✅ Done installing PgAdmin4"
 
     post_pgadmin_install
+}
+
+function install_helm_openebs(){
+    echo -e "$yellow Installing OpenEBS with helm"
+    helm repo add openebs https://openebs.github.io/openebs
+
+    (helm install openebs --namespace openebs openebs/openebs --create-namespace || 
+    { 
+        echo -e "$red 🛑 Could not install OpenEBS into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing OpenEBS"
+
+    echo -e "$yellow\nTo see more documentation, go to https://docs.openebs.io/"
 }
 
 function install_helm_rook_ceph_operator(){
@@ -988,6 +1006,21 @@ function install_opencost_application() {
     echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:9090"
 }
 
+function install_openebs_application() {
+    echo -e "$yellow Installing OpenEBS ArgoCD application"
+    (kubectl apply -f $openebs_app_yaml|| 
+    { 
+        echo -e "$red 🛑 Could not install OpenEBS ArgoCD application into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing OpenEBS ArgoCD application"
+
+    echo "OpenEBS argocd application installed: yes" >> $cluster_info_file
+
+    echo -e "$yellow\nTo see more documentation, go to https://docs.openebs.io/"
+}
+
 function install_metallb_application() {
     echo -e "$yellow Installing Metallb ArgoCD application"
     (kubectl apply -f $metallb_app_yaml|| 
@@ -1307,6 +1340,9 @@ perform_action() {
         install-helm-rook_ceph_cluster|ihrcc)
             install_helm_rook_ceph_cluster
             exit;;
+        install-helm-openebs|ihoe)
+            install_helm_openebs
+            exit;;
 
         install-app-nyancat|iac)
             install_nyancat_application
@@ -1322,6 +1358,9 @@ perform_action() {
             exit;;
         install-app-opencost|iaoc)
             install_opencost_application
+            exit;;
+        install-app-openebs|iaoe)
+            install_openebs_application
             exit;;
         install-app-metallb|iam)
             install_metallb_application
