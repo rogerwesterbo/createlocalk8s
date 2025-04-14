@@ -40,6 +40,7 @@ rook_ceph_operator_app_yaml=$(get_abs_filename "$manifestDir/rook-ceph-operator-
 rook_ceph_cluster_app_yaml=$(get_abs_filename "$manifestDir/rook-ceph-cluster-app.yaml")
 cluster_info_file=$(get_abs_filename "$clustersDir/clusterinfo-$cluster_name.txt")
 openebs_app_yaml=$(get_abs_filename "$manifestDir/openebs-app.yaml")
+crossplane_app_yaml=$(get_abs_filename "$manifestDir/crossplane-app.yaml")
 argocd_password=""
 
 declare -a kindk8sversions=(
@@ -95,12 +96,13 @@ function print_help() {
     echo ""
     echo "Helm:"
     echo "  install-helm-argocd        alias: iha     Install ArgoCD with helm"
+    echo "  install-crossplane         alias: ihcr    Install Crossplane with helm"
     echo "  install-helm-ceph-operator alias: ihrco   Install Rook Ceph Operator with helm"
     echo "  install-helm-ceph-cluster  alias: ihrcc   Install Rook Ceph Cluster with helm"
     echo "  install-helm-falco         alias: ihf     Install Falco with helm"
     echo "  install-helm-metallb       alias: ihm     Install Metallb with helm"
     echo "  install-helm-mongodb       alias: ihmdb   Install Mongodb with helm"
-    echo "  install-helm-openebs       alias: ihoe     Install OpenEBS with helm"
+    echo "  install-helm-openebs       alias: ihoe    Install OpenEBS with helm"
     echo "  install-helm-postgres      alias: ihpg    Install Cloud Native Postgres Operator with helm"
     echo "  install-helm-pgadmin       alias: ihpa    Install PgAdmin4 with helm"
     echo "  install-helm-trivy         alias: iht     Install Trivy Operator with helm"
@@ -110,6 +112,7 @@ function print_help() {
     echo "  install-app-ceph-operator alias: iarco   Install Rook Ceph Operator ArgoCD application"
     echo "  install-app-ceph-cluster  alias: iarcc   Install Rook Ceph Cluster ArgoCD application"
     echo "  install-app-certmanager   alias: iacm    Install Cert-manager ArgoCD application"
+    echo "  install-app-crossplane    alias: iacr    Install Crossplane ArgoCD application"
     echo "  install-app-falco         alias: iaf     Install Falco ArgoCD application"
     echo "  install-app-kubeview      alias: iakv    Install Kubeview ArgoCD application"
     echo "  install-app-mongodb       alias: iamdb   Install Mongodb ArgoCD application"
@@ -579,6 +582,19 @@ function install_vault_trivy(){
     }) & spinner
 
     echo -e "$yellow ✅ Done installing Trivy-operator"
+}
+
+function install_helm_crossplane(){
+    echo -e "$yellow Installing Crossplane"
+    
+    helm repo add crossplane-stable https://charts.crossplane.io/stable
+    ( helm install crossplane --namespace crossplane-system --create-namespace crossplane-stable/crossplane|| 
+    { 
+        echo -e "$red 🛑 Could not install Crossplane into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Crossplane"
 }
 
 function install_nginx_controller_for_kind(){
@@ -1170,6 +1186,16 @@ function install_rook_ceph_cluster_application() {
     echo -e "$yellow ✅ Done installing Rook Ceph Cluster ArgoCD application"
 }
 
+function install_crossplane_application() {
+    echo -e "$yellow Installing Crossplane ArgoCD application"
+    (kubectl apply -f $crossplane_app_yaml|| 
+    { 
+        echo -e "$red 🛑 Could not install Crossplane ArgoCD application into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Crossplane ArgoCD application"
+}
 
 function post_pgadmin_install() {
     echo -e "$yellow\n⏰ Waiting for Pgadmin4 to be running"
@@ -1343,6 +1369,9 @@ perform_action() {
         install-helm-openebs|ihoe)
             install_helm_openebs
             exit;;
+        install-helm-crossplane|ihcr)
+            install_helm_crossplane
+            exit;;
 
         install-app-nyancat|iac)
             install_nyancat_application
@@ -1388,6 +1417,9 @@ perform_action() {
             exit;;
         install-app-rook-ceph-cluster|iarcc)
             install_rook_ceph_cluster_application
+            exit;;
+        install-app-crossplane|iacr)
+            install_crossplane_application
             exit;;
         *) # Invalid option
             print_logo
