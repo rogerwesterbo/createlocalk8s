@@ -174,7 +174,7 @@ function check_prerequisites() {
         return
     fi
 
-    echo -e "$yellow Missing prerequisites: "
+    echo -e "$red Missing prerequisites: \n"
 
     echo -e "$docker_cmd"
     echo -e "$kind_cmd"
