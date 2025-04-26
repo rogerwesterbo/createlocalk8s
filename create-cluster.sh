@@ -41,6 +41,7 @@ rook_ceph_cluster_app_yaml=$(get_abs_filename "$manifestDir/rook-ceph-cluster-ap
 cluster_info_file=$(get_abs_filename "$clustersDir/clusterinfo-$cluster_name.txt")
 openebs_app_yaml=$(get_abs_filename "$manifestDir/openebs-app.yaml")
 crossplane_app_yaml=$(get_abs_filename "$manifestDir/crossplane-app.yaml")
+nginx_controller_app_yaml=$(get_abs_filename "$manifestDir/nginx-controller-app.yaml")
 argocd_password=""
 
 declare -a kindk8sversions=(
@@ -100,6 +101,7 @@ function print_help() {
     echo "  install-helm-ceph-operator alias: ihrco   Install Rook Ceph Operator with helm"
     echo "  install-helm-ceph-cluster  alias: ihrcc   Install Rook Ceph Cluster with helm"
     echo "  install-helm-falco         alias: ihf     Install Falco with helm"
+    echo "  install-helm-nginx         alias: ihn     Install Nginx controller with helm"
     echo "  install-helm-metallb       alias: ihm     Install Metallb with helm"
     echo "  install-helm-mongodb       alias: ihmdb   Install Mongodb with helm"
     echo "  install-helm-openebs       alias: ihoe    Install OpenEBS with helm"
@@ -115,6 +117,7 @@ function print_help() {
     echo "  install-app-crossplane    alias: iacr    Install Crossplane ArgoCD application"
     echo "  install-app-falco         alias: iaf     Install Falco ArgoCD application"
     echo "  install-app-kubeview      alias: iakv    Install Kubeview ArgoCD application"
+    echo "  install-app-nginx         alias: ian     Install Nginx Controller ArgoCD application"
     echo "  install-app-mongodb       alias: iamdb   Install Mongodb ArgoCD application"
     echo "  install-app-nyancat       alias: iac     Install Nyan-cat ArgoCD application"
     echo "  install-app-openebs       alias: iaoe    Install OpenEBS ArgoCD application"
@@ -653,6 +656,19 @@ function install_helm_crossplane(){
     }) & spinner
 
     echo -e "$yellow ✅ Done installing Crossplane"
+}
+
+function install_helm_nginx_controller(){
+    echo -e "$yellow Installing Nginx Controller"
+    
+    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+    ( helm upgrade --install ingress-nginx ingress-nginx --repo https://kubernetes.github.io/ingress-nginx --namespace ingress-nginx --create-namespace|| 
+    { 
+        echo -e "$red 🛑 Could not install Nginx Controller into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Nginx Controller"
 }
 
 function install_nginx_controller_for_kind(){
@@ -1255,6 +1271,17 @@ function install_crossplane_application() {
     echo -e "$yellow ✅ Done installing Crossplane ArgoCD application"
 }
 
+function install_nginx_controller_application() {
+    echo -e "$yellow Installing Nginx Controller ArgoCD application"
+    (kubectl apply -f $nginx_controller_app_yaml|| 
+    { 
+        echo -e "$red 🛑 Could not install Nginx Controller ArgoCD application into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Nginx Controller ArgoCD application"
+}
+
 function post_pgadmin_install() {
     echo -e "$yellow\n⏰ Waiting for Pgadmin4 to be running"
     sleep 10
@@ -1426,6 +1453,9 @@ perform_action() {
         install-helm-crossplane|ihcr)
             install_helm_crossplane
             exit;;
+        install-helm-nginx|ihn)
+            install_helm_nginx_controller
+            exit;;
 
         install-app-nyancat|iac)
             install_nyancat_application
@@ -1474,6 +1504,9 @@ perform_action() {
             exit;;
         install-app-crossplane|iacr)
             install_crossplane_application
+            exit;;
+        install-app-nginx|ian)
+            install_nginx_controller_application
             exit;;
         *) # Invalid option
             print_logo
