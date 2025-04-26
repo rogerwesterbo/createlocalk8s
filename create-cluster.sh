@@ -132,7 +132,6 @@ function print_help() {
     now=$(date)
     printf "Current date and time in Linux %s\n" "$now"
     echo ""
-    echo -e "$clear"
 }
 
 clear
@@ -158,22 +157,43 @@ spinner()
     echo -e "$clear"
 }
 
+function check_prerequisites() {
+    docker_cmd=$(prerequisites "docker")
+    kind_cmd=$(prerequisites "kind")
+    kubectl_cmd=$(prerequisites "kubectl")
+    jq_cmd=$(prerequisites "jq")
+    base64_cmd=$(prerequisites "base64")
+    helm_cmd=$(prerequisites "helm")
+
+    # Helper to trim whitespace
+    trim() {
+        echo "$1" | xargs
+    }
+
+    if [ -z "$(trim "$docker_cmd")" ] && [ -z "$(trim "$kind_cmd")" ] && [ -z "$(trim "$kubectl_cmd")" ] && [ -z "$(trim "$jq_cmd")" ] && [ -z "$(trim "$base64_cmd")" ] && [ -z "$(trim "$helm_cmd")" ]; then
+        return
+    fi
+
+    echo -e "$docker_cmd"
+    echo -e "$kind_cmd"
+    echo -e "$kubectl_cmd"
+    echo -e "$jq_cmd"
+    echo -e "$base64_cmd"
+    echo -e "$helm_cmd"
+    echo -e "$red 🚨 One or more prerequisites are not installed. Please install them! 🚨"
+    exit 1
+}
+
 function prerequisites() {
   if ! command -v $1 1> /dev/null
   then
       echo -e "$red 🚨 $1 could not be found. Install it! 🚨"
-      exit
   fi
 }
 
 function get_cluster_parameter() {
     detect_os
-    prerequisites docker
-    prerequisites kind
-    prerequisites kubectl
-    prerequisites helm
-    prerequisites jq
-    prerequisites base64
+    check_prerequisites
 
     if ! docker info > /dev/null 2>&1; then
         echo -e "$red This script uses docker, and it isn't running - please start docker and try again!"
@@ -367,6 +387,41 @@ ArgoCD admin GUI url: http://localhost:58080" >> $cluster_info_file
     fi
 }
 
+# Generic Helm install helper
+function helm_install_generic() {
+    local name="$1"
+    local repo_name="$2"
+    local repo_url="$3"
+    local chart="$4"
+    local namespace="$5"
+    local extra_args="$6"
+    local post_wait_cmd="$7"
+    local post_msg="$8"
+
+    echo -e "$yellow Installing $name"
+    helm repo add "$repo_name" "$repo_url"
+    (helm upgrade --install "$name" "$repo_name/$chart" --namespace "$namespace" --create-namespace $extra_args || 
+    { 
+        echo -e "$red 🛑 Could not install $name into cluster ..."
+        die
+    }) & spinner
+
+    if [ -n "$post_wait_cmd" ]; then
+        echo -e "$yellow\n⏰ Waiting for $name to be ready"
+        sleep 10
+        ($post_wait_cmd || 
+        { 
+            echo -e "$red 🛑 $name is not ready ..."
+            die
+        }) & spinner
+    fi
+
+    echo -e "$yellow ✅ Done installing $name"
+    if [ -n "$post_msg" ]; then
+        echo -e "$yellow$post_msg"
+    fi
+}
+
 function install_helm_argocd(){
     echo -e "$yellow Installing ArgoCD "
     helm repo add argo https://argoproj.github.io/argo-helm
@@ -409,27 +464,27 @@ function install_helm_argocd(){
 }
 
 function install_helm_metallb(){
-    echo -e "$yellow Installing Metallb"
-    helm repo add metallb https://metallb.github.io/metallb
-    (helm install metallb metallb/metallb --namespace metallb --create-namespace || 
-    { 
-        echo -e "$red 🛑 Could not install metallb into cluster ..."
-        die
-    }) & spinner
-
-    echo -e "$yellow ✅ Done installing Metallb"
+    helm_install_generic \
+        "metallb" \
+        "metallb" \
+        "https://metallb.github.io/metallb" \
+        "metallb" \
+        "metallb" \
+        "" \
+        "" \
+        ""
 }
 
 function install_helm_trivy(){
-    echo -e "$yellow Installing Trivy-operator"
-    helm repo add aqua https://aquasecurity.github.io/helm-charts/
-    (helm install trivy-operator aqua/trivy-operator --namespace trivy --create-namespace || 
-    { 
-        echo -e "$red 🛑 Could not install Trivy-operator into cluster ..."
-        die
-    }) & spinner
-
-    echo -e "$yellow ✅ Done installing Trivy-operator"
+    helm_install_generic \
+        "trivy-operator" \
+        "aqua" \
+        "https://aquasecurity.github.io/helm-charts/" \
+        "trivy-operator" \
+        "trivy" \
+        "" \
+        "" \
+        ""
 }
 
 function install_helm_falco(){
@@ -723,7 +778,7 @@ function install_nyancat_application(){
     echo -e "$yellow ✅ Done installing Nyan-cat ArgoCD application"
     echo -e "$yellow ⏰ Waiting for Nyancat ArgoCD application to be ready"
     sleep 10
-    (kubectl wait --namespace nyancat --for=condition=ready pod --selector=app.kubernetes.io/name=nyan-cat --timeout=90s || 
+    (kubectl wait --namespace nyan-cat --for=condition=ready pod --selector=app.kubernetes.io/name=nyan-cat --timeout=90s || 
     { 
         echo -e "$red 
         🛑 Could not install Nyan-cat ArgoCD application into cluster  ...
@@ -1332,10 +1387,6 @@ perform_action() {
             get_kubeconfig $*
             exit;;
         
-        # install-nginx-kind|ink)
-        #     install_nginx_controller_for_kind
-        #     exit;;
-        
         install-helm-argocd|iha)
             install_helm_argocd
             exit;;
@@ -1435,6 +1486,8 @@ if [ "$#" -eq 0 ]; then
     detect_os
     print_logo
     print_help
+
+    check_prerequisites
 
     exit
 else
