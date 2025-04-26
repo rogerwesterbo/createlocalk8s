@@ -174,13 +174,15 @@ function check_prerequisites() {
         return
     fi
 
+    echo -e "$yellow Missing prerequisites: "
+
     echo -e "$docker_cmd"
     echo -e "$kind_cmd"
     echo -e "$kubectl_cmd"
     echo -e "$jq_cmd"
     echo -e "$base64_cmd"
     echo -e "$helm_cmd"
-    echo -e "$red 🚨 One or more prerequisites are not installed. Please install them! 🚨"
+    echo -e "$red \n🚨 One or more prerequisites are not installed. Please install them! 🚨"
     echo -e "$clear"
     exit 1
 }
