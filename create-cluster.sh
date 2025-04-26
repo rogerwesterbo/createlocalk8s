@@ -181,6 +181,7 @@ function check_prerequisites() {
     echo -e "$base64_cmd"
     echo -e "$helm_cmd"
     echo -e "$red 🚨 One or more prerequisites are not installed. Please install them! 🚨"
+    echo -e "$clear"
     exit 1
 }
 
