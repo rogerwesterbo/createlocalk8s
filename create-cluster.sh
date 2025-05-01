@@ -1,23 +1,18 @@
 #!/bin/bash
-function get_abs_filename() {
-  # $1 : relative filename
-  echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
-}
 
-function die () {
-    ec=$1
-    kill $$
-}
+for file in ./bash/variables.sh ./bash/common.sh ./bash/helm.sh ./bash/argo.sh ./bash/kind.sh; do
+    if [ -f "$file" ]; then
+        source "$file"
+    else
+        echo "Error: Required file $file not found. Exiting."
+        exit 1
+    fi
+done
 
-# global variables
+# file variables
 scriptDir=$(dirname -- "$(readlink -f -- "$BASH_SOURCE")")
 manifestDir=$(get_abs_filename "$scriptDir/manifests")
 clustersDir=$(get_abs_filename "$scriptDir/clusters")
-cluster_name="testcluster"
-worker_number=0
-controlplane_number=1
-install_nginx_controller="yes"
-install_argocd="yes"
 kind_config_path=$(get_abs_filename "$manifestDir/kindconfig.yaml")
 kind_config_template_path=$(get_abs_filename "$manifestDir/kindconfig-template.yaml")
 kind_config_file=$(get_abs_filename "$clustersDir/configkind-$cluster_name.yaml")
@@ -42,160 +37,9 @@ cluster_info_file=$(get_abs_filename "$clustersDir/clusterinfo-$cluster_name.txt
 openebs_app_yaml=$(get_abs_filename "$manifestDir/openebs-app.yaml")
 crossplane_app_yaml=$(get_abs_filename "$manifestDir/crossplane-app.yaml")
 nginx_controller_app_yaml=$(get_abs_filename "$manifestDir/nginx-controller-app.yaml")
-argocd_password=""
-
-declare -a kindk8sversions=(
-    "v1.32.2:kindest/node:v1.32.2@sha256:f226345927d7e348497136874b6d207e0b32cc52154ad8323129352923a3142f"
-    "v1.31.6:kindest/node:v1.31.6@ssha256:28b7cbb993dfe093c76641a0c95807637213c9109b761f1d422c2400e22b8e87"
-    "v1.30.10:kindest/node:v1.30.10@sha256:4de75d0e82481ea846c0ed1de86328d821c1e6a6a91ac37bf804e5313670e507"
-    "v1.29.12:kindest/node:v1.29.12@sha256:62c0672ba99a4afd7396512848d6fc382906b8f33349ae68fb1dbfe549f70dec"
-    "v1.28.15:kindest/node:v1.28.15@sha256:a7c05c7ae043a0b8c818f5a06188bc2c4098f6cb59ca7d1856df00375d839251"
-    "v1.27.16:kindest/node:v1.27.16@sha256:2d21a61643eafc439905e18705b8186f3296384750a835ad7a005dceb9546d20"
-    "v1.26.15:kindest/node:v1.26.15@sha256:c79602a44b4056d7e48dc20f7504350f1e87530fe953428b792def00bc1076dd"
-    "v1.25.16:kindest/node:v1.25.16@sha256:6110314339b3b44d10da7d27881849a87e092124afab5956f2e10ecdb463b025"
-)
-
-firstk8sversion="${kindk8sversions[0]}"
-IFS=':' read -r k8s_version kind_image <<< "$firstk8sversion"
-kindk8simage=$kind_image
-kindk8sversion=$k8s_version
-
-kindk8spossibilities=""
-for version in "${kindk8sversions[@]}"; do
-    IFS=':' read -r k8s_version kind_image <<< "$version"
-    kindk8spossibilities="$kindk8spossibilities $k8s_version,"
-done
-
-function print_logo() {
-    echo -e "$blue"
-
-    echo ""
-    echo " ▄████▄   ██▀███  ▓█████ ▄▄▄     ▄▄▄█████▓▓█████     ▄████▄   ██▓     █    ██   ██████ ▄▄▄█████▓▓█████  ██▀███  ";
-    echo "▒██▀ ▀█  ▓██ ▒ ██▒▓█   ▀▒████▄   ▓  ██▒ ▓▒▓█   ▀    ▒██▀ ▀█  ▓██▒     ██  ▓██▒▒██    ▒ ▓  ██▒ ▓▒▓█   ▀ ▓██ ▒ ██▒";
-    echo "▒▓█    ▄ ▓██ ░▄█ ▒▒███  ▒██  ▀█▄ ▒ ▓██░ ▒░▒███      ▒▓█    ▄ ▒██░    ▓██  ▒██░░ ▓██▄   ▒ ▓██░ ▒░▒███   ▓██ ░▄█ ▒";
-    echo "▒▓▓▄ ▄██▒▒██▀▀█▄  ▒▓█  ▄░██▄▄▄▄██░ ▓██▓ ░ ▒▓█  ▄    ▒▓▓▄ ▄██▒▒██░    ▓▓█  ░██░  ▒   ██▒░ ▓██▓ ░ ▒▓█  ▄ ▒██▀▀█▄  ";
-    echo "▒ ▓███▀ ░░██▓ ▒██▒░▒████▒▓█   ▓██▒ ▒██▒ ░ ░▒████▒   ▒ ▓███▀ ░░██████▒▒▒█████▓ ▒██████▒▒  ▒██▒ ░ ░▒████▒░██▓ ▒██▒";
-    echo "░ ░▒ ▒  ░░ ▒▓ ░▒▓░░░ ▒░ ░▒▒   ▓▒█░ ▒ ░░   ░░ ▒░ ░   ░ ░▒ ▒  ░░ ▒░▓  ░░▒▓▒ ▒ ▒ ▒ ▒▓▒ ▒ ░  ▒ ░░   ░░ ▒░ ░░ ▒▓ ░▒▓░";
-    echo "  ░  ▒     ░▒ ░ ▒░ ░ ░  ░ ▒   ▒▒ ░   ░     ░ ░  ░     ░  ▒   ░ ░ ▒  ░░░▒░ ░ ░ ░ ░▒  ░ ░    ░     ░ ░  ░  ░▒ ░ ▒░";
-    echo "░          ░░   ░    ░    ░   ▒    ░         ░      ░          ░ ░    ░░░ ░ ░ ░  ░  ░    ░         ░     ░░   ░ ";
-    echo "░ ░         ░        ░  ░     ░  ░           ░  ░   ░ ░          ░  ░   ░           ░              ░  ░   ░     ";
-    echo "░                                                   ░                                                           ";
-
-    echo -e "$clear"
-}
-
-function print_help() {
-    # Display Help
-    echo -e "$yellow"
-    echo "Kind spesific:"    
-    echo "  create                    alias: c       Create a local cluster with kind and docker"
-    echo "  list                      alias: ls      Show kind clusters"
-    echo "  details                   alias: dt      Show details for a cluster"
-    echo "  kubeconfig                alias: kc      Get kubeconfig for a cluster by name"
-    echo "  delete                    alias: d       Delete a cluster by name"
-    echo "  help                      alias: h       Print this Help"
-    echo ""
-    echo "Helm:"
-    echo "  install-helm-argocd        alias: iha     Install ArgoCD with helm"
-    echo "  install-crossplane         alias: ihcr    Install Crossplane with helm"
-    echo "  install-helm-ceph-operator alias: ihrco   Install Rook Ceph Operator with helm"
-    echo "  install-helm-ceph-cluster  alias: ihrcc   Install Rook Ceph Cluster with helm"
-    echo "  install-helm-falco         alias: ihf     Install Falco with helm"
-    echo "  install-helm-nginx         alias: ihn     Install Nginx controller with helm"
-    echo "  install-helm-metallb       alias: ihm     Install Metallb with helm"
-    echo "  install-helm-mongodb       alias: ihmdb   Install Mongodb with helm"
-    echo "  install-helm-openebs       alias: ihoe    Install OpenEBS with helm"
-    echo "  install-helm-postgres      alias: ihpg    Install Cloud Native Postgres Operator with helm"
-    echo "  install-helm-pgadmin       alias: ihpa    Install PgAdmin4 with helm"
-    echo "  install-helm-trivy         alias: iht     Install Trivy Operator with helm"
-    echo "  install-helm-vault         alias: ihv     Install Vault with helm"
-    echo ""
-    echo "ArgoCD Applications:"
-    echo "  install-app-ceph-operator alias: iarco   Install Rook Ceph Operator ArgoCD application"
-    echo "  install-app-ceph-cluster  alias: iarcc   Install Rook Ceph Cluster ArgoCD application"
-    echo "  install-app-certmanager   alias: iacm    Install Cert-manager ArgoCD application"
-    echo "  install-app-crossplane    alias: iacr    Install Crossplane ArgoCD application"
-    echo "  install-app-falco         alias: iaf     Install Falco ArgoCD application"
-    echo "  install-app-kubeview      alias: iakv    Install Kubeview ArgoCD application"
-    echo "  install-app-nginx         alias: ian     Install Nginx Controller ArgoCD application"
-    echo "  install-app-mongodb       alias: iamdb   Install Mongodb ArgoCD application"
-    echo "  install-app-nyancat       alias: iac     Install Nyan-cat ArgoCD application"
-    echo "  install-app-openebs       alias: iaoe    Install OpenEBS ArgoCD application"
-    echo "  install-app-opencost      alias: iaoc    Install OpenCost ArgoCD application"
-    echo "  install-app-postgres      alias: iapg    Install Cloud Native Postgres Operator ArgoCD application"
-    echo "  install-app-pgadmin       alias: iapga   Install PgAdmin4 ArgoCD application"
-    echo "  install-app-prometheus    alias: iap     Install Kube-prometheus-stack ArgoCD application"
-    
-    echo "  install-app-metallb       alias: iam     Install Metallb ArgoCD application"
-    echo "  install-app-trivy         alias: iat     Install Trivy Operator ArgoCD application"
-    echo "  install-app-vault         alias: iav     Install Hashicorp Vault ArgoCD application"
-    echo ""
-    echo "dependencies: docker, kind, kubectl, jq, base64 and helm"
-    echo ""
-    now=$(date)
-    printf "Current date and time in Linux %s\n" "$now"
-    echo ""
-}
+minio_app_yaml=$(get_abs_filename "$manifestDir/minio-app.yaml")
 
 clear
-
-yellow='\033[0;33m'
-clear='\033[0m'
-blue='\033[0;34m'
-red='\033[0;31m'
-
-spinner()
-{
-    local pid=$!
-    local delay=0.25
-    local spinstr='|/-\'
-    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
-        local temp=${spinstr#?}
-        printf "$blue [%c]  " "$spinstr"
-        local spinstr=$temp${spinstr%"$temp"}
-        sleep $delay
-        printf "\b\b\b\b\b\b"
-    done
-    printf "    \b\b\b\b"
-    echo -e "$clear"
-}
-
-function check_prerequisites() {
-    docker_cmd=$(prerequisites "docker")
-    kind_cmd=$(prerequisites "kind")
-    kubectl_cmd=$(prerequisites "kubectl")
-    jq_cmd=$(prerequisites "jq")
-    base64_cmd=$(prerequisites "base64")
-    helm_cmd=$(prerequisites "helm")
-
-    # Helper to trim whitespace
-    trim() {
-        echo "$1" | xargs
-    }
-
-    if [ -z "$(trim "$docker_cmd")" ] && [ -z "$(trim "$kind_cmd")" ] && [ -z "$(trim "$kubectl_cmd")" ] && [ -z "$(trim "$jq_cmd")" ] && [ -z "$(trim "$base64_cmd")" ] && [ -z "$(trim "$helm_cmd")" ]; then
-        return
-    fi
-
-    echo -e "$red Missing prerequisites: \n"
-
-    echo -e "$docker_cmd"
-    echo -e "$kind_cmd"
-    echo -e "$kubectl_cmd"
-    echo -e "$jq_cmd"
-    echo -e "$base64_cmd"
-    echo -e "$helm_cmd"
-    echo -e "$red \n🚨 One or more prerequisites are not installed. Please install them! 🚨"
-    echo -e "$clear"
-    exit 1
-}
-
-function prerequisites() {
-  if ! command -v $1 1> /dev/null
-  then
-      echo -e "$red 🚨 $1 could not be found. Install it! 🚨"
-  fi
-}
 
 function get_cluster_parameter() {
     detect_os
@@ -273,8 +117,14 @@ function get_cluster_parameter() {
     fi
 
     kind_config_file=$(get_abs_filename "$clustersDir/configkind-$cluster_name.yaml")
+    echo -e "$yellow\nKind config file: $kind_config_file"
     if [ -e "$kind_config_file" ] && [ -r "$kind_config_file" ] && [ -w "$kind_config_file" ]; then
         truncate -s 0 "$kind_config_file"
+    fi
+
+    if [ ! -f $kind_config_file ]; then 
+        echo "kind config file not found, creating it: $kind_config_file"
+        touch $kind_config_file; 
     fi
 
     controlplane_port_http=80
@@ -884,25 +734,7 @@ function details_for_cluster() {
     cat $kind_config_file
 }
 
-function is_running_more_than_one_cluster() {
-    local clusters=$(kind get clusters)
-
-    if [ -z "$clusters" ]; then
-        echo "no"
-    fi
-
-    if [[ "$clusters" == "No kind clusters found." ]]; then
-        echo "no"
-    fi
-
-    if [[ $(echo "$clusters" | wc -l) -ge 1 ]]; then
-        echo "yes"
-    # else
-    #     echo "yes - one cluster"
-    fi
-}
-
-function detect_arch {
+function detect_arch() {
     local host_arch
 
     case "$(uname -m)" in
@@ -967,7 +799,7 @@ function detect_os {
   #echo -n "${host_os}"
 }
 
-function detect_binary {
+function detect_binary() {
     host_arch=$(detect_arch)
     host_os=$(detect_os)
 
@@ -1456,6 +1288,9 @@ perform_action() {
         install-helm-nginx|ihn)
             install_helm_nginx_controller
             exit;;
+        install-helm-minio|ihmin)
+            install_helm_minio
+            exit;;
 
         install-app-nyancat|iac)
             install_nyancat_application
@@ -1507,6 +1342,9 @@ perform_action() {
             exit;;
         install-app-nginx|ian)
             install_nginx_controller_application
+            exit;;
+        install-app-minio|iamin)
+            install_minio_application
             exit;;
         *) # Invalid option
             print_logo
