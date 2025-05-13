@@ -1,0 +1,36 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  destination:
+    namespace: minio
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: minio-operator
+    repoURL: https://operator.min.io
+    targetRevision: '*'
+    helm:
+      values: |
+        mode: standalone
+        replicas: 1
+        persistence:
+          enabled: true
+          existingClaim: minio-pvc
+        rootUser: admin
+        rootPassword: minioadmin
+        service:
+          type: ClusterIP
+          port: 9000
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
