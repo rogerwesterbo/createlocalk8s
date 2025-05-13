@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for file in ./bash/variables.sh ./bash/common.sh ./bash/helm.sh ./bash/argo.sh ./bash/kind.sh; do
+for file in ./bash/variables.sh ./bash/common.sh ./bash/helm.sh ./bash/argo-apps.sh ./bash/kind.sh; do
     if [ -f "$file" ]; then
         source "$file"
     else
@@ -38,6 +38,7 @@ openebs_app_yaml=$(get_abs_filename "$manifestDir/openebs-app.yaml")
 crossplane_app_yaml=$(get_abs_filename "$manifestDir/crossplane-app.yaml")
 nginx_controller_app_yaml=$(get_abs_filename "$manifestDir/nginx-controller-app.yaml")
 minio_app_yaml=$(get_abs_filename "$manifestDir/minio-app.yaml")
+nfs_app_yaml=$(get_abs_filename "$manifestDir/nfs-app.yaml")
 
 clear
 
@@ -1291,6 +1292,9 @@ perform_action() {
         install-helm-minio|ihmin)
             install_helm_minio
             exit;;
+        install-helm-nfs|ihnfs)
+            install_helm_nfs
+            exit;;
 
         install-app-nyancat|iac)
             install_nyancat_application
@@ -1345,6 +1349,9 @@ perform_action() {
             exit;;
         install-app-minio|iamin)
             install_minio_application
+            exit;;
+        install-app-nfs|ianfs)
+            install_nfs_application
             exit;;
         *) # Invalid option
             print_logo

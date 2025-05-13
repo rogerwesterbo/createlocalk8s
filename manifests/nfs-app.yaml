@@ -1,32 +1,19 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: minio
+  name: nfs-subdir-external-provisioner
   namespace: argocd
   annotations:
     argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
   destination:
-    namespace: minio
+    namespace: nfs-subdir-external-provisioner
     server: https://kubernetes.default.svc
   project: default
   source:
-    chart: minio-operator
-    repoURL: https://operator.min.io
+    chart: nfs-subdir-external-provisioner
+    repoURL: https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/
     targetRevision: '*'
-    helm:
-      values: |
-        mode: standalone
-        replicas: 1
-        persistence:
-          enabled: true
-          existingClaim: minio-pvc
-        rootUser: admin
-        rootPassword: minioadmin
-        service:
-          type: ClusterIP
-          port: 9000
-
   syncPolicy:
     automated:
       prune: true
