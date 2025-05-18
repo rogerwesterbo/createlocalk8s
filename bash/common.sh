@@ -124,7 +124,6 @@ function print_help() {
     echo "  install-app-postgres      alias: iapg    Install Cloud Native Postgres Operator ArgoCD application"
     echo "  install-app-pgadmin       alias: iapga   Install PgAdmin4 ArgoCD application"
     echo "  install-app-prometheus    alias: iap     Install Kube-prometheus-stack ArgoCD application"
-    
     echo "  install-app-metallb       alias: iam     Install Metallb ArgoCD application"
     echo "  install-app-trivy         alias: iat     Install Trivy Operator ArgoCD application"
     echo "  install-app-vault         alias: iav     Install Hashicorp Vault ArgoCD application"

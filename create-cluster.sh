@@ -868,8 +868,8 @@ function get_kubeconfig() {
 
     echo "$(kind get kubeconfig --name $clusterName)" > $clustersDir/kubeconfig-$clusterName.config
 
-    echo -e "$yellow Kubeconfig saved to kubeconfig-$clusterName.config"
-    echo -e "$yellow To use the kubeconfig, type:$red export KUBECONFIG=kubeconfig-$clusterName.config"
+    echo -e "$yellow Kubeconfig saved to $clustersDir/kubeconfig-$clusterName.config"
+    echo -e "$yellow To use the kubeconfig, type:$red export KUBECONFIG=$clustersDir/kubeconfig-$clusterName.config"
     echo -e "$yellow And then you can use $blue kubectl $yellow to interact with the cluster"
     echo -e "$yellow Example: $blue kubectl get nodes"
     echo ""
