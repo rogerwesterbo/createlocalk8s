@@ -29,7 +29,7 @@ function print_help() {
     echo ""
     echo "Helm:"
     echo "  install-helm-argocd             alias: iha     Install ArgoCD with helm"
-    echo "  install-crossplane              alias: ihcr    Install Crossplane with helm"
+    echo "  install-helm-crossplane         alias: ihcr    Install Crossplane with helm"
     echo "  install-helm-ceph-operator      alias: ihrco   Install Rook Ceph Operator with helm"
     echo "  install-helm-ceph-cluster       alias: ihrcc   Install Rook Ceph Cluster with helm"
     echo "  install-helm-falco              alias: ihf     Install Falco with helm"
@@ -39,7 +39,6 @@ function print_help() {
     echo "  install-helm-minio              alias: ihmin   Install Minio with helm"
     echo "  install-helm-mongodb-operator   alias: ihmdb   Install Mongodb Operator with helm"
     echo "  install-helm-mongodb-instance   alias: ihmdbi  Install Mongodb Instance with helm"
-    echo "  install-helm-openebs            alias: ihoe    Install OpenEBS with helm"
     echo "  install-helm-postgres           alias: ihpg    Install Cloud Native Postgres Operator with helm"
     echo "  install-helm-pgadmin            alias: ihpa    Install PgAdmin4 with helm"
     echo "  install-helm-trivy              alias: iht     Install Trivy Operator with helm"
@@ -58,7 +57,6 @@ function print_help() {
     echo "  install-app-mongodb-operator    alias: iamdb   Install Mongodb Operator ArgoCD application"
     echo "  install-app-mongodb-instance    alias: iamdbi  Install Mongodb Instance ArgoCD application"
     echo "  install-app-nyancat             alias: iac     Install Nyan-cat ArgoCD application"
-    echo "  install-app-openebs             alias: iaoe    Install OpenEBS ArgoCD application"
     echo "  install-app-opencost            alias: iaoc    Install OpenCost ArgoCD application"
     echo "  install-app-postgres            alias: iapg    Install Cloud Native Postgres Operator ArgoCD application"
     echo "  install-app-pgadmin             alias: iapga   Install PgAdmin4 ArgoCD application"
@@ -108,8 +106,11 @@ perform_action() {
         install-helm-metallb|ihm)
             install_helm_metallb
             exit;;
-        install-helm-mongodb|ihmdb)
-            install_helm_mongodb
+        install-helm-mongodb-operator|ihmdb)
+            install_helm_mongodb_operator
+            exit;;
+        install-helm-mongodb-instance|ihmdbi)
+            install_helm_mongodb_instance
             exit;;
         install-helm-trivy|iht)
             install_helm_trivy
@@ -123,7 +124,7 @@ perform_action() {
         install-helm-postgres|ihpg)
             install_helm_postgres
             exit;;
-        install-helm-pgadmin|ihpga)
+        install-helm-pgadmin|ihpa)
             install_helm_pgadmin
             exit;;
         install-helm-rook_ceph_operator|ihrco)
@@ -131,9 +132,6 @@ perform_action() {
             exit;;
         install-helm-rook_ceph_cluster|ihrcc)
             install_helm_rook_ceph_cluster
-            exit;;
-        install-helm-openebs|ihoe)
-            install_helm_openebs
             exit;;
         install-helm-crossplane|ihcr)
             install_helm_crossplane
@@ -162,9 +160,6 @@ perform_action() {
             exit;;
         install-app-opencost|iaoc)
             install_opencost_application
-            exit;;
-        install-app-openebs|iaoe)
-            install_openebs_application
             exit;;
         install-app-metallb|iam)
             install_metallb_application

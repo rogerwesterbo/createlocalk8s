@@ -156,7 +156,7 @@ function install_helm_vault(){
     show_vault_after_installation
 }
 
-function install_helm_mongodb(){
+function install_helm_mongodb_operator(){
     echo -e "$yellow Installing Mongodb with helm"
     
     helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -173,6 +173,29 @@ function install_helm_mongodb(){
     (kubectl wait pods --for=condition=Ready --all -n mongodb --timeout=120s || 
     { 
         echo -e "$red 🛑 Mongodb is not running, and is not ready to use ..."
+        die
+    }) & spinner
+
+    show_mongodb_after_installation
+}
+
+function install_helm_mongodb_instance(){
+    echo -e "$yellow Installing Mongodb Instance with helm"
+    
+    helm repo add bitnami https://charts.bitnami.com/bitnami
+    (helm install mongodb-instance bitnami/mongodb --namespace mongodb-instance --create-namespace --values "$manifestDir/mongodb-values.yaml" || 
+    { 
+        echo -e "$red 🛑 Could not install Mongodb Instance into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Mongodb Instance"
+
+    echo -e "$yellow\n⏰ Waiting for Mongodb Instance to be running"
+    sleep 10
+    (kubectl wait pods --for=condition=Ready --all -n mongodb-instance --timeout=120s || 
+    { 
+        echo -e "$red 🛑 Mongodb Instance is not running, and is not ready to use ..."
         die
     }) & spinner
 
@@ -225,20 +248,6 @@ function install_helm_pgadmin(){
     post_pgadmin_install
 }
 
-function install_helm_openebs(){
-    echo -e "$yellow Installing OpenEBS with helm"
-    helm repo add openebs https://openebs.github.io/openebs
-
-    (helm install openebs --namespace openebs openebs/openebs --create-namespace || 
-    { 
-        echo -e "$red 🛑 Could not install OpenEBS into cluster ..."
-        die
-    }) & spinner
-
-    echo -e "$yellow ✅ Done installing OpenEBS"
-
-    echo -e "$yellow\nTo see more documentation, go to https://docs.openebs.io/"
-}
 
 function install_helm_rook_ceph_operator(){
     echo -e "$yellow Installing Rook Ceph Operator via helm"

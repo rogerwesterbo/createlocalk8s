@@ -198,20 +198,6 @@ function install_opencost_application() {
     echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:9090"
 }
 
-function install_openebs_application() {
-    echo -e "$yellow Installing OpenEBS ArgoCD application"
-    (kubectl apply -f $openebs_app_yaml|| 
-    { 
-        echo -e "$red 🛑 Could not install OpenEBS ArgoCD application into cluster ..."
-        die
-    }) & spinner
-
-    echo -e "$yellow ✅ Done installing OpenEBS ArgoCD application"
-
-    echo "OpenEBS argocd application installed: yes" >> $cluster_info_file
-
-    echo -e "$yellow\nTo see more documentation, go to https://docs.openebs.io/"
-}
 
 function install_metallb_application() {
     echo -e "$yellow Installing Metallb ArgoCD application"

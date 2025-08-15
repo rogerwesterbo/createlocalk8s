@@ -95,3 +95,34 @@ function find_free_port() {
         fi
     done
 }
+
+function check_docker_hub_login() {
+    echo -e "$yellow\n🔍 Checking Docker Hub login status..."
+    
+    if ! docker info >/dev/null 2>&1; then
+        echo -e "$red\n🚨 Docker is not running. Please start Docker and try again."
+        exit 1
+    fi
+    
+    # Check if user is logged in by trying to get username from docker info
+    local username=$(docker info 2>/dev/null | grep -i "Username:" | awk '{print $2}' | tr -d ' ')
+    
+    if [[ -n "$username" ]]; then
+        echo -e "$green\n✅ Logged into Docker Hub as: $username"
+        return 0
+    fi
+    
+    # Alternative check: try to get username using docker system info
+    local username_alt=$(docker system info --format '{{.Username}}' 2>/dev/null)
+    if [[ -n "$username_alt" ]]; then
+        echo -e "$green\n✅ Logged into Docker Hub as: $username_alt"
+        return 0
+    fi
+    
+    # If no username found, user is not logged in
+    echo -e "$red\n🚨 You are not logged into Docker Hub!"
+    echo -e "$yellow\nTo login to Docker Hub, run:"
+    echo -e "$blue docker login"
+    echo -e "$yellow\nThen enter your Docker Hub username and password."
+    exit 1
+}

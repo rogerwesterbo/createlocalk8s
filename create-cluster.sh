@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for file in ./scripts/variables.sh ./scripts/core/utils.sh ./scripts/core/cluster.sh ./scripts/core/config.sh ./scripts/installers/helm.sh ./scripts/installers/apps.sh ./scripts/legacy/kind.sh ./scripts/legacy/create.sh; do
+for file in ./scripts/variables.sh ./scripts/core/utils.sh ./scripts/core/cluster.sh ./scripts/core/config.sh ./scripts/installers/helm.sh ./scripts/installers/apps.sh; do
     if [ -f "$file" ]; then
         source "$file"
     else
@@ -11,7 +11,7 @@ done
 
 # file variables
 scriptDir=$(dirname -- "$(readlink -f -- "$BASH_SOURCE")")
-manifestDir=$(get_abs_filename "$scriptDir/configs/apps")
+manifestDir=$(get_abs_filename "$scriptDir/configs/apps/manifests")
 clustersDir=$(get_abs_filename "$scriptDir/clusters")
 kind_config_path=$(get_abs_filename "$manifestDir/kindconfig.yaml")
 kind_config_template_path=$(get_abs_filename "$manifestDir/kindconfig-template.yaml")
@@ -24,7 +24,6 @@ kubeview_yaml=$(get_abs_filename "$manifestDir/kubeview.yaml")
 trivy_app_yaml=$(get_abs_filename "$manifestDir/trivy-app.yaml")
 vault_app_yaml=$(get_abs_filename "$manifestDir/hashicorp-vault-app.yaml")
 metallb_app_yaml=$(get_abs_filename "$manifestDir/metallb-app.yaml")
-
 mongodb_operator_app_yaml=$(get_abs_filename "$manifestDir/mongodb-operator-app.yaml")
 mongodb_instance_yaml=$(get_abs_filename "$manifestDir/mongodb-instance.yaml")
 mongodb_instance_service_yaml=$(get_abs_filename "$manifestDir/mongodb-instance-service.yaml")
@@ -37,7 +36,6 @@ pgadmin_app_yaml=$(get_abs_filename "$manifestDir/pgadmin-app.yaml")
 rook_ceph_operator_app_yaml=$(get_abs_filename "$manifestDir/rook-ceph-operator-app.yaml")
 rook_ceph_cluster_app_yaml=$(get_abs_filename "$manifestDir/rook-ceph-cluster-app.yaml")
 cluster_info_file=$(get_abs_filename "$clustersDir/clusterinfo-$cluster_name.txt")
-openebs_app_yaml=$(get_abs_filename "$manifestDir/openebs-app.yaml")
 crossplane_app_yaml=$(get_abs_filename "$manifestDir/crossplane-app.yaml")
 nginx_controller_app_yaml=$(get_abs_filename "$manifestDir/nginx-controller-app.yaml")
 minio_app_yaml=$(get_abs_filename "$manifestDir/minio-app.yaml")
