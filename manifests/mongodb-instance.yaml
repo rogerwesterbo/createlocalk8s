@@ -1,0 +1,36 @@
+apiVersion: mongodbcommunity.mongodb.com/v1
+kind: MongoDBCommunity
+metadata:
+  name: mongodb-instance
+  namespace: mongodb
+spec:
+  members: 3
+  type: ReplicaSet
+  version: '7.0.14' # or a version you prefer that your cluster supports
+  security:
+    authentication:
+      modes: ['SCRAM']
+  users:
+    - name: appuser
+      db: appdb
+      passwordSecretRef:
+        name: appuser-password
+      roles:
+        - name: readWrite
+          db: appdb
+      scramCredentialsSecretName: appuser # => operator creates "appuser-scram-credentials"
+  additionalMongodConfig:
+    net:
+      port: 27017
+  statefulSet:
+    spec:
+      volumeClaimTemplates:
+        - metadata:
+            name: data-volume
+          spec:
+            accessModes: ['ReadWriteOnce']
+            resources:
+              requests:
+                storage: 20Gi
+            # set your storageClassName if needed
+            # storageClassName: fast

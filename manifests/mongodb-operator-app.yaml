@@ -1,29 +1,19 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: nginx-controller
+  name: mongodb-operator
   namespace: argocd
   annotations:
     argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
   destination:
-    namespace: ingress-nginx
+    namespace: mongodb
     server: https://kubernetes.default.svc
   project: default
   source:
-    chart: ingress-nginx
-    repoURL: https://kubernetes.github.io/ingress-nginx
+    chart: community-operator
+    repoURL: https://mongodb.github.io/helm-charts
     targetRevision: '*'
-    helm:
-      values: |
-        controller:
-          service:
-            type: NodePort
-            nodeports:
-              http: 30080
-              https: 30443
-            hostNetwork: true
-            dnsPolicy: ClusterFirstWithHostNet
   syncPolicy:
     automated:
       prune: true

@@ -22,3 +22,186 @@ for version in "${kindk8sversions[@]}"; do
     IFS=':' read -r k8s_version kind_image <<< "$version"
     kindk8spossibilities="$kindk8spossibilities $k8s_version,"
 done
+
+function install_nginx_controller_for_kind(){
+    echo -e "$yellow Create Nginx Ingress Controller for kind"
+    (kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml|| 
+    { 
+        echo -e "$red 🛑 Could not install nginx controller in cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Nginx ingress controller for kind to be ready"
+    sleep 10
+    (kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s || 
+    { 
+        echo -e "$red 🛑 Could not install nginx ingress controller into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Nginx Ingress Controller"
+}
+
+function create_kind_cluster() {
+    if [ -z $cluster_name ]  || [ $controlplane_number -lt 1 ] || [ $worker_number -lt 0 ]; then
+        echo "Not all parameters good ... quitting"
+        die
+    fi
+
+    echo -e "$yellow\n⏰ Creating Kind cluster"
+    echo -e "$clear"
+    (kind create cluster --name "$cluster_name" --config "$kind_config_file" || 
+    { 
+        echo -e "$red 🛑 Could not create cluster ..."
+        die
+    }) & spinner
+
+    install_nginx_controller_for_kind
+
+    if [ "$install_argocd" == "yes" ]; then
+        install_helm_argocd
+        argocd_password="$(kubectl get secrets -n argocd argocd-initial-admin-secret -o json | jq -r '.data.password' | base64 -d)"
+
+        echo "ArgoCD password: $argocd_password" >> $cluster_info_file
+    fi
+
+    echo -e "$yellow ✅ Done creating kind cluster"
+
+    if [ "$install_argocd" == "yes" ]; then
+    echo -e "$yellow 🚀 ArgoCD is ready to use"
+    
+    if [[ "$(is_running_more_than_one_cluster)" == "yes" ]]; then
+    echo -e "$yellow\nOpen the ArgoCD UI in your browser: http://argocd.localtest.me:$first_controlplane_port_http"
+    else
+    echo -e "$yellow\nOpen the ArgoCD UI in your browser: http://argocd.localtest.me"
+    fi
+    
+    echo -e "$yellow\n 🔑 Argocd Username:$blue admin"
+    echo -e "$yellow 🔑 Argocd Password:$blue $argocd_password"
+    fi
+
+    if [[ "$(is_running_more_than_one_cluster)" == "yes" ]]; then
+    echo -e "$yellow\n 🚀 Cluster default ports have been changed "
+    echo -e "$yellow Cluster http port: $first_controlplane_port_http"
+    echo -e "$yellow Cluster https port: $first_controlplane_port_https"
+
+    echo -e "$yellow\n To access a application add the controlplane port to the application as follows:"
+    echo -e "$yellow http://<application>.localtest.me:<controlplane http port>"
+    echo -e "$yellow Example: http://nyancat.localtest.me:$first_controlplane_port_http"
+    fi
+
+    echo -e "$yellow\n To see all kind clusters , type: $red kind get clusters"
+    echo -e "$yellow To delete cluster, type: $red kind delete cluster --name $cluster_name"
+    echo -e "$clear"
+
+    get_kubeconfig kc $cluster_name
+
+    if [ "$install_argocd" == "yes" ]; then
+        install_nyancat=""
+        read -p "Install Nyan-cat ArgoCD application? (default: yes) (y/yes | n/no): " install_nyancat_new
+        if [ "$install_nyancat_new" == "yes" ] || [ "$install_nyancat_new" == "y" ] || [ "$install_nyancat_new" == "" ]; then
+            install_nyancat="yes"
+        else
+            install_nyancat="no"
+        fi
+
+        if [ "$install_nyancat" == "yes" ]; then
+            install_nyancat_application
+        fi
+    fi
+}
+
+function delete_cluster() {
+    clusterName=${@: -1}
+
+    if [[ "$#" -lt 2 ]]; then 
+        echo "Missing name of cluster"; 
+        exit 1
+    fi
+
+    if [[ "$#" -gt 2 ]]; then 
+        echo "Too many arguments"; 
+        exit 1
+    fi
+
+    clusterName=$(echo $clusterName | tr '[:upper:]' '[:lower:]')
+
+    echo -e "$yellow\nDeleting cluster $clusterName"
+    read -p "Sure you want to delete ?! (n | no | y | yes)? " ok
+
+    if [ "$ok" == "yes" ] ;then
+            echo -e "$yellow\nDeleting cluster ..."
+        elif [ "$ok" == "y" ]; then
+            echo -e "$yellow\nDeleting cluster ..."
+        elif [ "$ok" == "n" ]; then
+            echo -e "$red\nThat was a close one! Not deleting!"
+            exit 0
+        elif [ "$ok" == "no" ]; then
+            echo -e "$red\nThat was a close one! Not deleting!"
+            exit 0
+        else
+            echo "🛑 Did not notice and confirmation, I need you to confirm with a yes or y 😀 ... quitting"
+            exit 0
+    fi
+
+    (kind delete cluster --name $clusterName|| 
+    { 
+        echo -e "$red 🛑 Could not delete cluster with name $clusterName"
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done deleting cluster"
+}
+
+function list_clusters() {
+    kind get clusters
+}
+
+function get_kubeconfig() {
+    if [ "$#" -ne 2 ]; then
+        echo "Error: This script requires exactly two arguments."
+        echo "Usage: $0 <arg1> <arg2>"
+        exit 1
+    fi
+
+    local clusterName=$2
+    if [ -z "$clusterName" ]; then
+        echo "Missing name of cluster"; 
+        exit 1
+    fi
+
+    echo "$(kind get kubeconfig --name $clusterName)" > $clustersDir/kubeconfig-$clusterName.config
+
+    echo -e "$yellow Kubeconfig saved to $clustersDir/kubeconfig-$clusterName.config"
+    echo -e "$yellow To use the kubeconfig, type:$red export KUBECONFIG=$clustersDir/kubeconfig-$clusterName.config"
+    echo -e "$yellow And then you can use $blue kubectl $yellow to interact with the cluster"
+    echo -e "$yellow Example: $blue kubectl get nodes"
+    echo ""
+}
+
+function details_for_cluster() {
+    clusterName=${@: -1}
+
+    if [[ "$#" -lt 2 ]]; then 
+        echo "Missing name of cluster"; 
+        exit 1
+    fi
+
+    if [[ "$#" -gt 2 ]]; then 
+        echo "Too many arguments"; 
+        exit 1
+    fi
+
+    clusters=$(kind get clusters)
+    if ! echo "$clusters" | grep -q "$clusterName"; then
+        echo "Cluster $clusterName not found"
+        exit 1
+    fi
+
+    echo -e "$yellow\nCluster details for $clusterName"
+    cat $cluster_info_file
+
+    echo -e "$yellow\nKind configuration for $clusterName"
+
+    cat $kind_config_file
+}
