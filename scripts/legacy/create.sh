@@ -46,7 +46,7 @@ function get_cluster_parameter() {
     selected_k8s_version=$(echo $selected_k8s_version | tr '[:upper:]' '[:lower:]')
     if [ ! -z $selected_k8s_version ]; then
         for version in "${kindk8sversions[@]}"; do
-            IFS=';' read -r k8s_version kind_image <<< "$version"
+            IFS=':' read -r k8s_version kind_image <<< "$version"
             if [ "$selected_k8s_version" == "$k8s_version" ]; then
                 kindk8simage=$kind_image
                 kindk8sversion=$k8s_version

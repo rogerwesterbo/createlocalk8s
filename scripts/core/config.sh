@@ -1,67 +1,5 @@
 #!/bin/bash
 
-function die () {
-    ec=$1
-    kill $$
-}
-
-function get_abs_filename() {
-  echo "$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
-}
-
-spinner()
-{
-    local pid=$!
-    local delay=0.25
-    local spinstr='|/-\'
-    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
-        local temp=${spinstr#?}
-        printf "$blue [%c]  " "$spinstr"
-        local spinstr=$temp${spinstr%"$temp"}
-        sleep $delay
-        printf "\b\b\b\b\b\b"
-    done
-    printf "    \b\b\b\b"
-    echo -e "$clear"
-}
-
-function check_prerequisites() {
-    docker_cmd=$(prerequisites "docker")
-    kind_cmd=$(prerequisites "kind")
-    kubectl_cmd=$(prerequisites "kubectl")
-    jq_cmd=$(prerequisites "jq")
-    base64_cmd=$(prerequisites "base64")
-    helm_cmd=$(prerequisites "helm")
-
-    # Helper to trim whitespace
-    trim() {
-        echo "$1" | xargs
-    }
-
-    if [ -z "$(trim "$docker_cmd")" ] && [ -z "$(trim "$kind_cmd")" ] && [ -z "$(trim "$kubectl_cmd")" ] && [ -z "$(trim "$jq_cmd")" ] && [ -z "$(trim "$base64_cmd")" ] && [ -z "$(trim "$helm_cmd")" ]; then
-        return
-    fi
-
-    echo -e "$red Missing prerequisites: \n"
-
-    echo -e "$docker_cmd"
-    echo -e "$kind_cmd"
-    echo -e "$kubectl_cmd"
-    echo -e "$jq_cmd"
-    echo -e "$base64_cmd"
-    echo -e "$helm_cmd"
-    echo -e "$red \n🚨 One or more prerequisites are not installed. Please install them! 🚨"
-    echo -e "$clear"
-    exit 1
-}
-
-function prerequisites() {
-  if ! command -v $1 1> /dev/null
-  then
-      echo -e "$red 🚨 $1 could not be found. Install it! 🚨"
-  fi
-}
-
 function print_logo() {
     echo -e "$blue"
 
@@ -80,9 +18,8 @@ function print_logo() {
 }
 
 function print_help() {
-    # Display Help
     echo -e "$yellow"
-    echo "Kind spesific:"    
+    echo "Kind specific:"    
     echo "  create                          alias: c       Create a local cluster with kind and docker"
     echo "  list                            alias: ls      Show kind clusters"
     echo "  details                         alias: dt      Show details for a cluster"
@@ -118,7 +55,6 @@ function print_help() {
     echo "  install-app-nfs                 alias: ianfs   Install NFS ArgoCD application"
     echo "  install-app-nginx               alias: ian     Install Nginx Controller ArgoCD application"
     echo "  install-app-minio               alias: iamin   Install Minio ArgoCD application"
-    #echo "  install-app-mongodb             alias: iamdb   Install Mongodb ArgoCD application"
     echo "  install-app-mongodb-operator    alias: iamdb   Install Mongodb Operator ArgoCD application"
     echo "  install-app-mongodb-instance    alias: iamdbi  Install Mongodb Instance ArgoCD application"
     echo "  install-app-nyancat             alias: iac     Install Nyan-cat ArgoCD application"
@@ -280,136 +216,4 @@ perform_action() {
             "
             exit;;
    esac
-}
-
-function is_running_more_than_one_cluster() {
-    local clusters
-    clusters=$(kind get clusters -q)
-
-    return_statement="no"
-
-    if [ "$clusters" == "No kind clusters found." ]; then
-        #echo "no"
-        #echo "no kind clusters found."
-        return_statement="no"
-    elif [ -z "$clusters" ]; then
-        #echo "no"
-        #echo "cluster is empty"
-        return_statement="no"
-    elif [[ $(echo "$clusters" | wc -l) -ge 1 ]]; then
-        #echo "no"
-        #echo "yes - one cluster"
-        return_statement="no"
-    # else
-    #     echo "yes - one cluster"
-    elif [[ $(echo "$clusters" | wc -l) -ge 2 ]]; then
-        #echo "yes"
-        #echo "yes - more than one cluster"
-        return_statement="yes"
-    fi
-
-    echo "$return_statement"
-}
-
-check_kind_clusters() {
-    # Try to run the command and capture output
-    local output
-    if output=$(kind get clusters -q); then
-        # Command succeeded, you can process $output internally
-        #echo "Clusters found: $output"  # optional internal echo
-
-        if [[ "$output" == "No kind clusters found." ]]; then
-            # No clusters found
-            echo "No kind clusters found."
-            return 0
-        elif [[ -z "$output" ]]; then
-            # Cluster list is empty
-            echo "Cluster list is empty."
-            return 0
-        elif [[ $(echo "$output" | wc -l) -eq 1 ]]; then
-            # Exactly one cluster found
-            echo "Exactly one kind cluster found."
-            return 1
-        elif [[ $(echo "$output" | wc -l) -ge 1 ]]; then
-            # One or more clusters found
-            echo "One or more kind clusters found."
-            return 1
-        elif [[ $(echo "$output" | wc -l) -ge 2 ]]; then
-            # More than one cluster found
-            echo "More than one kind cluster found."
-            return 1
-        else
-            # Unexpected output
-            echo "Unexpected output: $output"
-            return 1
-        fi
-
-
-        return 0
-    else
-        # Command failed
-        return 0
-    fi
-}
-
-function find_free_port() {
-    LOW_BOUND=49152
-    RANGE=16384
-    while true; do
-        CANDIDATE=$[$LOW_BOUND + ($RANDOM % $RANGE)]
-        (echo -n >/dev/tcp/127.0.0.1/${CANDIDATE}) >/dev/null 2>&1
-        if [ $? -ne 0 ]; then
-            echo $CANDIDATE
-            break
-        fi
-    done
-}
-
-function see_details_of_cluster() {
-    echo -e "$yellow
-    🚀 Cluster details
-    "
-    echo -e "$clear"
-    kubectl cluster-info
-    echo -e "$yellow
-    🚀 Nodes
-    "
-    echo -e "$clear"
-    kubectl get nodes
-    echo -e "$yellow
-    🚀 Pods
-    "
-    echo -e "$clear"
-    kubectl get pods --all-namespaces
-    echo -e "$yellow
-    🚀 Services
-    "
-    echo -e "$clear"
-    kubectl get services --all-namespaces
-    echo -e "$yellow
-    🚀 Ingresses
-    "
-    echo -e "$clear"
-    kubectl get ingresses --all-namespaces
-}
-
-function detect_os {
-    local host_os
-
-    case "$(uname -s)" in
-      Darwin)
-        host_os=darwin
-        ;;
-      Linux)
-        host_os=linux
-        ;;
-      *)
-        echo "Unsupported host OS.  Must be Linux or Mac OS X." >&2
-        exit 1
-        ;;
-    esac
-
-  if [[ -z "${host_os}" ]]; then
-    return
-  fi
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for file in ./bash/variables.sh ./bash/common.sh ./bash/helm.sh ./bash/argo-apps.sh ./bash/kind.sh ./bash/create.sh; do
+for file in ./scripts/variables.sh ./scripts/core/utils.sh ./scripts/core/cluster.sh ./scripts/core/config.sh ./scripts/installers/helm.sh ./scripts/installers/apps.sh ./scripts/legacy/kind.sh ./scripts/legacy/create.sh; do
     if [ -f "$file" ]; then
         source "$file"
     else
@@ -11,7 +11,7 @@ done
 
 # file variables
 scriptDir=$(dirname -- "$(readlink -f -- "$BASH_SOURCE")")
-manifestDir=$(get_abs_filename "$scriptDir/manifests")
+manifestDir=$(get_abs_filename "$scriptDir/configs/apps")
 clustersDir=$(get_abs_filename "$scriptDir/clusters")
 kind_config_path=$(get_abs_filename "$manifestDir/kindconfig.yaml")
 kind_config_template_path=$(get_abs_filename "$manifestDir/kindconfig-template.yaml")
