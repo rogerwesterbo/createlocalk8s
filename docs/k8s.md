@@ -14,7 +14,7 @@ Optional:
 
 -   k9s (https://github.com/derailed/k9s) / lens (https://k8slens.dev/)
 
-## Create a cluster with 1 controle plane and three workers:
+## Create a cluster with 1 control plane and three workers:
 
 ```bash
 kind create cluster --name testcluster --config ./config/kindconfig.yaml

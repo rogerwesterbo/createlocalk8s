@@ -347,6 +347,31 @@ function install_nginx_controller_application() {
     echo -e "$yellow ✅ Done installing Nginx Controller ArgoCD application"
 }
 
+function install_redis_stack_application() {
+    echo -e "$yellow Installing Redis Stack ArgoCD application"
+    (kubectl apply -f $redis_stack_app_yaml|| 
+    { 
+        echo -e "$red 🛑 Could not install Redis Stack ArgoCD application into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Redis Stack ArgoCD application"
+
+    #wait for redis to be ready
+    sleep 10
+    (kubectl wait pods --for=condition=Ready --all -n redis --timeout=120s || 
+    { 
+        echo -e "$red 🛑 Redis Stack is not running, and is not ready to use ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow\nRedis Stack is ready to use"
+
+    # docs with port forwarding
+    echo -e "$yellow\nTo access the Redis Stack dashboard, type:$blue kubectl port-forward --namespace redis service/redis-stack-server 6379:6379"
+    echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:6379"
+}
+
 function post_pgadmin_install() {
     echo -e "$yellow\n⏰ Waiting for Pgadmin4 to be running"
     sleep 10

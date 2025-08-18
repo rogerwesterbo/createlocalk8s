@@ -40,6 +40,7 @@ crossplane_app_yaml=$(get_abs_filename "$manifestDir/crossplane-app.yaml")
 nginx_controller_app_yaml=$(get_abs_filename "$manifestDir/nginx-controller-app.yaml")
 minio_app_yaml=$(get_abs_filename "$manifestDir/minio-app.yaml")
 nfs_app_yaml=$(get_abs_filename "$manifestDir/nfs-app.yaml")
+redis_stack_app_yaml=$(get_abs_filename "$manifestDir/redis-stack-app.yaml")
 
 
 if [ "$#" -eq 0 ]; then

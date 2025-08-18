@@ -41,6 +41,7 @@ function print_help() {
     echo "  install-helm-mongodb-instance   alias: ihmdbi  Install Mongodb Instance with helm"
     echo "  install-helm-postgres           alias: ihpg    Install Cloud Native Postgres Operator with helm"
     echo "  install-helm-pgadmin            alias: ihpa    Install PgAdmin4 with helm"
+    echo "  install-helm-redis-stack        alias: ihrs    Install Redis Stack with helm"
     echo "  install-helm-trivy              alias: iht     Install Trivy Operator with helm"
     echo "  install-helm-vault              alias: ihv     Install Vault with helm"
     echo ""
@@ -54,6 +55,7 @@ function print_help() {
     echo "  install-app-nfs                 alias: ianfs   Install NFS ArgoCD application"
     echo "  install-app-nginx               alias: ian     Install Nginx Controller ArgoCD application"
     echo "  install-app-minio               alias: iamin   Install Minio ArgoCD application"
+    echo "  install-app-metallb             alias: iam     Install Metallb ArgoCD application"
     echo "  install-app-mongodb-operator    alias: iamdb   Install Mongodb Operator ArgoCD application"
     echo "  install-app-mongodb-instance    alias: iamdbi  Install Mongodb Instance ArgoCD application"
     echo "  install-app-nyancat             alias: iac     Install Nyan-cat ArgoCD application"
@@ -61,7 +63,7 @@ function print_help() {
     echo "  install-app-postgres            alias: iapg    Install Cloud Native Postgres Operator ArgoCD application"
     echo "  install-app-pgadmin             alias: iapga   Install PgAdmin4 ArgoCD application"
     echo "  install-app-prometheus          alias: iap     Install Kube-prometheus-stack ArgoCD application"
-    echo "  install-app-metallb             alias: iam     Install Metallb ArgoCD application"
+    echo "  install-app-redis-stack         alias: iars    Install Redis Stack ArgoCD application"
     echo "  install-app-trivy               alias: iat     Install Trivy Operator ArgoCD application"
     echo "  install-app-vault               alias: iav     Install Hashicorp Vault ArgoCD application"
     echo ""
@@ -145,6 +147,9 @@ perform_action() {
         install-helm-nfs|ihnfs)
             install_helm_nfs
             exit;;
+        install-helm-redis-stack|ihrs)
+            install_helm_redis_stack
+            exit;;
 
         install-app-nyancat|iac)
             install_nyancat_application
@@ -202,6 +207,9 @@ perform_action() {
             exit;;
         install-app-nfs|ianfs)
             install_nfs_application
+            exit;;
+        install-app-redis-stack|iars)
+            install_redis_stack_application
             exit;;
         *) # Invalid option
             print_logo

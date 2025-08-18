@@ -59,6 +59,22 @@ function install_helm_nfs(){
         ""
 }
 
+function install_helm_redis_stack(){
+    # Add redis-stack helm repo and install redis-stack-server
+    helm_install_generic \
+        "redis-stack-server" \
+        "redis-stack" \
+        "https://redis-stack.github.io/helm-redis-stack" \
+        "redis-stack-server" \
+        "redis" \
+        "" \
+        "kubectl wait pods --for=condition=Ready --all -n redis --timeout=180s" \
+        "\nRedis Stack is ready to use\nTo access Redis CLI: kubectl exec -it -n redis deploy/redis-stack-server -- redis-cli\n"
+
+    echo -e "\nTo access Redis locally (port-forward), run: kubectl port-forward -n redis svc/redis-stack-server 6379:6379"
+    echo -e "Connect using redis-cli: redis-cli -h localhost -p 6379"
+}
+
 function install_helm_argocd(){
     echo -e "$yellow Installing ArgoCD "
     helm repo add argo https://argoproj.github.io/argo-helm

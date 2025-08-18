@@ -173,12 +173,8 @@ function details_for_cluster() {
 function get_cluster_parameter() {
     detect_os
     check_prerequisites
+    ensure_docker_running
     check_docker_hub_login
-
-    if ! docker info > /dev/null 2>&1; then
-        echo -e "$red This script uses docker, and it isn't running - please start docker and try again!"
-        exit 1
-    fi
 
     clusterName=${@: -1}
     if [[ "$#" -lt 2 ]]; then 

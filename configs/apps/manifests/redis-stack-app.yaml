@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: redis-stack
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://redis-stack.github.io/helm-redis-stack
+    chart: redis-stack-server
+    # Pin to an exact chart version or a semver range:
+    # exact example:
+    targetRevision: '0.4.18'
+    # or track patches:  targetRevision: "0.4.*"
+    helm:
+      # same as a values.yaml inline
+      valuesObject:
+        # optional: pick a specific container tag for redis/redis-stack-server
+        # (upstream chart supports redis_stack.tag)
+        redis_stack:
+          tag: 'latest'
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: redis
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
