@@ -12,10 +12,12 @@ Create and experiment with local Kubernetes clusters using [kind](https://kind.s
 
 ---
 
+![Workflow Diagram](./docs/create-cluster.png)
+
 ## ✨ Key Features
 
 -   Interactive cluster creation (name, control planes, workers, Kubernetes version)
--   Supported Kubernetes versions (kind node images) baked in: 1.33.x → 1.25.x (see `scripts/variables.sh` for full list)
+-   Supported Kubernetes versions (kind node images) baked in: 1.34.x → 1.25.x (see `scripts/variables.sh` for full list)
 -   Automatic port mapping adjustment when multiple clusters run simultaneously (avoids 80/443 conflicts)
 -   Optional automatic ArgoCD + Nginx Ingress install during cluster creation
 -   Post-create helper to install a sample Nyancat app (demo ingress + ArgoCD)
@@ -308,7 +310,7 @@ What do the optional apps provide? [docs/kubernetes-apps-overview.md](./docs/kub
 
 ArgoCD & App-of-Apps pattern: [docs/argocd-app-of-apps.md](./docs/argocd-app-of-apps.md)
 
-![Workflow Diagram](./docs/create-cluster.png)
+
 
 ---
 

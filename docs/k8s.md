@@ -25,10 +25,10 @@ After installation is complete, `kubectl get nodes` should be something like thi
 ```bash
 kubectl get nodes
 NAME                  STATUS   ROLES           AGE   VERSION
-testcluster-control-plane   Ready    control-plane   77s   v1.31.0
-testcluster-worker          Ready    <none>          62s   v1.31.0
-testcluster-worker2         Ready    <none>          62s   v1.31.0
-testcluster-worker3         Ready    <none>          62s   v1.31.0
+testcluster-control-plane   Ready    control-plane   77s   v1.34.0
+testcluster-worker          Ready    <none>          62s   v1.34.0
+testcluster-worker2         Ready    <none>          62s   v1.34.0
+testcluster-worker3         Ready    <none>          62s   v1.34.0
 ```
 
 ## Install ArgoCD
