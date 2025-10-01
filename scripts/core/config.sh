@@ -4,16 +4,14 @@ function print_logo() {
     echo -e "$blue"
 
     echo ""
-    echo " ▄████▄   ██▀███  ▓█████ ▄▄▄     ▄▄▄█████▓▓█████     ▄████▄   ██▓     █    ██   ██████ ▄▄▄█████▓▓█████  ██▀███  ";
-    echo "▒██▀ ▀█  ▓██ ▒ ██▒▓█   ▀▒████▄   ▓  ██▒ ▓▒▓█   ▀    ▒██▀ ▀█  ▓██▒     ██  ▓██▒▒██    ▒ ▓  ██▒ ▓▒▓█   ▀ ▓██ ▒ ██▒";
-    echo "▒▓█    ▄ ▓██ ░▄█ ▒▒███  ▒██  ▀█▄ ▒ ▓██░ ▒░▒███      ▒▓█    ▄ ▒██░    ▓██  ▒██░░ ▓██▄   ▒ ▓██░ ▒░▒███   ▓██ ░▄█ ▒";
-    echo "▒▓▓▄ ▄██▒▒██▀▀█▄  ▒▓█  ▄░██▄▄▄▄██░ ▓██▓ ░ ▒▓█  ▄    ▒▓▓▄ ▄██▒▒██░    ▓▓█  ░██░  ▒   ██▒░ ▓██▓ ░ ▒▓█  ▄ ▒██▀▀█▄  ";
-    echo "▒ ▓███▀ ░░██▓ ▒██▒░▒████▒▓█   ▓██▒ ▒██▒ ░ ░▒████▒   ▒ ▓███▀ ░░██████▒▒▒█████▓ ▒██████▒▒  ▒██▒ ░ ░▒████▒░██▓ ▒██▒";
-    echo "░ ░▒ ▒  ░░ ▒▓ ░▒▓░░░ ▒░ ░▒▒   ▓▒█░ ▒ ░░   ░░ ▒░ ░   ░ ░▒ ▒  ░░ ▒░▓  ░░▒▓▒ ▒ ▒ ▒ ▒▓▒ ▒ ░  ▒ ░░   ░░ ▒░ ░░ ▒▓ ░▒▓░";
-    echo "  ░  ▒     ░▒ ░ ▒░ ░ ░  ░ ▒   ▒▒ ░   ░     ░ ░  ░     ░  ▒   ░ ░ ▒  ░░░▒░ ░ ░ ░ ░▒  ░ ░    ░     ░ ░  ░  ░▒ ░ ▒░";
-    echo "░          ░░   ░    ░    ░   ▒    ░         ░      ░          ░ ░    ░░░ ░ ░ ░  ░  ░    ░         ░     ░░   ░ ";
-    echo "░ ░         ░        ░  ░     ░  ░           ░  ░   ░ ░          ░  ░   ░           ░              ░  ░   ░     ";
-    echo "░                                                   ░                                                           ";
+    echo "██╗  ██╗ █████╗ ███████╗    ██╗      ██████╗  ██████╗ █████╗ ██╗     ";
+    echo "██║ ██╔╝██╔══██╗██╔════╝    ██║     ██╔═══██╗██╔════╝██╔══██╗██║     ";
+    echo "█████╔╝ ╚█████╔╝███████╗    ██║     ██║   ██║██║     ███████║██║     ";
+    echo "██╔═██╗ ██╔══██╗╚════██║    ██║     ██║   ██║██║     ██╔══██║██║     ";
+    echo "██║  ██╗╚█████╔╝███████║    ███████╗╚██████╔╝╚██████╗██║  ██║███████╗";
+    echo "╚═╝  ╚═╝ ╚════╝ ╚══════╝    ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝";
+    echo ""
+    echo "         Local Kubernetes Cluster Manager (kind + docker)             ";
     echo ""
 }
 
@@ -27,47 +25,20 @@ function print_help() {
     echo "  delete                          alias: d       Delete a cluster by name"
     echo "  help                            alias: h       Print this Help"
     echo ""
-    echo "Helm (alphabetical):"
-    echo "  install-helm-argocd             alias: iha     Install ArgoCD with helm"
-    echo "  install-helm-ceph-cluster       alias: ihrcc   Install Rook Ceph Cluster with helm"
-    echo "  install-helm-ceph-operator      alias: ihrco   Install Rook Ceph Operator with helm"
-    echo "  install-helm-crossplane         alias: ihcr    Install Crossplane with helm"
-    echo "  install-helm-falco              alias: ihf     Install Falco with helm"
-    echo "  install-helm-metallb            alias: ihm     Install Metallb with helm"
-    echo "  install-helm-minio              alias: ihmin   Install Minio with helm"
-    echo "  install-helm-mongodb-instance   alias: ihmdbi  Install Mongodb Instance with helm"
-    echo "  install-helm-mongodb-operator   alias: ihmdb   Install Mongodb Operator with helm"
-    echo "  install-helm-nats               alias: ihnats  Install NATS with helm"
-    echo "  install-helm-nginx              alias: ihn     Install Nginx controller with helm"
-    echo "  install-helm-nfs                alias: ihnfs   Install NFS with helm"
-    echo "  install-helm-pgadmin            alias: ihpa    Install PgAdmin4 with helm"
-    echo "  install-helm-postgres           alias: ihpg    Install Cloud Native Postgres Operator with helm"
-    echo "  install-helm-redis-stack        alias: ihrs    Install Redis Stack with helm"
-    echo "  install-helm-trivy              alias: iht     Install Trivy Operator with helm"
-    echo "  install-helm-vault              alias: ihv     Install Vault with helm"
+    echo "Helm installations:"
+    printf "  %-40s %s\n" "helm list" "List available Helm components"
+    printf "  %-40s %s\n" "install helm redis-stack,nats" "Install one or more Helm components"
+    printf "  %-40s %s\n" "install helm redis-stack --dry-run" "Dry run (show what would be installed)"
     echo ""
-    echo "ArgoCD Applications (alphabetical):"
-    echo "  install-app-ceph-cluster        alias: iarcc   Install Rook Ceph Cluster ArgoCD application"
-    echo "  install-app-ceph-operator       alias: iarco   Install Rook Ceph Operator ArgoCD application"
-    echo "  install-app-certmanager         alias: iacm    Install Cert-manager ArgoCD application"
-    echo "  install-app-crossplane          alias: iacr    Install Crossplane ArgoCD application"
-    echo "  install-app-falco               alias: iaf     Install Falco ArgoCD application"
-    echo "  install-app-kubeview            alias: iakv    Install Kubeview ArgoCD application"
-    echo "  install-app-metallb             alias: iam     Install Metallb ArgoCD application"
-    echo "  install-app-minio               alias: iamin   Install Minio ArgoCD application"
-    echo "  install-app-mongodb-instance    alias: iamdbi  Install Mongodb Instance ArgoCD application"
-    echo "  install-app-mongodb-operator    alias: iamdb   Install Mongodb Operator ArgoCD application"
-    echo "  install-app-nats                alias: ianats  Install NATS ArgoCD application"
-    echo "  install-app-nginx               alias: ian     Install Nginx Controller ArgoCD application"
-    echo "  install-app-nfs                 alias: ianfs   Install NFS ArgoCD application"
-    echo "  install-app-nyancat             alias: iac     Install Nyan-cat ArgoCD application"
-    echo "  install-app-opencost            alias: iaoc    Install OpenCost ArgoCD application"
-    echo "  install-app-pgadmin             alias: iapga   Install PgAdmin4 ArgoCD application"
-    echo "  install-app-postgres            alias: iapg    Install Cloud Native Postgres Operator ArgoCD application"
-    echo "  install-app-prometheus          alias: iap     Install Kube-prometheus-stack ArgoCD application"
-    echo "  install-app-redis-stack         alias: iars    Install Redis Stack ArgoCD application"
-    echo "  install-app-trivy               alias: iat     Install Trivy Operator ArgoCD application"
-    echo "  install-app-vault               alias: iav     Install Hashicorp Vault ArgoCD application"
+    echo "ArgoCD application installations:"
+    printf "  %-40s %s\n" "apps list" "List available ArgoCD app components"
+    printf "  %-40s %s\n" "install apps nyancat,prometheus" "Install one or more ArgoCD apps"
+    printf "  %-40s %s\n" "install apps nats,redis-stack --dry-run" "Dry run for ArgoCD apps"
+    echo ""
+    echo "Notes:"
+    echo "  - Use comma-separated lists (no spaces): redis-stack,nats"
+    echo "  - Components are installed in the order specified"
+    echo "  - Use --dry-run to preview changes before applying"
     echo ""
     echo "dependencies: docker, kind, kubectl, jq, base64 and helm"
     echo ""
@@ -77,154 +48,87 @@ function print_help() {
 }
 
 perform_action() {
-    local action=$1
-
-    case $action in
-        help|h)
-            print_logo
-            print_help
-            exit;;
-        create|c)
-            print_logo
-            get_cluster_parameter $*
-            exit;;
-        details|dt)
-            see_details_of_cluster
-            exit;;
-        info|i)
-            details_for_cluster $*
-            exit;;
-        delete|d)
-            delete_cluster $*
-            exit;;
-        list|ls)
-            list_clusters $*
-            exit;;
-        kubeconfig|kc)
-            get_kubeconfig $*
-            exit;;
-        
-        install-helm-argocd|iha)
-            install_helm_argocd
-            exit;;
-        install-helm-metallb|ihm)
-            install_helm_metallb
-            exit;;
-        install-helm-mongodb-operator|ihmdb)
-            install_helm_mongodb_operator
-            exit;;
-        install-helm-mongodb-instance|ihmdbi)
-            install_helm_mongodb_instance
-            exit;;
-        install-helm-trivy|iht)
-            install_helm_trivy
-            exit;;
-        install-helm-vault|ihv)
-            install_helm_vault
-            exit;;
-        install-helm-falco|ihf)
-            install_helm_falco
-            exit;;
-        install-helm-postgres|ihpg)
-            install_helm_postgres
-            exit;;
-        install-helm-pgadmin|ihpa)
-            install_helm_pgadmin
-            exit;;
-        install-helm-rook_ceph_operator|ihrco)
-            install_helm_rook_ceph_operator
-            exit;;
-        install-helm-rook_ceph_cluster|ihrcc)
-            install_helm_rook_ceph_cluster
-            exit;;
-        install-helm-crossplane|ihcr)
-            install_helm_crossplane
-            exit;;
-        install-helm-nginx|ihn)
-            install_helm_nginx_controller
-            exit;;
-        install-helm-minio|ihmin)
-            install_helm_minio
-            exit;;
-        install-helm-nfs|ihnfs)
-            install_helm_nfs
-            exit;;
-        install-helm-redis-stack|ihrs)
-            install_helm_redis_stack
-            exit;;
-        install-helm-nats|ihnats)
-            install_helm_nats
-            exit;;
-
-        install-app-nyancat|iac)
-            install_nyancat_application
-            exit;;
-        install-app-certmanager|iacm)
-            install_cert_manager_application
-            exit;;
-        install-app-prometheus|iap)
-            install_kube_prometheus_stack_application
-            exit;;
-        install-app-kubeview|iakv)
-            install_kubeview_application
-            exit;;
-        install-app-opencost|iaoc)
-            install_opencost_application
-            exit;;
-        install-app-metallb|iam)
-            install_metallb_application
-            exit;;
-        install-app-mongodb-operator|iamdb)
-            install_mongodb_operator_application
-            exit;;
-        install-app-mongodb-instance|iamdbi)
-            install_mongodb_instance
-            exit;;
-        install-app-falco|iaf)
-            install_falco_application
-            exit;;
-        install-app-trivy|iat)
-            install_trivy_application
-            exit;;
-        install-app-vault|iav)
-            install_vault_application
-            exit;;
-        install-app-postgres|iapg)
-            install_postgres_application
-            exit;;
-        install-app-pgadmin|iapga)
-            install_pgadmin_application
-            exit;;
-        install-app-rook-ceph-operator|iarco)
-            install_rook_ceph_operator_application
-            exit;;
-        install-app-rook-ceph-cluster|iarcc)
-            install_rook_ceph_cluster_application
-            exit;;
-        install-app-crossplane|iacr)
-            install_crossplane_application
-            exit;;
-        install-app-nginx|ian)
-            install_nginx_controller_application
-            exit;;
-        install-app-minio|iamin)
-            install_minio_application
-            exit;;
-        install-app-nfs|ianfs)
-            install_nfs_application
-            exit;;
-        install-app-redis-stack|iars)
-            install_redis_stack_application
-            exit;;
-        install-app-nats|ianats)
-            install_nats_application
-            exit;;
-        *) # Invalid option
-            print_logo
-            echo -e "$red
-            Error: Invalid option
-            $clear
-            "
-            exit;;
-   esac
+  local cmd="$1"; shift || true
+  case "$cmd" in
+    help|h)
+      print_logo; print_help; exit;;
+    create|c)
+      print_logo; get_cluster_parameter "$@"; exit;;
+    details|dt)
+      see_details_of_cluster; exit;;
+    info|i)
+      details_for_cluster "$@"; exit;;
+    delete|d)
+      delete_cluster "$@"; exit;;
+    list|ls)
+      list_clusters "$@"; exit;;
+    kubeconfig|kc)
+      get_kubeconfig "$@"; exit;;
+    helm)
+      local sub="$1"; shift || true
+      case "$sub" in
+        list)
+          echo -e "${yellow}Available Helm components:${clear}"
+          registry_list_pretty helm
+          exit;;
+        *)
+          echo -e "${red}Usage: ./create-cluster.sh helm list${clear}"; exit 1;;
+      esac;;
+    apps)
+      local sub="$1"; shift || true
+      case "$sub" in
+        list)
+          echo -e "${yellow}Available ArgoCD application components:${clear}"
+          registry_list_pretty app
+          exit;;
+        *)
+          echo -e "${red}Usage: ./create-cluster.sh apps list${clear}"; exit 1;;
+      esac;;
+    install)
+      local target_type dry_run=false items
+      target_type="$1"; shift || true
+      items="$1"; shift || true
+      # collect remaining flags
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --dry-run) dry_run=true; shift;;
+          *) echo -e "${red}Unknown flag for install: $1${clear}"; exit 1;;
+        esac
+      done
+      if [[ -z $target_type || -z $items ]]; then
+         echo -e "${red}Usage: ./create-cluster.sh install <helm|apps> <name1,name2> [--dry-run]${clear}"; exit 1
+      fi
+      if [[ $items == all ]]; then
+         echo -e "${red}'all' no longer supported. List items explicitly.${clear}"; exit 1
+      fi
+      # Normalize type: apps -> app
+      local registry_type="$target_type"
+      [[ $registry_type == "apps" ]] && registry_type="app"
+      
+      case "$target_type" in
+        helm|apps)
+          if $dry_run; then
+            echo -e "${yellow}[dry-run] Would install $target_type items:${clear}" 
+            echo "  $(echo "$items" | tr ',' ' ')"
+            echo -e "${yellow}Functions:${clear}"
+            IFS=',' read -r -a arr <<< "$items"
+            for it in "${arr[@]}"; do
+              line=$(registry_find "$registry_type" "$it") || { echo -e "${red}Unknown $target_type item: $it${clear}"; exit 1; }
+              fn=$(echo "$line" | awk -F'|' '{print $3}')
+              desc=$(echo "$line" | awk -F'|' '{print $4}')
+              printf "  %-18s -> %-25s %s\n" "$it" "$fn" "$desc"
+            done
+            exit 0
+          else
+            registry_install_many "$registry_type" "$items" || exit 1
+            exit 0
+          fi;;
+        *) echo -e "${red}Unknown install target type: $target_type${clear}"; exit 1;;
+      esac;;
+    *)
+      print_logo
+      echo -e "${red}Invalid command. See help.${clear}"
+      print_help
+      exit 1;;
+  esac
 }

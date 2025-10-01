@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for file in ./scripts/variables.sh ./scripts/core/utils.sh ./scripts/core/cluster.sh ./scripts/core/config.sh ./scripts/installers/helm.sh ./scripts/installers/apps.sh; do
+for file in ./scripts/variables.sh ./scripts/core/utils.sh ./scripts/core/cluster.sh ./scripts/core/config.sh ./scripts/installers/registry.sh ./scripts/installers/helm.sh ./scripts/installers/apps.sh; do
     if [ -f "$file" ]; then
         source "$file"
     else

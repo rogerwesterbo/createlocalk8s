@@ -1,4 +1,15 @@
-# createlocalk8s
+# K8S Local
+
+```
+██╗  ██╗ █████╗ ███████╗    ██╗      ██████╗  ██████╗ █████╗ ██╗
+██║ ██╔╝██╔══██╗██╔════╝    ██║     ██╔═══██╗██╔════╝██╔══██╗██║
+█████╔╝ ╚█████╔╝███████╗    ██║     ██║   ██║██║     ███████║██║
+██╔═██╗ ██╔══██╗╚════██║    ██║     ██║   ██║██║     ██╔══██║██║
+██║  ██╗╚█████╔╝███████║    ███████╗╚██████╔╝╚██████╗██║  ██║███████╗
+╚═╝  ╚═╝ ╚════╝ ╚══════╝    ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝
+```
+
+Local Kubernetes Cluster Manager (kind + docker)
 
 New to Kubernetes? Start here: [docs/kubernetes-101.md](./docs/kubernetes-101.md)
 
@@ -16,14 +27,18 @@ Create and experiment with local Kubernetes clusters using [kind](https://kind.s
 
 ## ✨ Key Features
 
+-   **Multiple script names**: Use `./kl.sh` (short), `./k8s-local.sh`, or `./create-cluster.sh` (legacy)
+-   **Shell completion**: Tab completion for bash, zsh, and fish shells
 -   Interactive cluster creation (name, control planes, workers, Kubernetes version)
 -   Supported Kubernetes versions (kind node images) baked in: 1.34.x → 1.25.x (see `scripts/variables.sh` for full list)
 -   Automatic port mapping adjustment when multiple clusters run simultaneously (avoids 80/443 conflicts)
 -   Optional automatic ArgoCD + Nginx Ingress install during cluster creation
 -   Post-create helper to install a sample Nyancat app (demo ingress + ArgoCD)
 -   Rich subcommands to list, inspect, delete clusters & fetch kubeconfig
--   One-liner Helm installers for: ArgoCD, Crossplane, Rook Ceph (operator/cluster), Falco, Trivy, Vault, Metallb, Minio, NFS provisioner, MongoDB (operator / instance), CloudNativePG (operator / cluster), PgAdmin4, Redis Stack, Nginx Controller
--   Matching ArgoCD Application installers (GitOps style) for the same stack + monitoring (kube-prometheus-stack), OpenCost, Redis Stack, etc.
+-   **Registry-based installers**: List and install Helm/ArgoCD components with simple commands
+-   17 Helm installers: ArgoCD, Crossplane, Rook Ceph, Falco, Trivy, Vault, MetalLB, MinIO, NFS, MongoDB, CNPG, PgAdmin, Redis Stack, etc.
+-   21 ArgoCD Application installers (GitOps style): monitoring (Prometheus), databases, security, storage, cost monitoring, etc.
+-   **Dry-run mode**: Preview what will be installed with `--dry-run`
 -   Generates per-cluster info + kubeconfig files under `clusters/`
 -   Consistent colored output & spinners, with readiness waits for core components
 -   Uses `localtest.me` wildcard DNS (no /etc/hosts changes needed)
@@ -33,7 +48,9 @@ Create and experiment with local Kubernetes clusters using [kind](https://kind.s
 ## 🧱 Repository Layout (selected)
 
 ```
-create-cluster.sh          # Entry point CLI wrapper
+kl.sh                      # Short entry point (recommended)
+k8s-local.sh               # Full name entry point
+create-cluster.sh          # Legacy entry point (backward compatible)
 scripts/
 	variables.sh             # Global defaults (versions, colors, flags)
 	core/
@@ -41,8 +58,11 @@ scripts/
 		cluster.sh             # Interactive creation / deletion / info
 		utils.sh               # Prereq & utility helpers
 	installers/
-		helm.sh                # Generic + specific Helm installers
-		apps.sh                # ArgoCD Application installers & post steps
+		registry.sh            # Component registry (Helm + ArgoCD apps)
+		helm.sh                # Helm installer functions
+		apps.sh                # ArgoCD Application installer functions
+completions/               # Shell completion scripts (bash, zsh, fish)
+	install-completion.sh    # Automated completion installer
 configs/apps/manifests/    # ArgoCD Application YAMLs & supporting manifests
 clusters/                  # Generated: kubeconfig & clusterinfo-* per cluster
 docs/                      # Additional documentation & diagram(s)
@@ -83,18 +103,35 @@ After installing Docker Desktop, start it once so the daemon is running.
 
 ## 🚀 Quick Start
 
+### Installation
+
+**Optional**: Install shell completion for better experience:
+
+```bash
+./completions/install-completion.sh
+source ~/.zshrc  # or ~/.bashrc for bash
+```
+
+Now you'll have tab completion for all commands!
+
+### Basic Usage
+
 Show help (also printed when no args supplied):
 
 ```bash
-./create-cluster.sh
+./kl.sh help
+# or use the full name
+./k8s-local.sh help
+# or legacy name
+./create-cluster.sh help
 ```
 
 Create a cluster (interactive prompts follow):
 
 ```bash
-./create-cluster.sh create mycluster
+./kl.sh create mycluster
 # or shorthand
-./create-cluster.sh c mycluster
+./kl.sh c mycluster
 ```
 
 During the prompts you can choose:
@@ -128,40 +165,40 @@ Username: `admin` Password: Listed in clusterinfo file (extracted from the boots
 Install Nyancat sample app after cluster creation (if you skipped initially):
 
 ```bash
-./create-cluster.sh iac   # install-app-nyancat
+./kl.sh install apps nyancat
 ```
 
 Delete the cluster:
 
 ```bash
-./create-cluster.sh delete mycluster
+./kl.sh delete mycluster
 # or shorthand
-./create-cluster.sh d mycluster
+./kl.sh d mycluster
 ```
 
 List clusters:
 
 ```bash
-./create-cluster.sh ls
+./kl.sh ls
 ```
 
 Fetch (regenerate) kubeconfig file later:
 
 ```bash
-./create-cluster.sh kc mycluster
+./kl.sh kc mycluster
 ```
 
 See full cluster details (cluster info + kind config used):
 
 ```bash
-./create-cluster.sh info mycluster   # alias: i
+./kl.sh info mycluster   # alias: i
 ```
 
 ---
 
 ## 🧩 Command Reference
 
-Kind / cluster lifecycle:
+### Cluster Lifecycle
 
 | Action            | Alias | Description                                              |
 | ----------------- | ----- | -------------------------------------------------------- |
@@ -173,33 +210,83 @@ Kind / cluster lifecycle:
 | delete <name>     | d     | Delete cluster (confirmation prompt)                     |
 | help              | h     | Show help                                                |
 
-Helm installers (imperative, alphabetical):
+### Component Management
 
-```
-iha   (install-helm-argocd)         ihrcc (install-helm-ceph-cluster)
-ihrco (install-helm-ceph-operator)  ihcr  (install-helm-crossplane)
-ihf   (install-helm-falco)          ihm   (install-helm-metallb)
-ihmin (install-helm-minio)          ihmdbi (install-helm-mongodb-instance)
-ihmdb (install-helm-mongodb-operator) ihnats (install-helm-nats)
-ihn   (install-helm-nginx)          ihnfs (install-helm-nfs)
-ihpa  (install-helm-pgadmin)        ihpg  (install-helm-postgres)
-ihrs  (install-helm-redis-stack)    iht   (install-helm-trivy)
-ihv   (install-helm-vault)
+**List available components:**
+
+```bash
+./kl.sh helm list              # List all Helm components
+./kl.sh apps list              # List all ArgoCD applications
 ```
 
-ArgoCD Application installers (GitOps style, alphabetical):
+**Install components (single or multiple):**
 
-```
-iarcc (rook ceph cluster)    iarco (rook ceph operator)   iac   (nyancat)
-iacm  (cert-manager)         iacr  (crossplane)           iaf   (falco)
-iakv  (kubeview)             iam   (metallb)              iamin (minio)
-iamdbi (mongodb instance)    iamdb (mongodb operator)     ian   (nginx controller)
-ianats (nats)                ianfs (nfs)                  iaoc  (opencost)
-iapga (pgadmin)              iapg  (postgres operator)    iap   (kube-prometheus-stack)
-iars  (redis stack)          iat   (trivy)                iav   (vault)
+```bash
+# Install single Helm component
+./kl.sh install helm redis-stack
+
+# Install multiple Helm components (comma-separated)
+./kl.sh install helm redis-stack,nats,metallb
+
+# Install ArgoCD application
+./kl.sh install apps prometheus
+
+# Install multiple apps
+./kl.sh install apps nyancat,prometheus,mongodb
+
+# Dry-run mode (preview what will be installed)
+./kl.sh install helm redis-stack --dry-run
+./kl.sh install apps prometheus,mongodb --dry-run
 ```
 
-> All commands map 1:1 to script functions; see `scripts/core/config.sh` for authoritative list.
+**Available Helm components** (17):
+
+-   `argocd` - ArgoCD GitOps controller
+-   `cert-manager` - Certificate management
+-   `cnpg` - CloudNativePG operator
+-   `crossplane` - Cloud native control plane
+-   `falco` - Runtime security
+-   `hashicorp-vault` - Secrets management
+-   `kube-prometheus-stack` - Prometheus monitoring
+-   `kubeview` - Cluster visualizer
+-   `metallb` - Load balancer
+-   `minio` - S3-compatible storage
+-   `mongodb-operator` - MongoDB operator
+-   `nats` - NATS messaging
+-   `nfs` - NFS provisioner
+-   `nginx-ingress` - NGINX ingress controller
+-   `opencost` - Cost monitoring
+-   `pgadmin` - PostgreSQL admin UI
+-   `redis-stack` - Redis Stack server
+-   `rook-ceph-operator` - Rook Ceph operator
+-   `trivy` - Security scanner
+
+**Available ArgoCD apps** (21):
+
+-   `nyancat` - Sample demo app
+-   `prometheus` - Kube Prometheus Stack
+-   `cert-manager` - Cert Manager app
+-   `cnpg-cluster` - CNPG cluster instance
+-   `crossplane` - Crossplane app
+-   `falco` - Falco security app
+-   `hashicorp-vault` - Vault app
+-   `kubeview` - KubeView app
+-   `metallb` - MetalLB app
+-   `minio` - MinIO app
+-   `mongodb` - MongoDB instance
+-   `mongodb-operator` - MongoDB operator app
+-   `nats` - NATS app
+-   `nfs` - NFS provisioner app
+-   `opencost` - OpenCost app
+-   `pg-ui` - PostgreSQL UI
+-   `pgadmin` - PgAdmin app
+-   `redis-stack` - Redis Stack app
+-   `rook-ceph-cluster` - Rook Ceph cluster
+-   `rook-ceph-operator` - Rook Ceph operator app
+-   `trivy` - Trivy scanner app
+-   `coredns` - CoreDNS app
+
+> Use tab completion to discover available components! Run `./completions/install-completion.sh` to enable it.
 
 ---
 
@@ -257,6 +344,32 @@ open http://localhost:8200
 
 ---
 
+## 🎯 Shell Completion
+
+Tab completion makes it easy to discover and use commands:
+
+```bash
+# Install completion (auto-detects your shell)
+./completions/install-completion.sh
+
+# Reload your shell
+source ~/.zshrc     # for zsh
+source ~/.bashrc    # for bash
+```
+
+**Supported shells**: Bash 3.2+, Zsh 5.0+, Fish 3.0+
+
+**What you get:**
+
+-   Tab completion for all commands
+-   Component name completion with descriptions (zsh/fish)
+-   Flag completion (--dry-run)
+-   Works with all script names: `./kl.sh`, `./k8s-local.sh`, `./create-cluster.sh`
+
+See [docs/shell-completion.md](./docs/shell-completion.md) for detailed installation and usage.
+
+---
+
 ## ♻️ Cleanup
 
 ```bash
@@ -303,13 +416,20 @@ This project is licensed under the terms of the [LICENSE](./LICENSE).
 
 ## 📚 More Docs
 
-Additional walkthrough & background: [docs/k8s.md](./docs/k8s.md)
+**Getting Started:**
 
-New to Kubernetes? Start here: [docs/kubernetes-101.md](./docs/kubernetes-101.md)
+-   New to Kubernetes? Start here: [docs/kubernetes-101.md](./docs/kubernetes-101.md)
+-   Additional walkthrough & background: [docs/k8s.md](./docs/k8s.md)
 
-What do the optional apps provide? [docs/kubernetes-apps-overview.md](./docs/kubernetes-apps-overview.md)
+**Components & Patterns:**
 
-ArgoCD & App-of-Apps pattern: [docs/argocd-app-of-apps.md](./docs/argocd-app-of-apps.md)
+-   What do the optional apps provide? [docs/kubernetes-apps-overview.md](./docs/kubernetes-apps-overview.md)
+-   ArgoCD & App-of-Apps pattern: [docs/argocd-app-of-apps.md](./docs/argocd-app-of-apps.md)
+
+**Shell Completion:**
+
+-   Installation & usage guide: [docs/shell-completion.md](./docs/shell-completion.md)
+-   Quick install: [completions/README.md](./completions/README.md)
 
 ---
 
