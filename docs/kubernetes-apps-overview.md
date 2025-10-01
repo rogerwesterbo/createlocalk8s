@@ -25,6 +25,7 @@ This repo can install a curated set of platform + demo components using either H
 | Trivy Operator                  | Security / SBOM       | Image & config vulnerability scanning          | Learning security shift-left            | `iht`                | `iat`                  |
 | HashiCorp Vault                 | Secrets Management    | Centralized secrets + encryption               | Practicing secret injection & policies  | `ihv`                | `iav`                  |
 | Redis Stack                     | Cache / Data          | Redis + modules (JSON, Search, etc.)           | Caching patterns, pub/sub, JSON docs    | `ihrs`               | `iars`                 |
+| NATS                            | Messaging / Streaming | Lightweight high-speed pub/sub + JetStream     | Event-driven prototypes, decoupling     | `ihnats`             | `ianats`               |
 | Crossplane                      | Infra Abstraction     | Compose infra APIs / claim external services   | Exploring platform engineering patterns | `ihcr`               | `iacr`                 |
 | Kube-Prometheus-Stack           | Observability         | Prometheus + Alertmanager + Grafana            | Metrics / dashboards & alerting basics  | —                    | `iap`                  |
 | Kubeview                        | Cluster Visualization | UI to explore resources graphically            | Visualizing relationships               | —                    | `iakv`                 |
@@ -91,6 +92,15 @@ This repo can install a curated set of platform + demo components using either H
 -   Provides Redis plus enhanced modules (RedisJSON, Search, TimeSeries, Bloom) via the upstream redis-stack-server chart.
 -   Excellent for prototyping caching, document storage (JSON), pub/sub messaging, search indexing, and time‑series ingestion in one lightweight component.
 -   Port-forward: `kubectl port-forward -n redis svc/redis-stack-server 6379:6379` then `redis-cli -h localhost -p 6379`.
+
+**NATS (Core + JetStream + nats-box)**
+
+-   Ultra-lightweight messaging system providing pub/sub, request/reply, and (with JetStream) persistence, streaming, key-value & object store primitives.
+-   Great for experimenting with event-driven architectures locally without the heavier footprint of Kafka or RabbitMQ.
+-   JetStream enabled by default here (see values in `nats-app.yaml`).
+-   Test publish: `kubectl -n nats exec -it deploy/nats-box -- nats pub test hi`
+-   Test subscribe: `kubectl -n nats exec -it deploy/nats-box -- nats sub test`
+-   JetStream stream quickstart: `kubectl -n nats exec -it deploy/nats-box -- nats str add mystream --subjects test --storage file` then publish again and inspect with `nats str ls`.
 
 -   Browser-based administration UI for Postgres.
 -   Low friction for inspecting DB objects when learning CNPG.
@@ -164,6 +174,7 @@ This repo can install a curated set of platform + demo components using either H
 | Storage fundamentals       | NFS or Minio             | Progress to Rook Ceph                 |
 | Database operator patterns | CloudNativePG Operator   | Add PgAdmin, then MongoDB Operator    |
 | Caching / polyglot storage | Redis Stack              | Add MongoDB / Postgres for comparison |
+| Event-driven basics        | NATS                     | Add Redis pub/sub & then JetStream    |
 | Security basics            | Trivy Operator           | Add Falco for runtime events          |
 | Observability              | Kube-Prometheus-Stack    | Layer in OpenCost                     |
 | Infra abstraction          | Crossplane               | Compose your own XRDs                 |
@@ -188,7 +199,7 @@ kubectl get pvc -A
 kubectl logs -n falco -l app.kubernetes.io/name=falco -f
 
 # List CRDs added by operators
-kubectl get crds | grep -E 'argoproj|vault|postgres|mongodb|crossplane|trivy|falco|redis'
+kubectl get crds | grep -E 'argoproj|vault|postgres|mongodb|crossplane|trivy|falco|redis|jetstream'
 ```
 
 ---

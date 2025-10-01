@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nats
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  destination:
+    namespace: nats
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: nats
+    repoURL: https://nats-io.github.io/k8s/helm/charts/
+    targetRevision: '*'
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

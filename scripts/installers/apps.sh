@@ -372,6 +372,29 @@ function install_redis_stack_application() {
     echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:6379"
 }
 
+function install_nats_application() {
+    echo -e "$yellow Installing NATS ArgoCD application"
+    (kubectl apply -f $nats_app_yaml|| { 
+        echo -e "$red 🛑 Could not install NATS ArgoCD application into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing NATS ArgoCD application"
+
+    echo -e "$yellow\n⏰ Waiting for NATS to be running"
+    sleep 10
+    (kubectl wait pods --for=condition=Ready --all -n nats --timeout=180s || { 
+        echo -e "$red 🛑 NATS is not running, and is not ready to use ..."; 
+        die 
+    }) & spinner
+
+    echo "NATS application installed: yes" >> $cluster_info_file
+
+    echo -e "$yellow\nNATS is ready to use"
+    echo -e "$yellow Publish test:$blue kubectl -n nats exec -it deploy/nats-box -- nats pub test hi"
+    echo -e "$yellow Subscribe:$blue kubectl -n nats exec -it deploy/nats-box -- nats sub test"
+}
+
 function post_pgadmin_install() {
     echo -e "$yellow\n⏰ Waiting for Pgadmin4 to be running"
     sleep 10

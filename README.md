@@ -173,29 +173,30 @@ Kind / cluster lifecycle:
 | delete <name>     | d     | Delete cluster (confirmation prompt)                     |
 | help              | h     | Show help                                                |
 
-Helm installers (imperative):
+Helm installers (imperative, alphabetical):
 
 ```
-iha  (install-helm-argocd)          ihn     (install-helm-nginx)
-ihcr (install-helm-crossplane)      ihmin   (install-helm-minio)
-ihrco (rook ceph operator)          ihnfs   (install-helm-nfs)
-ihrcc (rook ceph cluster)           ihmdb   (install-helm-mongodb-operator)
-ihf  (install-helm-falco)           ihmdbi  (install-helm-mongodb-instance)
-ihm  (install-helm-metallb)         ihpg    (install-helm-postgres)
-iht  (install-helm-trivy)           ihpa    (install-helm-pgadmin)
-ihv  (install-helm-vault)           ihrs    (install-helm-redis-stack)
+iha   (install-helm-argocd)         ihrcc (install-helm-ceph-cluster)
+ihrco (install-helm-ceph-operator)  ihcr  (install-helm-crossplane)
+ihf   (install-helm-falco)          ihm   (install-helm-metallb)
+ihmin (install-helm-minio)          ihmdbi (install-helm-mongodb-instance)
+ihmdb (install-helm-mongodb-operator) ihnats (install-helm-nats)
+ihn   (install-helm-nginx)          ihnfs (install-helm-nfs)
+ihpa  (install-helm-pgadmin)        ihpg  (install-helm-postgres)
+ihrs  (install-helm-redis-stack)    iht   (install-helm-trivy)
+ihv   (install-helm-vault)
 ```
 
-ArgoCD Application installers (GitOps style):
+ArgoCD Application installers (GitOps style, alphabetical):
 
 ```
-iacm (cert-manager)     iakv (kubeview)           iam   (metallb)
-iacr (crossplane)       ian  (nginx controller)   iamin (minio)
-iaf  (falco)            ianfs (nfs)               iamdb (mongodb operator)
-iat  (trivy)            iamdbi (mongodb instance) iapg  (postgres operator)
-iav  (vault)            iapga (pgadmin)           iap   (kube-prometheus-stack)
-iac  (nyancat)          iaoc (opencost)           iarco (rook ceph operator)
-iarcc (rook ceph cluster)           iars (redis stack)
+iarcc (rook ceph cluster)    iarco (rook ceph operator)   iac   (nyancat)
+iacm  (cert-manager)         iacr  (crossplane)           iaf   (falco)
+iakv  (kubeview)             iam   (metallb)              iamin (minio)
+iamdbi (mongodb instance)    iamdb (mongodb operator)     ian   (nginx controller)
+ianats (nats)                ianfs (nfs)                  iaoc  (opencost)
+iapga (pgadmin)              iapg  (postgres operator)    iap   (kube-prometheus-stack)
+iars  (redis stack)          iat   (trivy)                iav   (vault)
 ```
 
 > All commands map 1:1 to script functions; see `scripts/core/config.sh` for authoritative list.
@@ -309,8 +310,6 @@ New to Kubernetes? Start here: [docs/kubernetes-101.md](./docs/kubernetes-101.md
 What do the optional apps provide? [docs/kubernetes-apps-overview.md](./docs/kubernetes-apps-overview.md)
 
 ArgoCD & App-of-Apps pattern: [docs/argocd-app-of-apps.md](./docs/argocd-app-of-apps.md)
-
-
 
 ---
 

@@ -314,3 +314,23 @@ function install_helm_nginx_controller(){
 
     echo -e "$yellow ✅ Done installing Nginx Controller"
 }
+
+function install_helm_nats(){
+    echo -e "$yellow Installing NATS"
+    helm repo add nats https://nats-io.github.io/k8s/helm/charts/
+    (helm upgrade --install nats nats/nats --namespace nats --create-namespace || { 
+        echo -e "$red 🛑 Could not install NATS into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for NATS pods to be ready"
+    sleep 10
+    (kubectl wait pods --for=condition=Ready --all -n nats --timeout=180s || { 
+        echo -e "$red 🛑 NATS is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing NATS"
+    echo -e "$yellow To publish test message:$blue kubectl -n nats exec -it deploy/nats-box -- nats pub test hi"
+    echo -e "$yellow To subscribe:$blue kubectl -n nats exec -it deploy/nats-box -- nats sub test"
+}

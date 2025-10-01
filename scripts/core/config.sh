@@ -27,41 +27,43 @@ function print_help() {
     echo "  delete                          alias: d       Delete a cluster by name"
     echo "  help                            alias: h       Print this Help"
     echo ""
-    echo "Helm:"
+    echo "Helm (alphabetical):"
     echo "  install-helm-argocd             alias: iha     Install ArgoCD with helm"
-    echo "  install-helm-crossplane         alias: ihcr    Install Crossplane with helm"
-    echo "  install-helm-ceph-operator      alias: ihrco   Install Rook Ceph Operator with helm"
     echo "  install-helm-ceph-cluster       alias: ihrcc   Install Rook Ceph Cluster with helm"
+    echo "  install-helm-ceph-operator      alias: ihrco   Install Rook Ceph Operator with helm"
+    echo "  install-helm-crossplane         alias: ihcr    Install Crossplane with helm"
     echo "  install-helm-falco              alias: ihf     Install Falco with helm"
-    echo "  install-helm-nfs                alias: ihnfs   Install NFS with helm"
-    echo "  install-helm-nginx              alias: ihn     Install Nginx controller with helm"
     echo "  install-helm-metallb            alias: ihm     Install Metallb with helm"
     echo "  install-helm-minio              alias: ihmin   Install Minio with helm"
-    echo "  install-helm-mongodb-operator   alias: ihmdb   Install Mongodb Operator with helm"
     echo "  install-helm-mongodb-instance   alias: ihmdbi  Install Mongodb Instance with helm"
-    echo "  install-helm-postgres           alias: ihpg    Install Cloud Native Postgres Operator with helm"
+    echo "  install-helm-mongodb-operator   alias: ihmdb   Install Mongodb Operator with helm"
+    echo "  install-helm-nats               alias: ihnats  Install NATS with helm"
+    echo "  install-helm-nginx              alias: ihn     Install Nginx controller with helm"
+    echo "  install-helm-nfs                alias: ihnfs   Install NFS with helm"
     echo "  install-helm-pgadmin            alias: ihpa    Install PgAdmin4 with helm"
+    echo "  install-helm-postgres           alias: ihpg    Install Cloud Native Postgres Operator with helm"
     echo "  install-helm-redis-stack        alias: ihrs    Install Redis Stack with helm"
     echo "  install-helm-trivy              alias: iht     Install Trivy Operator with helm"
     echo "  install-helm-vault              alias: ihv     Install Vault with helm"
     echo ""
-    echo "ArgoCD Applications:"
-    echo "  install-app-ceph-operator       alias: iarco   Install Rook Ceph Operator ArgoCD application"
+    echo "ArgoCD Applications (alphabetical):"
     echo "  install-app-ceph-cluster        alias: iarcc   Install Rook Ceph Cluster ArgoCD application"
+    echo "  install-app-ceph-operator       alias: iarco   Install Rook Ceph Operator ArgoCD application"
     echo "  install-app-certmanager         alias: iacm    Install Cert-manager ArgoCD application"
     echo "  install-app-crossplane          alias: iacr    Install Crossplane ArgoCD application"
     echo "  install-app-falco               alias: iaf     Install Falco ArgoCD application"
     echo "  install-app-kubeview            alias: iakv    Install Kubeview ArgoCD application"
-    echo "  install-app-nfs                 alias: ianfs   Install NFS ArgoCD application"
-    echo "  install-app-nginx               alias: ian     Install Nginx Controller ArgoCD application"
-    echo "  install-app-minio               alias: iamin   Install Minio ArgoCD application"
     echo "  install-app-metallb             alias: iam     Install Metallb ArgoCD application"
-    echo "  install-app-mongodb-operator    alias: iamdb   Install Mongodb Operator ArgoCD application"
+    echo "  install-app-minio               alias: iamin   Install Minio ArgoCD application"
     echo "  install-app-mongodb-instance    alias: iamdbi  Install Mongodb Instance ArgoCD application"
+    echo "  install-app-mongodb-operator    alias: iamdb   Install Mongodb Operator ArgoCD application"
+    echo "  install-app-nats                alias: ianats  Install NATS ArgoCD application"
+    echo "  install-app-nginx               alias: ian     Install Nginx Controller ArgoCD application"
+    echo "  install-app-nfs                 alias: ianfs   Install NFS ArgoCD application"
     echo "  install-app-nyancat             alias: iac     Install Nyan-cat ArgoCD application"
     echo "  install-app-opencost            alias: iaoc    Install OpenCost ArgoCD application"
-    echo "  install-app-postgres            alias: iapg    Install Cloud Native Postgres Operator ArgoCD application"
     echo "  install-app-pgadmin             alias: iapga   Install PgAdmin4 ArgoCD application"
+    echo "  install-app-postgres            alias: iapg    Install Cloud Native Postgres Operator ArgoCD application"
     echo "  install-app-prometheus          alias: iap     Install Kube-prometheus-stack ArgoCD application"
     echo "  install-app-redis-stack         alias: iars    Install Redis Stack ArgoCD application"
     echo "  install-app-trivy               alias: iat     Install Trivy Operator ArgoCD application"
@@ -150,6 +152,9 @@ perform_action() {
         install-helm-redis-stack|ihrs)
             install_helm_redis_stack
             exit;;
+        install-helm-nats|ihnats)
+            install_helm_nats
+            exit;;
 
         install-app-nyancat|iac)
             install_nyancat_application
@@ -210,6 +215,9 @@ perform_action() {
             exit;;
         install-app-redis-stack|iars)
             install_redis_stack_application
+            exit;;
+        install-app-nats|ianats)
+            install_nats_application
             exit;;
         *) # Invalid option
             print_logo
