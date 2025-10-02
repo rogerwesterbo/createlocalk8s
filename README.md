@@ -24,27 +24,54 @@ Create and experiment with local Kubernetes clusters using [kind](https://kind.s
 ---
 
 ```bash
-$ ./kl.sh help
-Commands:
-  create | c <name>          Create a new Kubernetes cluster (interactive)
-  delete | d <name>          Delete a cluster
-  list   | ls                List existing kind clusters
-  details| dt                Live cluster info (nodes/pods/services/ingresses)
-  info   | i  <name>         Show stored cluster configuration summary
-  kubeconfig | kc <name>     Write kubeconfig file for a cluster
-  config <name>              Show the original kind config used (if stored)
-  start  <name>              Start a previously stopped cluster (if supported)
-  stop   <name>              Stop a running cluster (if supported)
-  helm list                  List Helm-installable components
-  apps list                  List ArgoCD application installers
-  install helm <comp[,comp]> [--dry-run]
-  install apps <app[,app]>   [--dry-run]
-  help  | h                  Show this help
+$ ./kl.sh
+
+
+██╗  ██╗ █████╗ ███████╗    ██╗      ██████╗  ██████╗ █████╗ ██╗
+██║ ██╔╝██╔══██╗██╔════╝    ██║     ██╔═══██╗██╔════╝██╔══██╗██║
+█████╔╝ ╚█████╔╝███████╗    ██║     ██║   ██║██║     ███████║██║
+██╔═██╗ ██╔══██╗╚════██║    ██║     ██║   ██║██║     ██╔══██║██║
+██║  ██╗╚█████╔╝███████║    ███████╗╚██████╔╝╚██████╗██║  ██║███████╗
+╚═╝  ╚═╝ ╚════╝ ╚══════╝    ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝
+
+         Local Kubernetes Cluster Manager (kind + docker)
+
+
+Kind specific:
+  list                            alias: ls      Show kind clusters
+  create [cluster-name]           alias: c       Create a local cluster with kind and docker
+  details <cluster-name>          alias: dt      Show details for a cluster
+  k8sdetails <cluster-name>       alias: k8s     Show detailed Kubernetes resources info
+  kubeconfig <cluster-name>       alias: kc      Get kubeconfig for a cluster by name
+  delete <cluster-name>           alias: d       Delete a cluster by name
+  help                            alias: h       Print this Help
 
 Examples:
-  ./kl.sh create demo
-  ./kl.sh install helm argocd,nats
-  ./kl.sh install apps prometheus,nyancat
+  ./kl.sh create mycluster                       Create cluster named 'mycluster'
+  ./kl.sh details mycluster                      Show details for cluster 'mycluster'
+  ./kl.sh k8sdetails mycluster                   Show K8s resources for cluster 'mycluster'
+  ./kl.sh delete mycluster                       Delete cluster 'mycluster'
+
+Helm installations:
+  helm list                                List available Helm components
+  install helm redis-stack,nats            Install one or more Helm components
+  install helm redis-stack --dry-run       Dry run (show what would be installed)
+
+ArgoCD application installations:
+  apps list                                List available ArgoCD app components
+  install apps nyancat,prometheus          Install one or more ArgoCD apps
+  install apps nats,redis-stack --dry-run  Dry run for ArgoCD apps
+
+Notes:
+  - Parameters in [brackets] are optional
+  - Parameters in <brackets> are required
+  - Use comma-separated lists (no spaces): redis-stack,nats
+  - Components are installed in the order specified
+  - Use --dry-run to preview changes before applying
+
+dependencies: docker, kind, kubectl, jq, base64 and helm
+
+Current date and time in Linux Thu Oct  2 10:38:20 CEST 2025
 ```
 
 ## ✨ Key Features
@@ -222,18 +249,18 @@ See full cluster details (cluster info + kind config used):
 
 ### Cluster Lifecycle
 
-| Action / Aliases              | Description                                              |
-| ----------------------------- | -------------------------------------------------------- |
-| create (c) <name>             | Interactive creation workflow                            |
-| list (ls)                     | List kind clusters                                       |
-| details (dt)                  | Live k8s cluster info (nodes, pods, services, ingresses) |
-| info (i) <name>               | Show saved cluster configuration & kind config summary   |
-| kubeconfig (kc) <name>        | Write kubeconfig file for cluster                        |
-| config <name>                 | Show raw kind config used (if persisted)                 |
-| start <name>                  | Start a stopped cluster (noop if not supported)          |
-| stop <name>                   | Stop a running cluster (noop if not supported)           |
-| delete (d) <name>             | Delete cluster (confirmation)                            |
-| help (h)                      | Show help                                                |
+| Action / Aliases       | Description                                              |
+| ---------------------- | -------------------------------------------------------- |
+| create (c) <name>      | Interactive creation workflow                            |
+| list (ls)              | List kind clusters                                       |
+| details (dt)           | Live k8s cluster info (nodes, pods, services, ingresses) |
+| info (i) <name>        | Show saved cluster configuration & kind config summary   |
+| kubeconfig (kc) <name> | Write kubeconfig file for cluster                        |
+| config <name>          | Show raw kind config used (if persisted)                 |
+| start <name>           | Start a stopped cluster (noop if not supported)          |
+| stop <name>            | Stop a running cluster (noop if not supported)           |
+| delete (d) <name>      | Delete cluster (confirmation)                            |
+| help (h)               | Show help                                                |
 
 ### Component Management
 
