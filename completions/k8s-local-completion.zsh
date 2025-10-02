@@ -2,80 +2,123 @@
 # Zsh completion script for k8s-local.sh / kl.sh / create-cluster.sh
 
 _k8s_local_zsh() {
+    local -a commands helm_components argo_apps
     local line state
+    local script="${words[1]}"
 
-    # Main commands
-    local -a commands
-    commands=(
-        'create:Create a new Kubernetes cluster'
-        'delete:Delete an existing cluster'
-        'list:List all clusters'
-        'info:Show cluster information'
-        'config:Show cluster configuration'
-        'start:Start a stopped cluster'
-        'stop:Stop a running cluster'
-        'help:Show help message'
-        'helm:Manage Helm installations'
-        'apps:Manage ArgoCD applications'
-        'install:Install Helm components or ArgoCD apps'
-    )
+    # --- Dynamic command extraction ---
+    # Tries: <script> help  (adjust if your script uses --help)
+    local help_out
+    help_out="$($script help 2>/dev/null)"
+    if [[ -z "$help_out" ]]; then
+        help_out="$($script --help 2>/dev/null)"
+    fi
 
-    # Helm components
-    local -a helm_components
-    helm_components=(
-        'argocd:ArgoCD GitOps controller'
-        'cert-manager:Certificate management'
-        'cnpg:CloudNativePG operator'
-        'crossplane:Cloud native control plane'
-        'falco:Runtime security'
-        'hashicorp-vault:Secrets management'
-        'kube-prometheus-stack:Prometheus monitoring'
-        'kubeview:Kubernetes cluster visualizer'
-        'metallb:Load balancer for bare metal'
-        'minio:S3-compatible object storage'
-        'mongodb-operator:MongoDB operator'
-        'nats:NATS messaging system'
-        'nfs:NFS provisioner'
-        'nginx-ingress:NGINX ingress controller'
-        'opencost:Cost monitoring'
-        'pgadmin:PostgreSQL admin UI'
-        'redis-stack:Redis Stack server'
-        'rook-ceph-operator:Rook Ceph operator'
-        'trivy:Security scanner'
-    )
+    if [[ -n "$help_out" ]]; then
+        # Extract lines under a "Commands:" header until blank line
+        local cmd_block
+        cmd_block="$(echo "$help_out" | sed -n '/^[[:space:]]*Commands[:]/,/^[[:space:]]*$/p')"
+        # Transform "name - Description" -> "name:Description"
+        commands=(${(f)"$(echo "$cmd_block" | sed -E 's/^[[:space:]]*([a-zA-Z0-9_-]+)[[:space:]]+-[[:space:]]+(.+)/\1:\2/' | grep ':' )"})
+    fi
 
-    # ArgoCD apps
-    local -a argo_apps
-    argo_apps=(
-        'nyancat:Sample Nyancat demo'
-        'prometheus:Kube Prometheus Stack'
-        'cert-manager:Cert Manager application'
-        'cnpg-cluster:CNPG cluster instance'
-        'crossplane:Crossplane application'
-        'falco:Falco security'
-        'hashicorp-vault:Vault application'
-        'kubeview:KubeView application'
-        'metallb:MetalLB application'
-        'minio:MinIO application'
-        'mongodb:MongoDB instance'
-        'mongodb-operator:MongoDB operator app'
-        'nats:NATS application'
-        'nfs:NFS provisioner app'
-        'opencost:OpenCost application'
-        'pg-ui:PostgreSQL UI'
-        'pgadmin:PgAdmin application'
-        'redis-stack:Redis Stack app'
-        'rook-ceph-cluster:Rook Ceph cluster'
-        'rook-ceph-operator:Rook Ceph operator app'
-        'trivy:Trivy scanner app'
-        'coredns:CoreDNS application'
-    )
+    # Fallback static list if parsing produced nothing
+    if (( ${#commands} == 0 )); then
+        commands=(
+            'create:Create a new Kubernetes cluster'
+            'delete:Delete an existing cluster'
+            'list:List all clusters'
+            'info:Show cluster information'
+            'config:Show cluster configuration'
+            'start:Start a stopped cluster'
+            'stop:Stop a running cluster'
+            'help:Show help message'
+            'helm:Manage Helm components'
+            'apps:Manage ArgoCD applications'
+            'install:Install Helm component or ArgoCD app'
+        )
+    fi
+
+    # --- Dynamic Helm components ---
+    # Expect something like a newline list or table; we take first column tokens
+    local helm_out
+    helm_out="$($script helm list 2>/dev/null)"
+    if [[ -n "$helm_out" ]]; then
+        # Remove header lines commonly containing NAME or similar
+        helm_components=(${(f)"$(echo "$helm_out" | awk 'NR==1 && tolower($0) ~ /name/ {next} {print $1}' | sed -E '/^$/d')"})
+        helm_components=(${helm_components:#(NAME|NAME:)*})
+        # Map to "name:Helm component"
+        for i in {1..${#helm_components[@]}}; do
+            helm_components[$i]="${helm_components[$i]}:Helm component"
+        done
+    fi
+    # Fallback static list
+    if (( ${#helm_components} == 0 )); then
+        helm_components=(
+            'argocd:ArgoCD'
+            'cert-manager:cert-manager'
+            'cnpg:CloudNativePG operator'
+            'crossplane:Crossplane'
+            'falco:Falco'
+            'hashicorp-vault:Vault'
+            'kube-prometheus-stack:Prometheus stack'
+            'kubeview:KubeView'
+            'metallb:MetalLB'
+            'minio:MinIO'
+            'mongodb-operator:MongoDB operator'
+            'nats:NATS'
+            'nfs:NFS provisioner'
+            'nginx-ingress:NGINX ingress'
+            'opencost:OpenCost'
+            'pgadmin:PgAdmin'
+            'redis-stack:Redis Stack'
+            'rook-ceph-operator:Rook Ceph operator'
+            'trivy:Trivy'
+        )
+    fi
+
+    # --- Dynamic Argo apps ---
+    local apps_out
+    apps_out="$($script apps list 2>/dev/null)"
+    if [[ -n "$apps_out" ]]; then
+        argo_apps=(${(f)"$(echo "$apps_out" | awk '{print $1}' | sed -E '/^(NAME|Name|#|$)/d')"})
+        for i in {1..${#argo_apps[@]}}; do
+            argo_apps[$i]="${argo_apps[$i]}:ArgoCD app"
+        done
+    fi
+    # Fallback static list
+    if (( ${#argo_apps} == 0 )); then
+        argo_apps=(
+            'nyancat:Nyancat demo'
+            'prometheus:Kube Prometheus Stack'
+            'cert-manager:Cert Manager app'
+            'cnpg-cluster:CNPG cluster'
+            'crossplane:Crossplane app'
+            'falco:Falco'
+            'hashicorp-vault:Vault'
+            'kubeview:KubeView'
+            'metallb:MetalLB'
+            'minio:MinIO'
+            'mongodb:MongoDB instance'
+            'mongodb-operator:MongoDB operator app'
+            'nats:NATS'
+            'nfs:NFS provisioner'
+            'opencost:OpenCost'
+            'pg-ui:PostgreSQL UI'
+            'pgadmin:PgAdmin'
+            'redis-stack:Redis Stack'
+            'rook-ceph-cluster:Rook Ceph cluster'
+            'rook-ceph-operator:Rook Ceph operator'
+            'trivy:Trivy scanner'
+            'coredns:CoreDNS'
+        )
+    fi
 
     _arguments -C \
-        '1: :->command' \
-        '2: :->subcommand' \
-        '3: :->item' \
-        '4: :->flag' \
+        '1:command:->command' \
+        '2:subcommand:->subcommand' \
+        '3:item:->item' \
+        '4:flag:->flag' \
         && return 0
 
     case $state in
@@ -83,7 +126,7 @@ _k8s_local_zsh() {
             _describe -t commands 'k8s-local commands' commands
             ;;
         subcommand)
-            case $line[1] in
+            case $words[1] in
                 helm)
                     _values 'helm commands' 'list[List available Helm components]'
                     ;;
@@ -96,9 +139,9 @@ _k8s_local_zsh() {
             esac
             ;;
         item)
-            case $line[1] in
+            case $words[1] in
                 install)
-                    case $line[2] in
+                    case $words[2] in
                         helm)
                             _describe -t helm_components 'Helm components' helm_components
                             ;;
@@ -110,7 +153,7 @@ _k8s_local_zsh() {
             esac
             ;;
         flag)
-            case $line[1] in
+            case $words[1] in
                 install)
                     _values 'flags' '--dry-run[Show what would be installed]'
                     ;;

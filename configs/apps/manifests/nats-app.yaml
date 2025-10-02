@@ -13,7 +13,58 @@ spec:
   source:
     chart: nats
     repoURL: https://nats-io.github.io/k8s/helm/charts/
-    targetRevision: '*'
+    targetRevision: ^1.0.0
+    helm:
+      values: |
+        nats:
+          jetstream:
+            enabled: true
+            memStorage:
+              enabled: true
+              size: 2Gi
+            fileStorage:
+              enabled: true
+              size: 1Gi
+              storageClassName: standard
+          
+        natsbox:
+          enabled: true
+          
+        config:
+          jetstream:
+            enabled: true
+          websocket:
+            enabled: true
+            port: 8080
+            noTLS: true
+          mqtt:
+            enabled: true
+            port: 1883
+
+        # Enable WebSocket Ingress
+        websocket:
+          enabled: true
+          port: 8080
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            hosts:
+              - nats-ws.localtest.me
+            annotations:
+              nginx.ingress.kubernetes.io/websocket-services: nats
+              nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+              nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+  ignoreDifferences:
+    - group: networking.k8s.io
+      kind: Ingress
+      jsonPointers:
+        - /status
+    # Ignore chart vs live mutations on PVC templates (apiVersion/kind/metadata fields etc.)
+    - group: apps
+      kind: StatefulSet
+      name: nats
+      jsonPointers:
+        - /spec/volumeClaimTemplates
   syncPolicy:
     automated:
       prune: true
@@ -21,3 +72,4 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      - ApplyOutOfSyncOnly=true

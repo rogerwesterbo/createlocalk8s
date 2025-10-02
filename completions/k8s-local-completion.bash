@@ -5,14 +5,72 @@ _k8s_local_completion() {
     local cur prev words cword
     _init_completion || return
 
-    # Main commands
-    local commands="create delete list info config start stop help helm apps install"
-    
-    # Helm components (from registry)
-    local helm_components="argocd cert-manager cnpg crossplane falco hashicorp-vault kube-prometheus-stack kubeview metallb minio mongodb-operator nats nfs nginx-ingress opencost pgadmin redis-stack rook-ceph-operator trivy"
-    
-    # ArgoCD apps (from registry)
-    local argo_apps="nyancat prometheus cert-manager cnpg-cluster crossplane falco hashicorp-vault kubeview metallb minio mongodb mongodb-operator nats nfs opencost pg-ui pgadmin redis-stack rook-ceph-cluster rook-ceph-operator trivy coredns"
+    local script="${COMP_WORDS[0]}"
+
+    # --- Dynamic helpers (with simple caching per shell session) ---
+    _k8s_local_cache_init() {
+        [[ -n "${_K8S_LOCAL_CACHE_DONE}" ]] && return
+        _K8S_LOCAL_CACHE_DONE=1
+        _K8S_LOCAL_CMDS=""
+        _K8S_LOCAL_HELM=""
+        _K8S_LOCAL_APPS=""
+    }
+
+    _k8s_local_get_commands() {
+        _k8s_local_cache_init
+        if [[ -z "$_K8S_LOCAL_CMDS" ]]; then
+            local help_out
+            help_out="$("$script" help 2>/dev/null || "$script" --help 2>/dev/null)"
+            if [[ -n "$help_out" ]]; then
+                _K8S_LOCAL_CMDS="$(echo "$help_out" | awk '
+                    /^[[:space:]]*Commands:/ {collect=1;next}
+                    collect && /^[[:space:]]*$/ {collect=0}
+                    collect { 
+                        if (match($0,/^[[:space:]]*([[:alnum:]_-]+)/,m)) print m[1]
+                    }' | tr '\n' ' ')"
+            fi
+            [[ -z "$_K8S_LOCAL_CMDS" ]] && _K8S_LOCAL_CMDS="create delete list info config start stop help helm apps install"
+        fi
+        printf '%s' "$_K8S_LOCAL_CMDS"
+    }
+
+    _k8s_local_get_helm_components() {
+        _k8s_local_cache_init
+        if [[ -z "$_K8S_LOCAL_HELM" ]]; then
+            local out
+            out="$("$script" helm list 2>/dev/null)"
+            if [[ -n "$out" ]]; then
+                _K8S_LOCAL_HELM="$(echo "$out" | awk 'NR==1 && tolower($0) ~ /name/ {next} {print $1}' | sed -E '/^$/d' | tr '\n' ' ')"
+            fi
+            [[ -z "$_K8S_LOCAL_HELM" ]] && _K8S_LOCAL_HELM="argocd cert-manager cnpg crossplane falco hashicorp-vault kube-prometheus-stack kubeview metallb minio mongodb-operator nats nfs nginx-ingress opencost pgadmin redis-stack rook-ceph-operator trivy"
+        fi
+        printf '%s' "$_K8S_LOCAL_HELM"
+    }
+
+    _k8s_local_get_argo_apps() {
+        _k8s_local_cache_init
+        if [[ -z "$_K8S_LOCAL_APPS" ]]; then
+            local out
+            out="$("$script" apps list 2>/dev/null)"
+            if [[ -n "$out" ]]; then
+                _K8S_LOCAL_APPS="$(echo "$out" | awk '{print $1}' | sed -E '/^(NAME|Name|#|$)/d' | tr '\n' ' ')"
+            fi
+            [[ -z "$_K8S_LOCAL_APPS" ]] && _K8S_LOCAL_APPS="nyancat prometheus cert-manager cnpg-cluster crossplane falco hashicorp-vault kubeview metallb minio mongodb mongodb-operator nats nfs opencost pg-ui pgadmin redis-stack rook-ceph-cluster rook-ceph-operator trivy coredns"
+        fi
+        printf '%s' "$_K8S_LOCAL_APPS"
+    }
+
+    _k8s_local_get_clusters() {
+        # Optional: suggest cluster directory names
+        if [[ -d clusters ]]; then
+            ls -1 clusters 2>/dev/null | sed -E '/^$/d' | tr '\n' ' '
+        fi
+    }
+
+    local commands="$(_k8s_local_get_commands)"
+    local helm_components="$(_k8s_local_get_helm_components)"
+    local argo_apps="$(_k8s_local_get_argo_apps)"
+    local clusters="$(_k8s_local_get_clusters)"
 
     case "${cword}" in
         1)
@@ -22,10 +80,7 @@ _k8s_local_completion() {
         2)
             # Second argument depends on first
             case "${prev}" in
-                helm)
-                    COMPREPLY=($(compgen -W "list" -- "${cur}"))
-                    ;;
-                apps)
+                helm|apps)
                     COMPREPLY=($(compgen -W "list" -- "${cur}"))
                     ;;
                 install)
@@ -34,6 +89,7 @@ _k8s_local_completion() {
                 create|delete|list|info|config|start|stop)
                     # These commands typically take cluster names
                     # Could potentially scan clusters/ directory for cluster names
+                    [[ -n "$clusters" ]] && COMPREPLY=($(compgen -W "${clusters}" -- "${cur}"))
                     ;;
             esac
             ;;

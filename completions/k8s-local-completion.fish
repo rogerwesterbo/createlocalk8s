@@ -1,79 +1,111 @@
-# Fish completion script for k8s-local.sh / kl.sh / create-cluster.sh
+# Fish completion for k8s-local / kl / create-cluster
 
-# Main commands
-complete -c k8s-local.sh -f -n "__fish_use_subcommand" -a "create" -d "Create a new Kubernetes cluster"
-complete -c k8s-local.sh -f -n "__fish_use_subcommand" -a "delete" -d "Delete an existing cluster"
-complete -c k8s-local.sh -f -n "__fish_use_subcommand" -a "list" -d "List all clusters"
-complete -c k8s-local.sh -f -n "__fish_use_subcommand" -a "info" -d "Show cluster information"
-complete -c k8s-local.sh -f -n "__fish_use_subcommand" -a "config" -d "Show cluster configuration"
-complete -c k8s-local.sh -f -n "__fish_use_subcommand" -a "start" -d "Start a stopped cluster"
-complete -c k8s-local.sh -f -n "__fish_use_subcommand" -a "stop" -d "Stop a running cluster"
-complete -c k8s-local.sh -f -n "__fish_use_subcommand" -a "help" -d "Show help message"
-complete -c k8s-local.sh -f -n "__fish_use_subcommand" -a "helm" -d "Manage Helm installations"
-complete -c k8s-local.sh -f -n "__fish_use_subcommand" -a "apps" -d "Manage ArgoCD applications"
-complete -c k8s-local.sh -f -n "__fish_use_subcommand" -a "install" -d "Install components or apps"
+function __k8s_local_script_names
+    printf "k8s-local\nkl\ncreate-cluster\nk8s-local.sh\nkl.sh\ncreate-cluster.sh\n"
+end
 
-# helm subcommands
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from helm" -a "list" -d "List available Helm components"
+function __k8s_local_help_cmds
+    set -l s (commandline -opc)[1]
+    test -z "$s"; and return
+    set -l out ($s help ^ /dev/null; or $s --help ^ /dev/null)
+    if test -n "$out"
+        set -l extracting 0
+        for l in $out
+            if string match -qr '^[[:space:]]*Commands:' -- $l
+                set extracting 1
+                continue
+            end
+            if test $extracting -eq 1
+                if test -z (string trim -- $l)
+                    break
+                end
+                set -l name (string match -r '^[[:space:]]*([A-Za-z0-9_-]+)' -- $l | string trim)
+                test -n "$name"; and echo $name
+            end
+        end
+    end
+end
 
-# apps subcommands
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from apps" -a "list" -d "List available ArgoCD apps"
+function __k8s_local_commands
+    set -l cmds (__k8s_local_help_cmds)
+    if test (count $cmds) -eq 0
+        set cmds create delete list info config start stop help helm apps install
+    end
+    printf "%s\n" $cmds
+end
 
-# install subcommands
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and not __fish_seen_subcommand_from helm apps" -a "helm" -d "Install Helm component"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and not __fish_seen_subcommand_from helm apps" -a "apps" -d "Install ArgoCD app"
+function __k8s_local_helm_components
+    set -l s (commandline -opc)[1]
+    set -l out ($s helm list ^ /dev/null)
+    if test -n "$out"
+        for l in $out
+            string match -qr '^(NAME|Name)' -- $l; and continue
+            set -l f (string split ' ' -- $l)[1]
+            test -n "$f"; and echo $f
+        end
+    else
+        printf "%s\n" argocd cert-manager cnpg crossplane falco hashicorp-vault kube-prometheus-stack kubeview metallb minio mongodb-operator nats nfs nginx-ingress opencost pgadmin redis-stack rook-ceph-operator trivy
+    end
+end
 
-# Helm components (after: install helm ...)
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "argocd" -d "ArgoCD GitOps controller"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "cert-manager" -d "Certificate management"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "cnpg" -d "CloudNativePG operator"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "crossplane" -d "Cloud native control plane"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "falco" -d "Runtime security"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "hashicorp-vault" -d "Secrets management"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "kube-prometheus-stack" -d "Prometheus monitoring"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "kubeview" -d "Kubernetes cluster visualizer"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "metallb" -d "Load balancer for bare metal"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "minio" -d "S3-compatible object storage"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "mongodb-operator" -d "MongoDB operator"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "nats" -d "NATS messaging system"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "nfs" -d "NFS provisioner"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "nginx-ingress" -d "NGINX ingress controller"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "opencost" -d "Cost monitoring"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "pgadmin" -d "PostgreSQL admin UI"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "redis-stack" -d "Redis Stack server"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "rook-ceph-operator" -d "Rook Ceph operator"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from helm" -a "trivy" -d "Security scanner"
+function __k8s_local_argo_apps
+    set -l s (commandline -opc)[1]
+    set -l out ($s apps list ^ /dev/null)
+    if test -n "$out"
+        for l in $out
+            string match -qr '^(NAME|Name|#)' -- $l; and continue
+            set -l f (string split ' ' -- $l)[1]
+            test -n "$f"; and echo $f
+        end
+    else
+        printf "%s\n" nyancat prometheus cert-manager cnpg-cluster crossplane falco hashicorp-vault kubeview metallb minio mongodb mongodb-operator nats nfs opencost pg-ui pgadmin redis-stack rook-ceph-cluster rook-ceph-operator trivy coredns
+    end
+end
 
-# ArgoCD apps (after: install apps ...)
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "nyancat" -d "Sample Nyancat demo"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "prometheus" -d "Kube Prometheus Stack"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "cert-manager" -d "Cert Manager application"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "cnpg-cluster" -d "CNPG cluster instance"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "crossplane" -d "Crossplane application"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "falco" -d "Falco security"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "hashicorp-vault" -d "Vault application"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "kubeview" -d "KubeView application"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "metallb" -d "MetalLB application"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "minio" -d "MinIO application"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "mongodb" -d "MongoDB instance"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "mongodb-operator" -d "MongoDB operator app"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "nats" -d "NATS application"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "nfs" -d "NFS provisioner app"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "opencost" -d "OpenCost application"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "pg-ui" -d "PostgreSQL UI"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "pgadmin" -d "PgAdmin application"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "redis-stack" -d "Redis Stack app"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "rook-ceph-cluster" -d "Rook Ceph cluster"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "rook-ceph-operator" -d "Rook Ceph operator app"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "trivy" -d "Trivy scanner app"
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install; and __fish_seen_subcommand_from apps" -a "coredns" -d "CoreDNS application"
+function __k8s_local_clusters
+    if test -d clusters
+        ls -1 clusters
+    end
+end
 
-# --dry-run flag (after install command)
-complete -c k8s-local.sh -f -n "__fish_seen_subcommand_from install" -l "dry-run" -d "Show what would be installed"
+# Clear previous to avoid duplicates when re-sourcing
+for n in (__k8s_local_script_names)
+    complete -c $n -f
+end
 
-# Also register for kl.sh and create-cluster.sh
-complete -c kl.sh -w k8s-local.sh
-complete -c create-cluster.sh -w k8s-local.sh
-complete -c k8s-local -w k8s-local.sh
-complete -c kl -w k8s-local.sh
-complete -c create-cluster -w k8s-local.sh
+# Command position 1
+for n in (__k8s_local_script_names)
+    complete -c $n -n "commandline -opc | count | test (count (commandline -opc)) -eq 1" \
+        -a "(__k8s_local_commands)" -d "k8s-local command"
+end
+
+# Subcommands for helm/apps/install
+for n in (__k8s_local_script_names)
+    # helm/apps list
+    complete -c $n -n "__fish_seen_subcommand_from helm; and test (count (commandline -opc)) -eq 2" -a list -d "List Helm components"
+    complete -c $n -n "__fish_seen_subcommand_from apps; and test (count (commandline -opc)) -eq 2" -a list -d "List Argo apps"
+    # install types
+    complete -c $n -n "__fish_seen_subcommand_from install; and test (count (commandline -opc)) -eq 2" -a "helm apps" -d "Install type"
+end
+
+# Items for install helm/apps
+for n in (__k8s_local_script_names)
+    complete -c $n -n "__fish_seen_subcommand_from install; and contains helm (commandline -opc | tail -n1)" \
+        -a "(__k8s_local_helm_components)" -d "Helm component"
+    complete -c $n -n "__fish_seen_subcommand_from install; and contains apps (commandline -opc | tail -n1)" \
+        -a "(__k8s_local_argo_apps)" -d "Argo app"
+end
+
+# Cluster names for cluster-oriented commands (pos 2)
+set -l cluster_cmds create delete info config start stop
+for n in (__k8s_local_script_names)
+    for c in $cluster_cmds
+        complete -c $n -n "__fish_seen_subcommand_from $c; and test (count (commandline -opc)) -eq 2" \
+            -a "(__k8s_local_clusters)" -d "Cluster"
+    end
+end
+
+# Flags
+for n in (__k8s_local_script_names)
+    complete -c $n -n "__fish_seen_subcommand_from install" -a "--dry-run" -d "Show planned actions"
+end

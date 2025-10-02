@@ -23,12 +23,34 @@ Create and experiment with local Kubernetes clusters using [kind](https://kind.s
 
 ---
 
-![Workflow Diagram](./docs/create-cluster.png)
+```bash
+$ ./kl.sh help
+Commands:
+  create | c <name>          Create a new Kubernetes cluster (interactive)
+  delete | d <name>          Delete a cluster
+  list   | ls                List existing kind clusters
+  details| dt                Live cluster info (nodes/pods/services/ingresses)
+  info   | i  <name>         Show stored cluster configuration summary
+  kubeconfig | kc <name>     Write kubeconfig file for a cluster
+  config <name>              Show the original kind config used (if stored)
+  start  <name>              Start a previously stopped cluster (if supported)
+  stop   <name>              Stop a running cluster (if supported)
+  helm list                  List Helm-installable components
+  apps list                  List ArgoCD application installers
+  install helm <comp[,comp]> [--dry-run]
+  install apps <app[,app]>   [--dry-run]
+  help  | h                  Show this help
+
+Examples:
+  ./kl.sh create demo
+  ./kl.sh install helm argocd,nats
+  ./kl.sh install apps prometheus,nyancat
+```
 
 ## ✨ Key Features
 
 -   **Multiple script names**: Use `./kl.sh` (short), `./k8s-local.sh`, or `./create-cluster.sh` (legacy)
--   **Shell completion**: Tab completion for bash, zsh, and fish shells
+-   **Dynamic shell completion**: Bash, Zsh, Fish (commands + components discovered at runtime)
 -   Interactive cluster creation (name, control planes, workers, Kubernetes version)
 -   Supported Kubernetes versions (kind node images) baked in: 1.34.x → 1.25.x (see `scripts/variables.sh` for full list)
 -   Automatic port mapping adjustment when multiple clusters run simultaneously (avoids 80/443 conflicts)
@@ -36,8 +58,8 @@ Create and experiment with local Kubernetes clusters using [kind](https://kind.s
 -   Post-create helper to install a sample Nyancat app (demo ingress + ArgoCD)
 -   Rich subcommands to list, inspect, delete clusters & fetch kubeconfig
 -   **Registry-based installers**: List and install Helm/ArgoCD components with simple commands
--   17 Helm installers: ArgoCD, Crossplane, Rook Ceph, Falco, Trivy, Vault, MetalLB, MinIO, NFS, MongoDB, CNPG, PgAdmin, Redis Stack, etc.
--   21 ArgoCD Application installers (GitOps style): monitoring (Prometheus), databases, security, storage, cost monitoring, etc.
+-   19 Helm installers: ArgoCD, Crossplane, Rook Ceph, Falco, Trivy, Vault, MetalLB, MinIO, NFS, MongoDB Operator, CNPG, PgAdmin, Redis Stack, NATS, cert-manager, kube-prometheus-stack, kubeview, nginx-ingress, OpenCost
+-   22 ArgoCD Application installers (GitOps style): monitoring (Prometheus), databases, security, storage, cost monitoring, etc.
 -   **Dry-run mode**: Preview what will be installed with `--dry-run`
 -   Generates per-cluster info + kubeconfig files under `clusters/`
 -   Consistent colored output & spinners, with readiness waits for core components
@@ -200,15 +222,18 @@ See full cluster details (cluster info + kind config used):
 
 ### Cluster Lifecycle
 
-| Action            | Alias | Description                                              |
-| ----------------- | ----- | -------------------------------------------------------- |
-| create <name>     | c     | Interactive creation workflow                            |
-| list              | ls    | List kind clusters                                       |
-| details           | dt    | Live k8s cluster info (nodes, pods, services, ingresses) |
-| info <name>       | i     | Show saved cluster configuration & kind config file      |
-| kubeconfig <name> | kc    | Write kubeconfig file for cluster                        |
-| delete <name>     | d     | Delete cluster (confirmation prompt)                     |
-| help              | h     | Show help                                                |
+| Action / Aliases              | Description                                              |
+| ----------------------------- | -------------------------------------------------------- |
+| create (c) <name>             | Interactive creation workflow                            |
+| list (ls)                     | List kind clusters                                       |
+| details (dt)                  | Live k8s cluster info (nodes, pods, services, ingresses) |
+| info (i) <name>               | Show saved cluster configuration & kind config summary   |
+| kubeconfig (kc) <name>        | Write kubeconfig file for cluster                        |
+| config <name>                 | Show raw kind config used (if persisted)                 |
+| start <name>                  | Start a stopped cluster (noop if not supported)          |
+| stop <name>                   | Stop a running cluster (noop if not supported)           |
+| delete (d) <name>             | Delete cluster (confirmation)                            |
+| help (h)                      | Show help                                                |
 
 ### Component Management
 
@@ -239,7 +264,7 @@ See full cluster details (cluster info + kind config used):
 ./kl.sh install apps prometheus,mongodb --dry-run
 ```
 
-**Available Helm components** (17):
+**Available Helm components** (19):
 
 -   `argocd` - ArgoCD GitOps controller
 -   `cert-manager` - Certificate management
@@ -261,7 +286,7 @@ See full cluster details (cluster info + kind config used):
 -   `rook-ceph-operator` - Rook Ceph operator
 -   `trivy` - Security scanner
 
-**Available ArgoCD apps** (21):
+**Available ArgoCD apps** (22):
 
 -   `nyancat` - Sample demo app
 -   `prometheus` - Kube Prometheus Stack
@@ -365,6 +390,8 @@ source ~/.bashrc    # for bash
 -   Component name completion with descriptions (zsh/fish)
 -   Flag completion (--dry-run)
 -   Works with all script names: `./kl.sh`, `./k8s-local.sh`, `./create-cluster.sh`
+-   Dynamic extraction of commands (no manual sync needed)
+-   Live parsing of available Helm components & ArgoCD apps (`helm list` / `apps list`)
 
 See [docs/shell-completion.md](./docs/shell-completion.md) for detailed installation and usage.
 

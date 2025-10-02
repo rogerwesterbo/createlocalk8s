@@ -390,9 +390,35 @@ function install_nats_application() {
 
     echo "NATS application installed: yes" >> $cluster_info_file
 
-    echo -e "$yellow\nNATS is ready to use"
-    echo -e "$yellow Publish test:$blue kubectl -n nats exec -it deploy/nats-box -- nats pub test hi"
-    echo -e "$yellow Subscribe:$blue kubectl -n nats exec -it deploy/nats-box -- nats sub test"
+    echo -e "$yellow NATS ready."
+    echo -e "$yellow Features: core, JetStream (mem 2Gi / file 1Gi), WebSocket:8080 (nats-ws.localtest.me), MQTT:1883, nats-box"
+    echo -e "$yellow Endpoints (cluster):"
+    echo -e "  nats://nats.nats.svc.cluster.local:4222"
+    echo -e "  mqtt://nats.nats.svc.cluster.local:1883"
+    echo -e "  ws://nats-ws.localtest.me"
+    echo -e "$yellow Optional port-forward:"
+    echo -e "  kubectl -n nats port-forward svc/nats 4222:4222"
+    echo -e "  kubectl -n nats port-forward svc/nats 1883:1883"
+    echo -e "  kubectl -n nats port-forward svc/nats 8080:8080"
+    echo -e "$yellow Quick tests:"
+    echo -e "  # Pub/Sub"
+    echo -e "  kubectl -n nats exec deploy/nats-box -- nats sub demo.> &"
+    echo -e "  kubectl -n nats exec deploy/nats-box -- nats pub demo.hello hi"
+    echo -e "  # JetStream (create simple stream)"
+    echo -e "  kubectl -n nats exec deploy/nats-box -- nats stream add DEMO --subjects demo.* --storage file --retention limits"
+    echo -e "  kubectl -n nats exec deploy/nats-box -- nats pub demo.x test"
+    echo -e "  kubectl -n nats exec deploy/nats-box -- nats stream ls"
+    echo -e "  # MQTT (after port-forward if external)"
+    echo -e "  mosquitto_sub -h 127.0.0.1 -p 1883 -t demo/# &"
+    echo -e "  mosquitto_pub -h 127.0.0.1 -p 1883 -t demo/mqtt -m hi"
+    echo -e "  # JetStream status"
+    echo -e "  kubectl -n nats exec deploy/nats-box -- nats account info"
+    echo -e "$yellow Docs:"
+    echo -e "  https://docs.nats.io/"
+    echo -e "  https://docs.nats.io/nats-concepts/jetstream"
+    echo -e "  https://docs.nats.io/running-a-nats-service/configuration/websocket"
+    echo -e "  https://docs.nats.io/running-a-nats-service/configuration/mqtt"
+    echo -e "  https://docs.nats.io/using-nats/nats-tools/nats_cli"
 }
 
 function post_pgadmin_install() {
