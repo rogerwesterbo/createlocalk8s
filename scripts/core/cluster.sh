@@ -468,7 +468,9 @@ networking:
 nodes:" >> $kind_config_file
 
     for i in $(seq 1 $controlplane_number); do
-        echo "  - role: control-plane
+        # Only the first control plane gets port mappings
+        if [ $i -eq 1 ]; then
+            echo "  - role: control-plane
     image: $kindk8simage
     labels:
         ingress-ready: \"true\"
@@ -479,13 +481,11 @@ nodes:" >> $kind_config_file
       - containerPort: 443
         hostPort: "$controlplane_port_https"
         protocol: TCP" >> $kind_config_file
-    
-    local http=$(find_free_port)
-    local https=$(find_free_port)
-
-    controlplane_port_http=$http
-    controlplane_port_https=$https
-    
+        else
+            # Additional control planes don't get host port mappings
+            echo "  - role: control-plane
+    image: $kindk8simage" >> $kind_config_file
+        fi
     done
 
     if [ $worker_number -gt 0 ]; then
@@ -559,16 +559,23 @@ ArgoCD admin GUI URL: http://localhost:58080" >> $cluster_info_file
 
 function install_nginx_controller_for_kind(){
     echo -e "$yellow Creating Nginx Ingress Controller for kind"
-    (kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml|| 
-    { 
+    (kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml||
+    {
         echo -e "$red 🛑 Could not install Nginx controller in cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Patching Nginx controller to run on control-plane node"
+    (kubectl patch deployment -n ingress-nginx ingress-nginx-controller -p '{"spec":{"template":{"spec":{"nodeSelector":{"ingress-ready":"true"}}}}}' ||
+    {
+        echo -e "$red 🛑 Could not patch Nginx controller ..."
         die
     }) & spinner
 
     echo -e "$yellow\n⏰ Waiting for Nginx ingress controller for kind to be ready"
     sleep 10
-    (kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s || 
-    { 
+    (kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s ||
+    {
         echo -e "$red 🛑 Could not install Nginx ingress controller into cluster ..."
         die
     }) & spinner
