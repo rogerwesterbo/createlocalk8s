@@ -19,6 +19,56 @@ function is_running_more_than_one_cluster() {
     echo "$return_statement"
 }
 
+# Validate that a cluster exists, exit with error if not found
+function validate_cluster_exists() {
+    local clusterName="$1"
+    
+    if [ -z "$clusterName" ]; then
+        echo -e "${red}\n🛑 Cluster name cannot be empty"
+        exit 1
+    fi
+    
+    local clusters
+    clusters=$(kind get clusters 2>/dev/null)
+    
+    if ! echo "$clusters" | grep -q "^${clusterName}$"; then
+        echo -e "${red}\n🛑 Cluster '${clusterName}' not found"
+        echo -e "${yellow}\nAvailable clusters:"
+        kind get clusters
+        exit 1
+    fi
+}
+
+# Show error when cluster name parameter is missing
+function show_missing_cluster_name_error() {
+    local command_name="$1"
+    local command_alias="$2"
+    
+    echo -e "${red}\n🛑 Missing cluster name parameter${clear}"
+    echo -e "${yellow}\nUsage:${clear}"
+    echo -e "  ${blue}./kl.sh ${command_name} <cluster-name>${clear}"
+    
+    if [ -n "$command_alias" ]; then
+        echo -e "  ${blue}./kl.sh ${command_alias} <cluster-name>${clear}"
+    fi
+    
+    echo -e "\n${yellow}Example:${clear}"
+    echo -e "  ${blue}./kl.sh ${command_name} mycluster${clear}"
+    
+    echo -e "\n${yellow}To see available clusters, run:${clear}"
+    echo -e "  ${blue}./kl.sh list${clear}"
+    
+    local clusters
+    clusters=$(kind get clusters 2>/dev/null)
+    
+    if [ -n "$clusters" ] && [ "$clusters" != "No kind clusters found." ]; then
+        echo -e "\n${yellow}Available clusters:${clear}"
+        kind get clusters
+    fi
+    
+    exit 1
+}
+
 check_kind_clusters() {
     local output
     if output=$(kind get clusters -q); then
@@ -75,49 +125,140 @@ function see_details_of_cluster() {
     kubectl get ingresses --all-namespaces
 }
 
+function show_kubernetes_details() {
+    if [[ "$#" -lt 1 ]]; then 
+        show_missing_cluster_name_error "k8sdetails" "k8s"
+    fi
+
+    if [[ "$#" -gt 1 ]]; then 
+        echo "Too many arguments"; 
+        exit 1
+    fi
+
+    local clusterName="$1"
+    
+    # Validate cluster exists
+    validate_cluster_exists "$clusterName"
+    
+    echo -e "$yellow\n🔄 Switching to cluster context: $blue$clusterName"
+    kubectl config use-context "kind-$clusterName" 2>/dev/null || {
+        echo -e "$red 🛑 Could not switch to cluster context"
+        exit 1
+    }
+    echo -e "$clear"
+    
+    echo -e "$blue"
+    echo "════════════════════════════════════════════════════════════════════════════════"
+    echo "                    📊 Kubernetes Cluster Details                              "
+    echo "════════════════════════════════════════════════════════════════════════════════"
+    echo -e "$clear"
+    
+    see_details_of_cluster
+    
+    echo -e "$yellow
+    🚀 Deployments
+    "
+    echo -e "$clear"
+    kubectl get deployments --all-namespaces
+    
+    echo -e "$yellow
+    🚀 StatefulSets
+    "
+    echo -e "$clear"
+    kubectl get statefulsets --all-namespaces
+    
+    echo -e "$yellow
+    🚀 DaemonSets
+    "
+    echo -e "$clear"
+    kubectl get daemonsets --all-namespaces
+    
+    echo -e "$yellow
+    🚀 ConfigMaps
+    "
+    echo -e "$clear"
+    kubectl get configmaps --all-namespaces
+    
+    echo -e "$yellow
+    🚀 Secrets
+    "
+    echo -e "$clear"
+    kubectl get secrets --all-namespaces
+    
+    echo -e "$yellow
+    🚀 Persistent Volumes
+    "
+    echo -e "$clear"
+    kubectl get pv
+    
+    echo -e "$yellow
+    🚀 Persistent Volume Claims
+    "
+    echo -e "$clear"
+    kubectl get pvc --all-namespaces
+    
+    echo -e "$yellow
+    🚀 Storage Classes
+    "
+    echo -e "$clear"
+    kubectl get storageclass
+    
+    echo -e "$blue"
+    echo "════════════════════════════════════════════════════════════════════════════════"
+    echo -e "$clear"
+}
+
 function list_clusters() {
-    kind get clusters
+echo -e "$yellow 🚀 K8s local Clusters:"
+echo -e "$clear"
+kind get clusters
 }
 
 function get_kubeconfig() {
-    if [ "$#" -ne 2 ]; then
-        echo "Error: This script requires exactly two arguments."
-        echo "Usage: $0 <arg1> <arg2>"
+    if [ "$#" -lt 1 ]; then
+        show_missing_cluster_name_error "kubeconfig" "kc"
+    fi
+
+    if [ "$#" -gt 1 ]; then
+        echo "Too many arguments"
         exit 1
     fi
 
-    local clusterName=$2
+    local clusterName="$1"
     if [ -z "$clusterName" ]; then
-        echo "Missing name of cluster"; 
-        exit 1
+        show_missing_cluster_name_error "kubeconfig" "kc"
     fi
 
-    echo "$(kind get kubeconfig --name $clusterName)" > $clustersDir/kubeconfig-$clusterName.config
+    # Validate cluster exists
+    validate_cluster_exists "$clusterName"
 
-    echo -e "$yellow Kubeconfig saved to $clustersDir/kubeconfig-$clusterName.config"
-    echo -e "$yellow To use the kubeconfig, type:$red export KUBECONFIG=$clustersDir/kubeconfig-$clusterName.config"
-    echo -e "$yellow And then you can use $blue kubectl $yellow to interact with the cluster"
+    echo "$(kind get kubeconfig --name "$clusterName")" > "$clustersDir/$clusterName-kube.config"
+
+    echo -e "$yellow Kubeconfig saved to $clustersDir/$clusterName-kube.config"
+    echo -e "$yellow To use the kubeconfig, type:$red export KUBECONFIG=$clustersDir/$clusterName-kube.config"
+    echo -e "$yellow And then you can use $blue kubectl$yellow to interact with the cluster"
     echo -e "$yellow Example: $blue kubectl get nodes"
     echo ""
 }
 
 function delete_cluster() {
-    clusterName=${@: -1}
-
-    if [[ "$#" -lt 2 ]]; then 
-        echo "Missing name of cluster"; 
-        exit 1
+    if [[ "$#" -lt 1 ]]; then 
+        show_missing_cluster_name_error "delete" "d"
     fi
 
-    if [[ "$#" -gt 2 ]]; then 
+    if [[ "$#" -gt 1 ]]; then 
         echo "Too many arguments"; 
         exit 1
     fi
 
-    clusterName=$(echo $clusterName | tr '[:upper:]' '[:lower:]')
+    local clusterName="$1"
+    clusterName=$(echo "$clusterName" | tr '[:upper:]' '[:lower:]')
+
+    # Validate cluster exists
+    validate_cluster_exists "$clusterName"
 
     echo -e "$yellow\nDeleting cluster $clusterName"
-    read -p "Sure you want to delete ?! (n | no | y | yes)? " ok
+    read -p "Are you sure you want to delete? (n | no | y | yes)? " ok
 
     if [ "$ok" == "yes" ] ;then
             echo -e "$yellow\nDeleting cluster ..."
@@ -130,11 +271,11 @@ function delete_cluster() {
             echo -e "$red\nThat was a close one! Not deleting!"
             exit 0
         else
-            echo "🛑 Did not notice and confirmation, I need you to confirm with a yes or y 😀 ... quitting"
+            echo "🛑 Did not detect any confirmation, I need you to confirm with a yes or y 😀 ... quitting"
             exit 0
     fi
 
-    (kind delete cluster --name $clusterName|| 
+    (kind delete cluster --name "$clusterName" ||
     { 
         echo -e "$red 🛑 Could not delete cluster with name $clusterName"
         die
@@ -144,30 +285,41 @@ function delete_cluster() {
 }
 
 function details_for_cluster() {
-    clusterName=${@: -1}
-
-    if [[ "$#" -lt 2 ]]; then 
-        echo "Missing name of cluster"; 
-        exit 1
+    if [[ "$#" -lt 1 ]]; then 
+        show_missing_cluster_name_error "details" "dt"
     fi
 
-    if [[ "$#" -gt 2 ]]; then 
+    if [[ "$#" -gt 1 ]]; then 
         echo "Too many arguments"; 
         exit 1
     fi
 
-    clusters=$(kind get clusters)
-    if ! echo "$clusters" | grep -q "$clusterName"; then
-        echo "Cluster $clusterName not found"
-        exit 1
-    fi
+    local clusterName="$1"
+
+    # Validate cluster exists
+    validate_cluster_exists "$clusterName"
+
+    # Build file paths using the provided cluster name
+    local cluster_info_file_path
+    local kind_config_file_path
+    cluster_info_file_path=$(get_abs_filename "$clustersDir/$clusterName-clusterinfo.txt")
+    kind_config_file_path=$(get_abs_filename "$clustersDir/$clusterName-config.yaml")
 
     echo -e "$yellow\nCluster details for $clusterName"
-    cat $cluster_info_file
+    
+    if [ -f "$cluster_info_file_path" ]; then
+        cat "$cluster_info_file_path"
+    else
+        echo -e "$red\nCluster info file not found: $cluster_info_file_path"
+    fi
 
     echo -e "$yellow\nKind configuration for $clusterName"
 
-    cat $kind_config_file
+    if [ -f "$kind_config_file_path" ]; then
+        cat "$kind_config_file_path"
+    else
+        echo -e "$red\nKind config file not found: $kind_config_file_path"
+    fi
 }
 
 function get_cluster_parameter() {
@@ -176,42 +328,56 @@ function get_cluster_parameter() {
     ensure_docker_running
     check_docker_hub_login
 
-    clusterName=${@: -1}
-    if [[ "$#" -lt 2 ]]; then 
+    if [[ "$#" -lt 1 ]]; then 
         echo -e "$clear"
         read -p "Enter the cluster name: (default: $cluster_name): " cluster_name_new
-        if [ ! -z $cluster_name_new ]; then
+        if [ -n "$cluster_name_new" ]; then
             cluster_name=$cluster_name_new
+            echo -e "$yellow ✅ Cluster name set to: $blue$cluster_name"
+            echo -e "$clear"
+        else
+            echo -e "$yellow ✅ Using default cluster name: $blue$cluster_name"
+            echo -e "$clear"
         fi
     else
-        cluster_name=$clusterName
+        cluster_name="$1"
+        echo -e "$yellow ✅ Cluster name: $blue$cluster_name"
+        echo -e "$clear"
     fi
 
-    cluster_name=$(echo $cluster_name | tr '[:upper:]' '[:lower:]')
+    cluster_name=$(echo "$cluster_name" | tr '[:upper:]' '[:lower:]')
 
-    if [[ "$#" -gt 2 ]]; then 
+    if [[ "$#" -gt 1 ]]; then 
         echo -e  "$red Too many arguments"; 
         echo -e "$clear"
         echo -e "$yellow Use the following command to create a cluster: $blue ./create-cluster.sh create|c <cluster-name>"
         exit 1
     fi
 
-    echo -e "Cluster name: $cluster_name"
-
-    read -p "Enter number of control planes (default: 1): " controlplane_number_new 
-    if [ ! -z $controlplane_number_new ]; then
+    read -p "Enter number of control planes (default: 1): " controlplane_number_new
+    if [ -n "$controlplane_number_new" ]; then
         controlplane_number=$controlplane_number_new
+        echo -e "$yellow ✅ Control planes set to: $blue$controlplane_number"
+        echo -e "$clear"
+    else
+        echo -e "$yellow ✅ Using default control planes: $blue$controlplane_number"
+        echo -e "$clear"
     fi
 
-    read -p "Enter number of workers (default: 0): " worker_number_new 
-    if [ ! -z $worker_number_new ]; then
+    read -p "Enter number of workers (default: 0): " worker_number_new
+    if [ -n "$worker_number_new" ]; then
         worker_number=$worker_number_new
+        echo -e "$yellow ✅ Workers set to: $blue$worker_number"
+        echo -e "$clear"
+    else
+        echo -e "$yellow ✅ Using default workers: $blue$worker_number"
+        echo -e "$clear"
     fi
 
-    read -p "Enter version of kubernetes version (available:$kindk8spossibilities default: $kindk8sversion): " selected_k8s_version 
+    read -p "Enter version of Kubernetes (available:$kindk8spossibilities default: $kindk8sversion): " selected_k8s_version 
     check_k8s_version=""
-    selected_k8s_version=$(echo $selected_k8s_version | tr '[:upper:]' '[:lower:]')
-    if [ ! -z $selected_k8s_version ]; then
+    selected_k8s_version=$(echo "$selected_k8s_version" | tr '[:upper:]' '[:lower:]')
+    if [ -n "$selected_k8s_version" ]; then
         for version in "${kindk8sversions[@]}"; do
             IFS=':' read -r k8s_version kind_image <<< "$version"
             if [ "$selected_k8s_version" == "$k8s_version" ]; then
@@ -221,30 +387,39 @@ function get_cluster_parameter() {
             fi
         done
 
-        if [ -z $check_k8s_version ]; then
+        if [ -z "$check_k8s_version" ]; then
             echo -e "$red 🛑 Kubernetes version $selected_k8s_version is not available. Next time, please select from the available versions: $kindk8spossibilities"
             die
         fi
+        echo -e "$yellow ✅ Selected Kubernetes version: $blue$kindk8sversion"
+        echo -e "$clear"
+    else
+        echo -e "$yellow ✅ Using default Kubernetes version: $blue$kindk8sversion"
+        echo -e "$clear"
     fi
 
     install_nginx_controller="yes"
 
-    read -p "Install ArgoCD with helm? (default: yes) (y/yes | n/no): " install_argocd_new
+    read -p "Install ArgoCD with Helm? (default: yes) (y/yes | n/no): " install_argocd_new
     if [ "$install_argocd_new" == "yes" ] || [ "$install_argocd_new" == "y" ] || [ "$install_argocd_new" == "" ]; then
         install_argocd="yes"
+        echo -e "$yellow ✅ ArgoCD will be installed"
+        echo -e "$clear"
     else
         install_argocd="no"
+        echo -e "$yellow ✅ ArgoCD will NOT be installed"
+        echo -e "$clear"
     fi
 
-    kind_config_file=$(get_abs_filename "$clustersDir/configkind-$cluster_name.yaml")
+    kind_config_file=$(get_abs_filename "$clustersDir/$cluster_name-config.yaml")
     echo -e "$yellow\nKind config file: $kind_config_file"
     if [ -e "$kind_config_file" ] && [ -r "$kind_config_file" ] && [ -w "$kind_config_file" ]; then
         truncate -s 0 "$kind_config_file"
     fi
 
-    if [ ! -f $kind_config_file ]; then 
-        echo "kind config file not found, creating it: $kind_config_file"
-        touch $kind_config_file; 
+    if [ ! -f "$kind_config_file" ]; then
+        echo "Kind config file not found, creating it: $kind_config_file"
+        touch "$kind_config_file"; 
     fi
 
     controlplane_port_http=80
@@ -302,19 +477,19 @@ nodes:" >> $kind_config_file
     echo -en "$yellow\nCluster name:" 
     echo -en "$blue $cluster_name"
 
-    echo -en "$yellow\nHow many controlplanes?:"
+    echo -en "$yellow\nHow many control planes?:"
     echo -en "$blue $controlplane_number"
 
     echo -en "$yellow\nHow many workers?:"
     echo -en "$blue $worker_number"
 
-    echo -en "$yellow\nWhich version of kubernetes?:"
+    echo -en "$yellow\nWhich version of Kubernetes?:"
     echo -en "$blue $kindk8sversion"
 
     echo -en "$yellow\nInstall Nginx ingress controller for kind?:"
     echo -en "$blue $install_nginx_controller"
 
-    echo -en "$yellow\nInstall ArgoCD with helm?:"
+    echo -en "$yellow\nInstall ArgoCD with Helm?:"
     echo -en "$blue $install_argocd"
 
     echo -en "$yellow\nCluster http port:"
@@ -323,22 +498,22 @@ nodes:" >> $kind_config_file
     echo -en "$yellow\nCluster https port:"
     echo -en "$blue $first_controlplane_port_https"
 
-    cluster_info_file=$(get_abs_filename "$clustersDir/clusterinfo-$cluster_name.txt")
+    cluster_info_file=$(get_abs_filename "$clustersDir/$cluster_name-clusterinfo.txt")
     if [ -e "$cluster_info_file" ] && [ -r "$cluster_info_file" ] && [ -w "$cluster_info_file" ]; then
         truncate -s 0 "$cluster_info_file"
     fi
 
     echo "
 Cluster name: $cluster_name
-Controlplane number: $controlplane_number
+Control plane number: $controlplane_number
 Worker number: $worker_number
 Kubernetes version: $kindk8sversion
 Cluster http port: $first_controlplane_port_http
 Cluster https port: $first_controlplane_port_https
 Install Nginx ingress controller: $install_nginx_controller
 Install ArgoCD: $install_argocd
-ArgoCD admin GUI portforwarding: kubectl port-forward -n argocd services/argocd-server 58080:443
-ArgoCD admin GUI url: http://localhost:58080" >> $cluster_info_file
+ArgoCD admin GUI port forwarding: kubectl port-forward -n argocd services/argocd-server 58080:443
+ArgoCD admin GUI URL: http://localhost:58080" >> $cluster_info_file
 
     echo ""
     echo -e "$yellow\nKind command about to be run:"
@@ -348,22 +523,22 @@ ArgoCD admin GUI url: http://localhost:58080" >> $cluster_info_file
     read -p "Looks ok (n | no | y | yes)? " ok
 
     if [ "$ok" == "yes" ] ;then
-            echo "Excellent  👌 "
+            echo "Excellent 👌"
             create_kind_cluster
         elif [ "$ok" == "y" ]; then
-            echo "Good  🤌"
+            echo "Good 🤌"
             create_kind_cluster
         else
-            echo "🛑 Did not notice and confirmation, I need you to confirm with a yes or y 😀 ... quitting"
+            echo "🛑 Did not detect any confirmation, I need you to confirm with a yes or y 😀 ... quitting"
             exit 0
     fi
 }
 
 function install_nginx_controller_for_kind(){
-    echo -e "$yellow Create Nginx Ingress Controller for kind"
+    echo -e "$yellow Creating Nginx Ingress Controller for kind"
     (kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml|| 
     { 
-        echo -e "$red 🛑 Could not install nginx controller in cluster ..."
+        echo -e "$red 🛑 Could not install Nginx controller in cluster ..."
         die
     }) & spinner
 
@@ -371,7 +546,7 @@ function install_nginx_controller_for_kind(){
     sleep 10
     (kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s || 
     { 
-        echo -e "$red 🛑 Could not install nginx ingress controller into cluster ..."
+        echo -e "$red 🛑 Could not install Nginx ingress controller into cluster ..."
         die
     }) & spinner
 
@@ -379,8 +554,8 @@ function install_nginx_controller_for_kind(){
 }
 
 function create_kind_cluster() {
-    if [ -z $cluster_name ]  || [ $controlplane_number -lt 1 ] || [ $worker_number -lt 0 ]; then
-        echo "Not all parameters good ... quitting"
+    if [ -z "$cluster_name" ] || [ "$controlplane_number" -lt 1 ] || [ "$worker_number" -lt 0 ]; then
+        echo "Not all parameters are valid ... quitting"
         die
     fi
 
@@ -398,7 +573,7 @@ function create_kind_cluster() {
         install_helm_argocd
         argocd_password="$(kubectl get secrets -n argocd argocd-initial-admin-secret -o json | jq -r '.data.password' | base64 -d)"
 
-        echo "ArgoCD password: $argocd_password" >> $cluster_info_file
+        echo "ArgoCD password: $argocd_password" >> "$cluster_info_file"
     fi
 
     echo -e "$yellow ✅ Done creating kind cluster"
@@ -412,25 +587,25 @@ function create_kind_cluster() {
     echo -e "$yellow\nOpen the ArgoCD UI in your browser: http://argocd.localtest.me"
     fi
     
-    echo -e "$yellow\n 🔑 Argocd Username:$blue admin"
-    echo -e "$yellow 🔑 Argocd Password:$blue $argocd_password"
+    echo -e "$yellow\n 🔑 ArgoCD Username:$blue admin"
+    echo -e "$yellow 🔑 ArgoCD Password:$blue $argocd_password"
     fi
 
     if [[ "$(is_running_more_than_one_cluster)" == "yes" ]]; then
-    echo -e "$yellow\n 🚀 Cluster default ports have been changed "
+    echo -e "$yellow\n 🚀 Cluster default ports have been changed"
     echo -e "$yellow Cluster http port: $first_controlplane_port_http"
     echo -e "$yellow Cluster https port: $first_controlplane_port_https"
 
-    echo -e "$yellow\n To access a application add the controlplane port to the application as follows:"
-    echo -e "$yellow http://<application>.localtest.me:<controlplane http port>"
+    echo -e "$yellow\n To access an application add the control plane port to the application as follows:"
+    echo -e "$yellow http://<application>.localtest.me:<control plane http port>"
     echo -e "$yellow Example: http://nyancat.localtest.me:$first_controlplane_port_http"
     fi
 
-    echo -e "$yellow\n To see all kind clusters , type: $red kind get clusters"
+    echo -e "$yellow\n To see all kind clusters, type: $red kind get clusters"
     echo -e "$yellow To delete cluster, type: $red kind delete cluster --name $cluster_name"
     echo -e "$clear"
 
-    get_kubeconfig kc $cluster_name
+    get_kubeconfig "$cluster_name"
 
     if [ "$install_argocd" == "yes" ]; then
         install_nyancat=""

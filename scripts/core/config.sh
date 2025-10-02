@@ -18,12 +18,19 @@ function print_logo() {
 function print_help() {
     echo -e "$yellow"
     echo "Kind specific:"    
-    echo "  create                          alias: c       Create a local cluster with kind and docker"
     echo "  list                            alias: ls      Show kind clusters"
-    echo "  details                         alias: dt      Show details for a cluster"
-    echo "  kubeconfig                      alias: kc      Get kubeconfig for a cluster by name"
-    echo "  delete                          alias: d       Delete a cluster by name"
+    echo "  create [cluster-name]           alias: c       Create a local cluster with kind and docker"
+    echo "  details <cluster-name>          alias: dt      Show details for a cluster"
+    echo "  k8sdetails <cluster-name>       alias: k8s     Show detailed Kubernetes resources info"
+    echo "  kubeconfig <cluster-name>       alias: kc      Get kubeconfig for a cluster by name"
+    echo "  delete <cluster-name>           alias: d       Delete a cluster by name"
     echo "  help                            alias: h       Print this Help"
+    echo ""
+    echo "Examples:"
+    echo "  ./kl.sh create mycluster                       Create cluster named 'mycluster'"
+    echo "  ./kl.sh details mycluster                      Show details for cluster 'mycluster'"
+    echo "  ./kl.sh k8sdetails mycluster                   Show K8s resources for cluster 'mycluster'"
+    echo "  ./kl.sh delete mycluster                       Delete cluster 'mycluster'"
     echo ""
     echo "Helm installations:"
     printf "  %-40s %s\n" "helm list" "List available Helm components"
@@ -36,6 +43,8 @@ function print_help() {
     printf "  %-40s %s\n" "install apps nats,redis-stack --dry-run" "Dry run for ArgoCD apps"
     echo ""
     echo "Notes:"
+    echo "  - Parameters in [brackets] are optional"
+    echo "  - Parameters in <brackets> are required"
     echo "  - Use comma-separated lists (no spaces): redis-stack,nats"
     echo "  - Components are installed in the order specified"
     echo "  - Use --dry-run to preview changes before applying"
@@ -55,7 +64,9 @@ perform_action() {
     create|c)
       print_logo; get_cluster_parameter "$@"; exit;;
     details|dt)
-      see_details_of_cluster; exit;;
+      details_for_cluster "$@"; exit;;
+    k8sdetails|k8s)
+      show_kubernetes_details "$@"; exit;;
     info|i)
       details_for_cluster "$@"; exit;;
     delete|d)

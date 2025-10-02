@@ -396,11 +396,11 @@ function install_nats_application() {
 }
 
 function post_pgadmin_install() {
-    echo -e "$yellow\n⏰ Waiting for Pgadmin4 to be running"
+    echo -e "$yellow\n⏰ Waiting for PgAdmin4 to be running"
     sleep 10
     (kubectl wait pods --for=condition=Ready --all -n pgadmin --timeout=120s || 
     { 
-        echo -e "$red 🛑 Falco is not running, and is not ready to use ..."
+        echo -e "$red 🛑 PgAdmin4 is not running, and is not ready to use ..."
         die
     }) & spinner
 
@@ -408,8 +408,8 @@ function post_pgadmin_install() {
     PgAdmin4 is ready to use
     "
     echo -e "$yellow
-    PgAdmin4 admin GUI portforwarding:$blue kubectl port-forward -n pgadmin services/pgadmin-pgadmin4 5050:80
-    PgAdmin4 admin GUI url: http://localhost:5050
+    PgAdmin4 admin GUI port forwarding:$blue kubectl port-forward -n pgadmin services/pgadmin-pgadmin4 5050:80
+    PgAdmin4 admin GUI URL: http://localhost:5050
     "
     echo -e "$yellow
     PgAdmin4 username: chart@domain.com
@@ -418,12 +418,12 @@ function post_pgadmin_install() {
 
     echo -e "$yellow
     Get available services by typing$blue kubectl get services -A
-    Use the ip to the service when connecting to the postgres instance 
+    Use the IP to the service when connecting to the Postgres instance 
     "
 }
 
 function show_vault_after_installation() {
-    echo -e "$yellow\nVaut is ready to use"
+    echo -e "$yellow\nVault is ready to use"
     echo -e "$yellow\nTo access the Vault dashboard, type:$blue kubectl port-forward --namespace vault service/vault 8200:8200"
     echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:8200"
     echo -e "$yellow\nToken to use: $(jq -cr '.root_token' vault-init.json)"
@@ -464,14 +464,14 @@ function unseal_vault() {
     sleep 10
     (kubectl wait --namespace vault --for=condition=PodReadyToStartContainers pod/vault-0 --timeout=90s || 
     { 
-        echo -e "$red 🛑 Could not install nginx ingress controller into cluster ..."
+        echo -e "$red 🛑 Could not install Nginx ingress controller into cluster ..."
         die
     }) & spinner
 
     echo -e "$yellow\nUnsealing the vault"
     (kubectl exec -i -n vault vault-0 -- vault operator init -format=json > vault-init.json || 
     { 
-        echo -e "$red 🛑 Could not install unseal the vault ..."
+        echo -e "$red 🛑 Could not unseal the vault ..."
         die
     }) & spinner
     echo -e "$clear"
