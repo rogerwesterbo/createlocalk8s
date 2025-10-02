@@ -1,9 +1,2 @@
-config/configkind.yaml
-config/clusterinfo-*.txt
-config/configkind-*.yaml
-vault-init.json
-kubeconfig-*.config
-clusters/*.config
-clusters/*.txt
-clusters/*.yaml
-clusters/*.yml
+clusters
+!clusters/.gitkeep

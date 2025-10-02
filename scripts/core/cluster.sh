@@ -39,6 +39,26 @@ function validate_cluster_exists() {
     fi
 }
 
+# Validate that a cluster does NOT exist, exit with error if found
+function validate_cluster_not_exists() {
+    local clusterName="$1"
+    
+    if [ -z "$clusterName" ]; then
+        echo -e "${red}\n🛑 Cluster name cannot be empty"
+        exit 1
+    fi
+    
+    local clusters
+    clusters=$(kind get clusters 2>/dev/null)
+    
+    if echo "$clusters" | grep -q "^${clusterName}$"; then
+        echo -e "${red}\n🛑 Cluster '${clusterName}' already exists"
+        echo -e "${yellow}\nPlease choose a different name or delete the existing cluster first:"
+        echo -e "  ${blue}./kl.sh delete ${clusterName}${clear}"
+        exit 1
+    fi
+}
+
 # Show error when cluster name parameter is missing
 function show_missing_cluster_name_error() {
     local command_name="$1"
@@ -347,6 +367,9 @@ function get_cluster_parameter() {
 
     cluster_name=$(echo "$cluster_name" | tr '[:upper:]' '[:lower:]')
 
+    # Validate cluster name is unique
+    validate_cluster_not_exists "$cluster_name"
+
     if [[ "$#" -gt 1 ]]; then 
         echo -e  "$red Too many arguments"; 
         echo -e "$clear"
@@ -559,6 +582,9 @@ function create_kind_cluster() {
         die
     fi
 
+    # Double-check cluster doesn't exist before creating
+    validate_cluster_not_exists "$cluster_name"
+
     echo -e "$yellow\n⏰ Creating Kind cluster"
     echo -e "$clear"
     (kind create cluster --name "$cluster_name" --config "$kind_config_file" || 
@@ -566,6 +592,20 @@ function create_kind_cluster() {
         echo -e "$red 🛑 Could not create cluster ..."
         die
     }) & spinner
+
+    # Ensure kubectl is using the correct context for the newly created cluster
+    echo -e "$yellow\n🔄 Switching to cluster context: kind-$cluster_name"
+    kubectl config use-context "kind-$cluster_name" 2>/dev/null || {
+        echo -e "$red 🛑 Could not switch to cluster context"
+        die
+    }
+    
+    # Verify cluster is ready
+    echo -e "$yellow\n⏰ Waiting for cluster to be ready..."
+    kubectl wait --for=condition=Ready nodes --all --timeout=60s || {
+        echo -e "$red 🛑 Cluster nodes not ready in time"
+        die
+    }
 
     install_nginx_controller_for_kind
 
