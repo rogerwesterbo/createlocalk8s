@@ -5,8 +5,8 @@
 #   function: existing install function to invoke
 
 APP_HELM_REGISTRY_DATA="$(cat <<'EOF'
-argocd|helm|install_helm_argocd|ArgoCD GitOps controller (Helm install)
-metallb|helm|install_helm_metallb|MetalLB load balancer (Helm)
+argocd|helm|install_helm_argocd|ArgoCD GitOps controller
+metallb|helm|install_helm_metallb|MetalLB load balancer
 mongodb-operator|helm|install_helm_mongodb_operator|MongoDB (Bitnami) single deployment
 mongodb-instance|helm|install_helm_mongodb_instance|MongoDB additional instance (Bitnami)
 trivy|helm|install_helm_trivy|Trivy security operator
@@ -31,18 +31,18 @@ certmanager|app|install_cert_manager_application|Cert-Manager for certificates
 prometheus|app|install_kube_prometheus_stack_application|Kube Prometheus Stack (Grafana/Prometheus/Alertmanager)
 kubeview|app|install_kubeview_application|Kubeview UI
 opencost|app|install_opencost_application|OpenCost cost monitoring
-metallb|app|install_metallb_application|MetalLB load balancer (ArgoCD App)
+metallb|app|install_metallb_application|MetalLB load balancer
 mongodb-operator|app|install_mongodb_operator_application|MongoDB Operator (Community)
 mongodb-instance|app|install_mongodb_instance|MongoDB Instance CR
 falco|app|install_falco_application|Falco runtime security
 trivy|app|install_trivy_application|Trivy operator
 vault|app|install_vault_application|HashiCorp Vault server
-postgres|app|install_postgres_application|CloudNativePG operator + cluster (ArgoCD)
-pgadmin|app|install_pgadmin_application|PgAdmin4 UI (ArgoCD)
+postgres|app|install_postgres_application|CloudNativePG operator + cluster
+pgadmin|app|install_pgadmin_application|PgAdmin4 UI
 rook-ceph-operator|app|install_rook_ceph_operator_application|Rook Ceph operator
 rook-ceph-cluster|app|install_rook_ceph_cluster_application|Rook Ceph cluster
 crossplane|app|install_crossplane_application|Crossplane control plane
-nginx|app|install_nginx_controller_application|Ingress-Nginx controller (ArgoCD)
+nginx|app|install_nginx_controller_application|Ingress-Nginx controller
 minio|app|install_minio_application|MinIO operator
 nfs|app|install_nfs_application|NFS external provisioner
 redis-stack|app|install_redis_stack_application|Redis Stack server
