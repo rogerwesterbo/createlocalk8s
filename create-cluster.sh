@@ -1,6 +1,6 @@
 #!/bin/bash
 
-for file in ./scripts/variables.sh ./scripts/core/utils.sh ./scripts/core/cluster.sh ./scripts/core/config.sh ./scripts/installers/registry.sh ./scripts/installers/helm.sh ./scripts/installers/apps.sh; do
+for file in ./scripts/variables.sh ./scripts/core/utils.sh ./scripts/providers/provider-interface.sh ./scripts/core/cluster-common.sh ./scripts/core/cluster.sh ./scripts/core/config.sh ./scripts/installers/registry.sh ./scripts/installers/helm.sh ./scripts/installers/apps.sh; do
     if [ -f "$file" ]; then
         source "$file"
     else
@@ -8,6 +8,9 @@ for file in ./scripts/variables.sh ./scripts/core/utils.sh ./scripts/core/cluste
         exit 1
     fi
 done
+
+# Set SCRIPT_DIR for provider interface
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # file variables
 scriptDir=$(dirname -- "$(readlink -f -- "$BASH_SOURCE")")
