@@ -61,9 +61,9 @@ _k8s_local_completion() {
     }
 
     _k8s_local_get_clusters() {
-        # Optional: suggest cluster directory names
+        # Suggest cluster directory names from clusters/
         if [[ -d clusters ]]; then
-            ls -1 clusters 2>/dev/null | sed -E '/^$/d' | tr '\n' ' '
+            find clusters -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | grep -v '^\.' | tr '\n' ' '
         fi
     }
 
@@ -86,16 +86,35 @@ _k8s_local_completion() {
                 install)
                     COMPREPLY=($(compgen -W "helm apps" -- "${cur}"))
                     ;;
-                create|delete|list|info|config|start|stop)
-                    # These commands typically take cluster names
-                    # Could potentially scan clusters/ directory for cluster names
+                create|c)
+                    # Support --provider flag for create command
+                    if [[ ${cur} == -* ]]; then
+                        COMPREPLY=($(compgen -W "--provider" -- "${cur}"))
+                    else
+                        [[ -n "$clusters" ]] && COMPREPLY=($(compgen -W "${clusters}" -- "${cur}"))
+                    fi
+                    ;;
+                delete|d|details|dt|k8sdetails|k8s|kubeconfig|kc)
+                    # These commands take cluster names
                     [[ -n "$clusters" ]] && COMPREPLY=($(compgen -W "${clusters}" -- "${cur}"))
+                    ;;
+                list|ls)
+                    # list doesn't take arguments
+                    COMPREPLY=()
                     ;;
             esac
             ;;
         3)
             # Third argument
             case "${words[1]}" in
+                create|c)
+                    # Handle --provider=kind or --provider=talos
+                    if [[ ${prev} == "--provider" ]]; then
+                        COMPREPLY=($(compgen -W "kind talos" -- "${cur}"))
+                    elif [[ ${cur} == --provider=* ]]; then
+                        COMPREPLY=($(compgen -W "kind talos" -P "--provider=" -- "${cur#--provider=}"))
+                    fi
+                    ;;
                 install)
                     case "${prev}" in
                         helm)

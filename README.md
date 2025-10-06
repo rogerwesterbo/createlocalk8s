@@ -11,6 +11,12 @@
 
 Local Kubernetes Cluster Manager (kind + talos + docker)
 
+> **⚠️ IMPORTANT: FOR DEVELOPMENT AND TESTING ONLY**
+> 
+> These clusters are designed for local development, testing, and learning purposes. 
+> **DO NOT use in production environments.** They lack the security hardening, high availability, 
+> and operational features required for production workloads.
+
 New to Kubernetes? Start here: [docs/kubernetes-101.md](./docs/kubernetes-101.md)
 
 Need more info about ArgoCD (perhaps the most central part except kubernetes?) & App-of-Apps pattern: [docs/argocd-app-of-apps.md](./docs/argocd-app-of-apps.md)
@@ -45,9 +51,11 @@ $ ./kl.sh
          Local Kubernetes Cluster Manager (kind + talos + docker)
 
 
-Kind specific:
-  list                            alias: ls      Show kind clusters
-  create [cluster-name]           alias: c       Create a local cluster with kind and docker
+General commands:
+  list                            alias: ls      Show all clusters (kind and talos)
+  create [cluster-name]           alias: c       Create a local cluster (choose provider interactively)
+  create [cluster-name] --provider=kind          Create a kind cluster
+  create [cluster-name] --provider=talos         Create a talos cluster
   details <cluster-name>          alias: dt      Show details for a cluster
   k8sdetails <cluster-name>       alias: k8s     Show detailed Kubernetes resources info
   kubeconfig <cluster-name>       alias: kc      Get kubeconfig for a cluster by name
@@ -55,7 +63,8 @@ Kind specific:
   help                            alias: h       Print this Help
 
 Examples:
-  ./kl.sh create mycluster                       Create cluster named 'mycluster'
+  ./kl.sh create mycluster                       Create cluster named 'mycluster' (interactive provider selection)
+  ./kl.sh create mycluster --provider=talos      Create a talos cluster named 'mycluster'
   ./kl.sh details mycluster                      Show details for cluster 'mycluster'
   ./kl.sh k8sdetails mycluster                   Show K8s resources for cluster 'mycluster'
   ./kl.sh delete mycluster                       Delete cluster 'mycluster'
@@ -77,7 +86,10 @@ Notes:
   - Components are installed in the order specified
   - Use --dry-run to preview changes before applying
 
-dependencies: docker, kind, kubectl, jq, base64 and helm
+dependencies:
+  - Common: docker, kubectl, jq, base64, helm
+  - kind provider: kind CLI
+  - talos provider: talosctl CLI, yq
 
 Current date and time in Linux Thu Oct  2 10:38:20 CEST 2025
 ```
@@ -86,8 +98,12 @@ Current date and time in Linux Thu Oct  2 10:38:20 CEST 2025
 
 -   **Multiple script names**: Use `./kl.sh` (short), `./k8s-local.sh`, or `./create-cluster.sh` (legacy)
 -   **Dynamic shell completion**: Bash, Zsh, Fish (commands + components discovered at runtime)
--   Interactive cluster creation (name, control planes, workers, Kubernetes version)
--   Supported Kubernetes versions (kind node images) baked in: 1.34.x → 1.25.x (see `scripts/variables.sh` for full list)
+-   **Multi-Provider Support**: Choose between kind and Talos providers (interactive or via `--provider` flag)
+-   Interactive cluster creation (name, control planes, workers, Kubernetes version, provider selection)
+-   Supported Kubernetes versions:
+    - **kind**: v1.25.x → v1.34.x (see `scripts/variables.sh` for full list)
+    - **talos**: v1.30.x → v1.34.x (see `scripts/variables.sh` for full list)
+-   **Organized cluster storage**: Each cluster gets its own directory under `clusters/<cluster-name>/`
 -   Automatic port mapping adjustment when multiple clusters run simultaneously (avoids 80/443 conflicts)
 -   Optional automatic ArgoCD + Nginx Ingress install during cluster creation
 -   Post-create helper to install a sample Nyancat app (demo ingress + ArgoCD)
@@ -96,7 +112,7 @@ Current date and time in Linux Thu Oct  2 10:38:20 CEST 2025
 -   19 Helm installers: ArgoCD, Crossplane, Rook Ceph, Falco, Trivy, Vault, MetalLB, MinIO, NFS, MongoDB Operator, CNPG, PgAdmin, Redis Stack, NATS, cert-manager, kube-prometheus-stack, kubeview, nginx-ingress, OpenCost
 -   22 ArgoCD Application installers (GitOps style): monitoring (Prometheus), databases, security, storage, cost monitoring, etc.
 -   **Dry-run mode**: Preview what will be installed with `--dry-run`
--   Generates per-cluster info + kubeconfig files under `clusters/`
+-   Generates per-cluster info + kubeconfig files under `clusters/<cluster-name>/`
 -   Consistent colored output & spinners, with readiness waits for core components
 -   Uses `localtest.me` wildcard DNS (no /etc/hosts changes needed)
 
@@ -126,11 +142,11 @@ Current date and time in Linux Thu Oct  2 10:38:20 CEST 2025
 docker ps --filter "name=mycluster-" --format "{{.Names}}: {{.Ports}}"
 
 # Access Talos API directly
-talosctl --talosconfig clusters/mycluster-talos/talosconfig \
+talosctl --talosconfig clusters/mycluster/talos/talosconfig \
   --nodes <node-ip> get services
 
 # View Talos logs
-talosctl --talosconfig clusters/mycluster-talos/talosconfig \
+talosctl --talosconfig clusters/mycluster/talos/talosconfig \
   --nodes <node-ip> logs
 ```
 

@@ -29,7 +29,7 @@ end
 function __k8s_local_commands
     set -l cmds (__k8s_local_help_cmds)
     if test (count $cmds) -eq 0
-        set cmds create delete list info config start stop help helm apps install
+        set cmds create c delete d list ls details dt k8sdetails k8s kubeconfig kc help h helm apps install
     end
     printf "%s\n" $cmds
 end
@@ -64,7 +64,7 @@ end
 
 function __k8s_local_clusters
     if test -d clusters
-        ls -1 clusters
+        find clusters -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | grep -v '^\.'
     end
 end
 
@@ -97,12 +97,17 @@ for n in (__k8s_local_script_names)
 end
 
 # Cluster names for cluster-oriented commands (pos 2)
-set -l cluster_cmds create delete info config start stop
+set -l cluster_cmds create c delete d details dt k8sdetails k8s kubeconfig kc
 for n in (__k8s_local_script_names)
     for c in $cluster_cmds
         complete -c $n -n "__fish_seen_subcommand_from $c; and test (count (commandline -opc)) -eq 2" \
             -a "(__k8s_local_clusters)" -d "Cluster"
     end
+end
+
+# Provider flag for create command
+for n in (__k8s_local_script_names)
+    complete -c $n -n "__fish_seen_subcommand_from create c" -l provider -d "Provider (kind or talos)" -a "kind talos"
 end
 
 # Flags

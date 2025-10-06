@@ -88,10 +88,33 @@ These features work identically on **all providers**:
 ./kl.sh kubeconfig mycluster
 
 # Use the kubeconfig
-export KUBECONFIG=$(pwd)/clusters/mycluster-kube.config
+export KUBECONFIG=$(pwd)/clusters/mycluster/kubeconfig
 kubectl get nodes
 kubectl get pods --all-namespaces
 ```
+
+## Cluster File Structure
+
+Each cluster has its own organized directory:
+
+```
+clusters/
+└── mycluster/
+    ├── provider.txt           # Provider type (kind or talos)
+    ├── clusterinfo.txt        # Cluster metadata
+    ├── kubeconfig             # Kubernetes config
+    ├── config.yaml            # kind config (for kind clusters)
+    └── talos/                 # Talos configs (for talos clusters)
+        ├── controlplane.yaml
+        ├── worker.yaml
+        └── talosconfig
+```
+
+**Benefits:**
+- All cluster files in one place
+- Easy to backup/restore entire cluster config
+- Clear separation between clusters
+- Simple cleanup (delete entire directory)
 
 ## Provider-Specific Features
 
@@ -115,11 +138,11 @@ kubectl get pods --all-namespaces
 docker ps --filter "name=mycluster-" --format "{{.Names}}: {{.Ports}}"
 
 # Use talosctl
-talosctl --talosconfig clusters/mycluster-talos/talosconfig \
+talosctl --talosconfig clusters/mycluster/talos/talosconfig \
   --nodes <node-ip> get services
 
 # View Talos logs
-talosctl --talosconfig clusters/mycluster-talos/talosconfig \
+talosctl --talosconfig clusters/mycluster/talos/talosconfig \
   --nodes <node-ip> logs
 ```
 
@@ -130,19 +153,13 @@ talosctl --talosconfig clusters/mycluster-talos/talosconfig \
 
 ## Cluster Metadata
 
-Each cluster stores its provider information:
+Each cluster stores its provider information in an organized directory structure (see "Cluster File Structure" section above for details).
 
-```bash
-clusters/
-├── mycluster-provider.txt          # Contains: "kind" or "talos"
-├── mycluster-clusterinfo.txt       # Cluster details
-├── mycluster-kube.config           # Kubeconfig file
-├── mycluster-config.yaml           # kind config (kind only)
-└── mycluster-talos/                # Talos configs (talos only)
-    ├── talosconfig
-    ├── controlplane.yaml
-    └── worker.yaml
-```
+The cluster metadata includes:
+- Provider type (kind or talos)
+- Cluster configuration
+- Kubeconfig
+- Provider-specific configs
 
 ## Multi-Cluster Scenarios
 
@@ -160,10 +177,10 @@ clusters/
 #   staging (talos)
 
 # Install same components on both
-export KUBECONFIG=$(pwd)/clusters/dev-kube.config
+export KUBECONFIG=$(pwd)/clusters/dev/kubeconfig
 ./kl.sh install helm argocd
 
-export KUBECONFIG=$(pwd)/clusters/staging-kube.config
+export KUBECONFIG=$(pwd)/clusters/staging/kubeconfig
 ./kl.sh install helm argocd
 ```
 
@@ -175,7 +192,7 @@ When running multiple clusters:
 
 ```bash
 # Check ports in cluster info
-cat clusters/mycluster-clusterinfo.txt | grep port
+cat clusters/mycluster/clusterinfo.txt | grep port
 # Output:
 # Cluster http port: 8080
 # Cluster https port: 8443
@@ -251,14 +268,14 @@ talosctl --talosconfig clusters/mycluster-talos/talosconfig \
   --nodes <node-ip> get nodes
 
 # View Talos logs
-talosctl --talosconfig clusters/mycluster-talos/talosconfig \
+talosctl --talosconfig clusters/mycluster/talos/talosconfig \
   --nodes <node-ip> logs
 ```
 
 **Can't access Kubernetes API:**
 ```bash
 # Verify kubeconfig
-export KUBECONFIG=$(pwd)/clusters/mycluster-kube.config
+export KUBECONFIG=$(pwd)/clusters/mycluster/kubeconfig
 kubectl cluster-info
 
 # Check API server is running
@@ -284,7 +301,7 @@ brew install siderolabs/tap/talosctl
 ./kl.sh kubeconfig mycluster
 
 # Set environment variable
-export KUBECONFIG=$(pwd)/clusters/mycluster-kube.config
+export KUBECONFIG=$(pwd)/clusters/mycluster/kubeconfig
 
 # Verify
 kubectl get nodes
@@ -302,12 +319,12 @@ After cluster creation, you can modify Talos configs:
 
 ```bash
 # Edit controlplane config
-vim clusters/mycluster-talos/controlplane.yaml
+vim clusters/mycluster/talos/controlplane.yaml
 
 # Apply changes
-talosctl --talosconfig clusters/mycluster-talos/talosconfig \
+talosctl --talosconfig clusters/mycluster/talos/talosconfig \
   apply-config --nodes <node-ip> \
-  --file clusters/mycluster-talos/controlplane.yaml
+  --file clusters/mycluster/talos/controlplane.yaml
 ```
 
 ## Future Providers
