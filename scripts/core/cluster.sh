@@ -345,7 +345,12 @@ function get_cluster_parameter() {
     }
 
     # Check provider prerequisites
-    call_provider_function "$provider" "check_prerequisites" || exit 1
+    echo -e "${yellow}🔍 Checking prerequisites for provider '$provider'...${clear}"
+    if ! call_provider_function "$provider" "check_prerequisites"; then
+        echo -e "${red} 🛑 Prerequisite check failed for provider '$provider'. Please install missing tools.${clear}"
+        exit 1
+    fi
+    echo -e "${yellow}✅ Prerequisites check passed${clear}"
 
     # Get cluster name
     if [ -z "$cluster_name_arg" ]; then

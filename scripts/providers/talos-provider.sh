@@ -14,6 +14,10 @@ talos_check_prerequisites() {
         missing+=("docker")
     fi
 
+    if ! command -v yq &> /dev/null; then
+        missing+=("yq")
+    fi
+
     if [ ${#missing[@]} -gt 0 ]; then
         echo -e "${red}Missing prerequisites for Talos provider:${clear}"
         printf '%s\n' "${missing[@]}"
@@ -21,6 +25,8 @@ talos_check_prerequisites() {
         echo -e "  curl -sL https://talos.dev/install | sh"
         echo -e "\n${yellow}Or via Homebrew:${clear}"
         echo -e "  brew install siderolabs/tap/talosctl"
+        echo -e "\n${yellow}Install yq:${clear}"
+        echo -e "  https://github.com/mikefarah/yq/#install"
         return 1
     fi
 
@@ -53,20 +59,33 @@ talos_create_cluster() {
         return 1
     }) & spinner
 
+    # Modify the generated controlplane.yaml to disable PodSecurity admission controller
+    # echo -e "${yellow}\n🩹 Modifying Talos machine configuration for PodSecurity policy${clear}"
+    # (
+    #     yq -i 'del(.cluster.apiServer.admissionControl)' "$talos_dir/controlplane.yaml" && \
+    #     yq -i '.cluster.apiServer.extraArgs."disable-admission-plugins" = "PodSecurity"' "$talos_dir/controlplane.yaml" && \
+    #     yq -i '.cluster.apiServer.extraArgs."enable-admission-plugins" = ""' "$talos_dir/controlplane.yaml"
+    # ) || {
+    #     echo -e "${red} 🛑 Could not modify Talos config with yq. Is yq installed?${clear}"
+    #     return 1
+    # }
+
     echo -e "${yellow}\n⏰ Creating Talos cluster using talosctl${clear}"
 
     # Build talosctl cluster create command
     local create_cmd="talosctl cluster create"
     create_cmd="$create_cmd --name $cluster_name"
+    # Dynamically set CIDR to avoid conflicts in multi-cluster setups
+    local cluster_count
+    cluster_count=$(talos_list_clusters | wc -l)
+    local cidr_octet=$((5 + cluster_count))
+    create_cmd="$create_cmd --cidr 10.${cidr_octet}.0.0/24"
     create_cmd="$create_cmd --controlplanes $controlplane_count"
     create_cmd="$create_cmd --workers $worker_count"
     create_cmd="$create_cmd --kubernetes-version $k8s_version"
 
     # Add port mappings for first control plane
     create_cmd="$create_cmd --exposed-ports $http_port:80/tcp,$https_port:443/tcp"
-
-    # disable PodSecurity admission controller to avoid issues with default policies
-    create_cmd="$create_cmd --config-patch '[{"op": "add", "path": "/cluster/apiServer/extraArgs/disable-admission-plugins", "value": "PodSecurity"}]'"
 
     # Wait for cluster to be ready
     create_cmd="$create_cmd --wait --wait-timeout 5m"
