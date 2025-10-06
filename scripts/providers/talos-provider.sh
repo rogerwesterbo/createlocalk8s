@@ -65,11 +65,17 @@ talos_create_cluster() {
     # Add port mappings for first control plane
     create_cmd="$create_cmd --exposed-ports $http_port:80/tcp,$https_port:443/tcp"
 
+    # disable PodSecurity admission controller to avoid issues with default policies
+    create_cmd="$create_cmd --config-patch '[{"op": "add", "path": "/cluster/apiServer/extraArgs/disable-admission-plugins", "value": "PodSecurity"}]'"
+
     # Wait for cluster to be ready
     create_cmd="$create_cmd --wait --wait-timeout 5m"
 
     # Create the cluster using talosctl
     echo -e "${yellow}Running: talosctl cluster create with $controlplane_count control plane(s) and $worker_count worker(s)${clear}"
+
+    # print the command for debugging
+    echo -e "${yellow}Command: $create_cmd${clear}"
 
     ($create_cmd ||
     {
@@ -197,8 +203,6 @@ talos_get_kubeconfig() {
 
     # talosctl can export kubeconfig directly by cluster name
     talosctl kubeconfig "$output_file" \
-        --force \
-        --merge=true \
         --cluster "$cluster_name" \
         --nodes "127.0.0.1" 2>/dev/null
 
@@ -231,32 +235,54 @@ talos_setup_ingress() {
     local http_port="$2"
     local https_port="$3"
 
-    # Talos uses standard Nginx ingress (no special patches needed)
+    # Talos uses standard Nginx ingress
     echo -e "${yellow}Installing Nginx Ingress Controller for Talos${clear}"
 
-    (kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml ||
+    (kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml ||
     {
         echo -e "${red} 🛑 Could not install Nginx controller${clear}"
         return 1
     }) & spinner
 
-    echo -e "${yellow}\n⏰ Waiting for Nginx ingress controller to be ready${clear}"
-    sleep 10
+    echo -e "${yellow}\n⏰ Waiting for Nginx ingress controller deployment to be available${clear}"
     (kubectl wait --namespace ingress-nginx \
-        --for=condition=ready pod \
+        --for=condition=available deployment \
         --selector=app.kubernetes.io/component=controller \
         --timeout=180s ||
     {
-        echo -e "${red} 🛑 Nginx ingress controller not ready in time${clear}"
+        echo -e "${red} 🛑 Nginx ingress controller deployment not available in time${clear}"
         return 1
     }) & spinner
 
-    # Patch the ingress service to use host ports
-    echo -e "${yellow}\n⏰ Configuring ingress for host network access${clear}"
-    (kubectl patch service -n ingress-nginx ingress-nginx-controller \
-        -p '{"spec":{"type":"NodePort"}}' ||
+    # Label the ingress-nginx namespace to allow hostNetwork pods, suppressing PodSecurity warnings.
+    # This is done *after* applying the manifest, as the manifest itself sets a restrictive policy.
+    echo -e "${yellow}\n⏰ Applying PodSecurity policy to ingress-nginx namespace${clear}"
+    (kubectl label --overwrite ns ingress-nginx pod-security.kubernetes.io/enforce=privileged ||
     {
-        echo -e "${yellow} ⚠️  Could not patch ingress service (may already be configured)${clear}"
+        echo -e "${red} 🛑 Could not label ingress-nginx namespace${clear}"
+        return 1
+    }) & spinner
+
+    # Patch the ingress deployment to use host network and run on the first control plane node.
+    # This is necessary to expose it via the Docker port mappings.
+    echo -e "${yellow}\n⏰ Configuring ingress for host network access on the control plane${clear}"
+    local controlplane_hostname
+    controlplane_hostname=$(echo "$cluster_name" | tr '[:upper:]' '[:lower:]')-controlplane-1
+
+    local patch_payload
+    patch_payload=$(printf '{"spec":{"template":{"spec":{"hostNetwork":true,"dnsPolicy":"ClusterFirstWithHostNet","nodeSelector":{"kubernetes.io/hostname":"%s"},"tolerations":[{"key":"node-role.kubernetes.io/control-plane","operator":"Exists","effect":"NoSchedule"}]}}}}' "$controlplane_hostname")
+
+    (kubectl patch deployment -n ingress-nginx ingress-nginx-controller -p "$patch_payload" ||
+    {
+        echo -e "${red} 🛑 Could not patch ingress deployment${clear}"
+        return 1
+    }) & spinner
+
+    echo -e "${yellow}\n⏰ Waiting for Nginx ingress controller to be ready after patching${clear}"
+    (kubectl rollout status deployment/ingress-nginx-controller -n ingress-nginx --timeout=180s ||
+    {
+        echo -e "${red} 🛑 Nginx ingress controller rollout failed after patching${clear}"
+        return 1
     }) & spinner
 
     echo -e "${yellow} ✅ Done installing Nginx Ingress Controller${clear}"
