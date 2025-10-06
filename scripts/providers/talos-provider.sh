@@ -42,7 +42,8 @@ talos_create_cluster() {
     local http_port="$6"
     local https_port="$7"
 
-    local talos_dir="$clustersDir/$cluster_name-talos"
+    local cluster_dir="$clustersDir/$cluster_name"
+    local talos_dir="$cluster_dir/talos"
     mkdir -p "$talos_dir"
 
     # Generate Talos machine configuration files.
@@ -109,14 +110,14 @@ talos_create_cluster() {
 
     # Get kubeconfig
     echo -e "${yellow}\n⏰ Retrieving kubeconfig${clear}"
-    (talos_get_kubeconfig "$cluster_name" "$clustersDir/$cluster_name-kube.config" ||
+    (talos_get_kubeconfig "$cluster_name" "$cluster_dir/kubeconfig" ||
     {
         echo -e "${red} 🛑 Could not retrieve kubeconfig${clear}"
         return 1
     }) & spinner
 
     # Set the context
-    export KUBECONFIG="$clustersDir/$cluster_name-kube.config"
+    export KUBECONFIG="$cluster_dir/kubeconfig"
 
     # Update context name to match our convention
     kubectl config rename-context "admin@$cluster_name" "admin@$cluster_name" 2>/dev/null || true

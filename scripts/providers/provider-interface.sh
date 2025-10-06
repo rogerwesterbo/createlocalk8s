@@ -112,13 +112,19 @@ load_provider() {
 # Get the provider for a cluster
 get_cluster_provider() {
     local cluster_name="$1"
-    local provider_file="$clustersDir/$cluster_name-provider.txt"
+    local provider_file="$clustersDir/$cluster_name/provider.txt"
 
     if [ -f "$provider_file" ]; then
         cat "$provider_file"
     else
-        # Default to kind for backward compatibility
-        echo "kind"
+        # Backward compatibility: check old location
+        local old_provider_file="$clustersDir/$cluster_name-provider.txt"
+        if [ -f "$old_provider_file" ]; then
+            cat "$old_provider_file"
+        else
+            # Default to kind for backward compatibility
+            echo "kind"
+        fi
     fi
 }
 
@@ -126,7 +132,9 @@ get_cluster_provider() {
 set_cluster_provider() {
     local cluster_name="$1"
     local provider_name="$2"
-    echo "$provider_name" > "$clustersDir/$cluster_name-provider.txt"
+    local cluster_dir="$clustersDir/$cluster_name"
+    mkdir -p "$cluster_dir"
+    echo "$provider_name" > "$cluster_dir/provider.txt"
 }
 
 # Validate that all required provider functions are implemented

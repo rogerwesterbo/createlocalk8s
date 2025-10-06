@@ -166,7 +166,7 @@ function get_kubeconfig() {
     load_provider "$provider" || exit 1
 
     # Use provider-specific kubeconfig function
-    local output_file="$clustersDir/$clusterName-kube.config"
+    local output_file="$clustersDir/$clusterName/kubeconfig"
     if ! call_provider_function "$provider" "get_kubeconfig" "$clusterName" "$output_file"; then
         echo -e "${red}\n🛑 Could not retrieve kubeconfig for cluster '${clusterName}'.${clear}"
         return 1
@@ -222,7 +222,10 @@ function delete_cluster() {
 
     echo -e "$yellow ✅ Done deleting cluster"
 
-    # Clean up cluster metadata files
+    # Clean up cluster directory
+    rm -rf "$clustersDir/$clusterName" 2>/dev/null
+    
+    # Also clean up old-style files for backward compatibility
     rm -f "$clustersDir/$clusterName-provider.txt" 2>/dev/null
     rm -f "$clustersDir/$clusterName-clusterinfo.txt" 2>/dev/null
     rm -f "$clustersDir/$clusterName-config.yaml" 2>/dev/null
@@ -246,15 +249,16 @@ function details_for_cluster() {
     validate_cluster_exists "$clusterName"
 
     # Build file paths using the provided cluster name
+    local cluster_dir="$clustersDir/$clusterName"
     local cluster_info_file_path
     local config_file_path
-    cluster_info_file_path=$(get_abs_filename "$clustersDir/$clusterName-clusterinfo.txt")
+    cluster_info_file_path=$(get_abs_filename "$cluster_dir/clusterinfo.txt")
 
     local provider=$(get_cluster_provider "$clusterName")
     if [ "$provider" == "kind" ]; then
-        config_file_path=$(get_abs_filename "$clustersDir/$clusterName-config.yaml")
+        config_file_path=$(get_abs_filename "$cluster_dir/config.yaml")
     else
-        config_file_path=$(get_abs_filename "$clustersDir/$clusterName-talos/talosconfig")
+        config_file_path=$(get_abs_filename "$cluster_dir/talos/talosconfig")
     fi
 
     echo -e "$yellow\nCluster details for $clusterName"
@@ -479,7 +483,9 @@ function get_cluster_parameter() {
 
     # Generate provider-specific config
     if [ "$provider" == "kind" ]; then
-        kind_config_file=$(get_abs_filename "$clustersDir/$cluster_name-config.yaml")
+        local cluster_dir="$clustersDir/$cluster_name"
+        mkdir -p "$cluster_dir"
+        kind_config_file=$(get_abs_filename "$cluster_dir/config.yaml")
         echo -e "$yellow\nKind config file: $kind_config_file"
 
         kind_generate_config "$cluster_name" "$kind_config_file" "$kindk8simage" \
@@ -488,8 +494,9 @@ function get_cluster_parameter() {
 
         config_file="$kind_config_file"
     elif [ "$provider" == "talos" ]; then
-        config_file="$clustersDir/$cluster_name-talos"
-        mkdir -p "$config_file"
+        local cluster_dir="$clustersDir/$cluster_name"
+        mkdir -p "$cluster_dir/talos"
+        config_file="$cluster_dir/talos"
     fi
 
     # Display summary
@@ -579,7 +586,7 @@ function create_cluster() {
     fi
 
     # Write cluster info file
-    local cluster_info_file=$(get_abs_filename "$clustersDir/$cluster_name-clusterinfo.txt")
+    local cluster_info_file=$(get_abs_filename "$clustersDir/$cluster_name/clusterinfo.txt")
     write_cluster_info_file "$cluster_name" "$provider" "$controlplane_number" \
         "$worker_number" "$kindk8sversion" "$first_controlplane_port_http" \
         "$first_controlplane_port_https" "$install_argocd" "$argocd_password" \

@@ -3,6 +3,19 @@
 # Provider-agnostic cluster operations
 # These functions work on any Kubernetes cluster regardless of provider
 
+# Get cluster directory path
+get_cluster_dir() {
+    local cluster_name="$1"
+    echo "$clustersDir/$cluster_name"
+}
+
+# Get cluster file path
+get_cluster_file() {
+    local cluster_name="$1"
+    local file_name="$2"
+    echo "$clustersDir/$cluster_name/$file_name"
+}
+
 # Install ArgoCD using Helm (provider-agnostic)
 install_argocd_generic() {
     local cluster_name="$1"
@@ -128,16 +141,31 @@ is_running_multiple_clusters() {
     # Count clusters for the current provider
     local cluster_count=0
 
-    # Check all cluster provider files
-    for provider_file in "$clustersDir"/*-provider.txt; do
-        [ -f "$provider_file" ] || continue
-        local cluster_provider=$(cat "$provider_file")
-        if [ "$cluster_provider" == "$provider" ]; then
-            cluster_count=$((cluster_count + 1))
+    if [ "$provider" == "kind" ]; then
+        # For kind, use kind CLI
+        local kind_clusters=$(kind get clusters 2>/dev/null)
+        if [ -n "$kind_clusters" ] && [ "$kind_clusters" != "No kind clusters found." ]; then
+            cluster_count=$(echo "$kind_clusters" | wc -l)
         fi
-    done
+    elif [ "$provider" == "talos" ]; then
+        # For talos, check docker containers
+        local talos_clusters=$(docker ps -a --filter "name=-controlplane-1$" --format "{{.Names}}" 2>/dev/null | sed 's/-controlplane-1$//' | wc -l)
+        cluster_count=$talos_clusters
+    else
+        # Fallback: check cluster directories
+        for cluster_dir in "$clustersDir"/*/; do
+            [ -d "$cluster_dir" ] || continue
+            local cluster_provider_file="$cluster_dir/provider.txt"
+            if [ -f "$cluster_provider_file" ]; then
+                local cluster_provider=$(cat "$cluster_provider_file")
+                if [ "$cluster_provider" == "$provider" ]; then
+                    cluster_count=$((cluster_count + 1))
+                fi
+            fi
+        done
+    fi
 
-    # Also check if provider-specific list shows multiple
+    # Return yes if 2 or more clusters
     if [ "$cluster_count" -ge 2 ]; then
         echo "yes"
     else
