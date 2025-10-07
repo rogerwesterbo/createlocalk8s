@@ -175,9 +175,14 @@ is_running_multiple_clusters() {
 
 # Find a free port (provider-agnostic)
 find_free_port() {
+    local exclude_port="$1"
     local port
     # Try ports in range 8080-65535
     for port in $(seq 8080 65535); do
+        # Skip excluded port
+        if [ -n "$exclude_port" ] && [ "$port" -eq "$exclude_port" ]; then
+            continue
+        fi
         if ! lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1; then
             echo "$port"
             return 0
@@ -193,11 +198,24 @@ determine_cluster_ports() {
     local http_port=80
     local https_port=443
 
+    # Check if ANY cluster is running (regardless of provider) since they share host network
+    local total_clusters=0
+    
+    # Count kind clusters
+    local kind_clusters=$(kind get clusters 2>/dev/null)
+    if [ -n "$kind_clusters" ] && [ "$kind_clusters" != "No kind clusters found." ]; then
+        total_clusters=$((total_clusters + $(echo "$kind_clusters" | wc -l)))
+    fi
+    
+    # Count talos clusters
+    local talos_clusters=$(docker ps -a --filter "name=-controlplane-1$" --format "{{.Names}}" 2>/dev/null | sed 's/-controlplane-1$//' | wc -l)
+    total_clusters=$((total_clusters + talos_clusters))
+
     # Check if we need to assign random ports
-    if [ "$(is_running_multiple_clusters "$provider")" == "yes" ]; then
-        echo -e "${yellow}\n🚨 Multiple clusters detected. Assigning random ports to avoid conflicts.${clear}"
-        http_port=$(find_free_port)
-        https_port=$(find_free_port)
+    if [ "$total_clusters" -ge 1 ]; then
+        echo -e "${yellow}\n🚨 Existing cluster(s) detected. Assigning random ports to avoid conflicts.${clear}" >&2
+        http_port=$(find_free_port "")
+        https_port=$(find_free_port "$http_port")
     fi
 
     echo "$http_port $https_port"
