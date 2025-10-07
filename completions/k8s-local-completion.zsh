@@ -25,18 +25,33 @@ _k8s_local_zsh() {
     # Fallback static list if parsing produced nothing
     if (( ${#commands} == 0 )); then
         commands=(
-            'create:Create a new Kubernetes cluster'
+            'create:Create a new Kubernetes cluster (kind or talos)'
+            'c:Alias for create'
             'delete:Delete an existing cluster'
+            'd:Alias for delete'
             'list:List all clusters'
-            'info:Show cluster information'
-            'config:Show cluster configuration'
-            'start:Start a stopped cluster'
-            'stop:Stop a running cluster'
+            'ls:Alias for list'
+            'details:Show cluster details'
+            'dt:Alias for details'
+            'k8sdetails:Show detailed Kubernetes resources'
+            'k8s:Alias for k8sdetails'
+            'kubeconfig:Get kubeconfig for a cluster'
+            'kc:Alias for kubeconfig'
             'help:Show help message'
+            'h:Alias for help'
             'helm:Manage Helm components'
             'apps:Manage ArgoCD applications'
             'install:Install Helm component or ArgoCD app'
         )
+    fi
+
+    # --- Get cluster names from directories ---
+    local -a clusters
+    if [[ -d clusters ]]; then
+        clusters=(${(f)"$(find clusters -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | grep -v '^\.')"})
+        for i in {1..${#clusters[@]}}; do
+            clusters[$i]="${clusters[$i]}:Cluster"
+        done
     fi
 
     # --- Dynamic Helm components ---
@@ -126,7 +141,7 @@ _k8s_local_zsh() {
             _describe -t commands 'k8s-local commands' commands
             ;;
         subcommand)
-            case $words[1] in
+            case $words[2] in
                 helm)
                     _values 'helm commands' 'list[List available Helm components]'
                     ;;
@@ -135,6 +150,17 @@ _k8s_local_zsh() {
                     ;;
                 install)
                     _values 'install types' 'helm[Install Helm component]' 'apps[Install ArgoCD app]'
+                    ;;
+                create|c)
+                    if [[ $words[3] == --provider=* || $words[3] == --provider ]]; then
+                        _values 'provider' 'kind[Kubernetes in Docker]' 'talos[Talos Linux]'
+                    else
+                        _describe -t clusters 'Clusters' clusters
+                        _values 'flags' '--provider[Specify provider: kind or talos]'
+                    fi
+                    ;;
+                delete|d|details|dt|k8sdetails|k8s|kubeconfig|kc)
+                    _describe -t clusters 'Clusters' clusters
                     ;;
             esac
             ;;

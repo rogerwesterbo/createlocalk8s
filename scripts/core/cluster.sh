@@ -1,60 +1,62 @@
 #!/bin/bash
 
-function is_running_more_than_one_cluster() {
-    local clusters
-    clusters=$(kind get clusters -q)
-
-    return_statement="no"
-
-    if [ "$clusters" == "No kind clusters found." ]; then
-        return_statement="no"
-    elif [ -z "$clusters" ]; then
-        return_statement="no"
-    elif [[ $(echo "$clusters" | wc -l) -eq 1 ]]; then
-        return_statement="no"
-    elif [[ $(echo "$clusters" | wc -l) -ge 2 ]]; then
-        return_statement="yes"
-    fi
-
-    echo "$return_statement"
-}
+# Cluster operations - now provider-agnostic
+# Uses provider abstraction layer for provider-specific operations
 
 # Validate that a cluster exists, exit with error if not found
 function validate_cluster_exists() {
     local clusterName="$1"
-    
+    local provider="${2:-}"
+
     if [ -z "$clusterName" ]; then
-        echo -e "${red}\n🛑 Cluster name cannot be empty"
+        echo -e "${red}\n🛑 Cluster name cannot be empty${clear}"
         exit 1
     fi
-    
-    local clusters
-    clusters=$(kind get clusters 2>/dev/null)
-    
-    if ! echo "$clusters" | grep -q "^${clusterName}$"; then
-        echo -e "${red}\n🛑 Cluster '${clusterName}' not found"
-        echo -e "${yellow}\nAvailable clusters:"
-        kind get clusters
-        exit 1
+
+    # Determine provider
+    if [ -z "$provider" ]; then
+        provider=$(get_cluster_provider "$clusterName")
     fi
+
+    # Load provider and validate
+    load_provider "$provider" || exit 1
+    call_provider_function "$provider" "validate_cluster_exists" "$clusterName"
 }
 
 # Validate that a cluster does NOT exist, exit with error if found
 function validate_cluster_not_exists() {
     local clusterName="$1"
-    
+    local provider="${2:-kind}"  # Default to kind for new clusters
+
     if [ -z "$clusterName" ]; then
-        echo -e "${red}\n🛑 Cluster name cannot be empty"
+        echo -e "${red}\n🛑 Cluster name cannot be empty${clear}"
         exit 1
     fi
+
+    # Check if cluster exists across ALL providers, not just the one being created
+    local existing_provider=""
     
-    local clusters
-    clusters=$(kind get clusters 2>/dev/null)
+    # Check kind clusters
+    if command -v kind &> /dev/null; then
+        if kind get clusters 2>/dev/null | grep -q "^${clusterName}$"; then
+            existing_provider="kind"
+        fi
+    fi
     
-    if echo "$clusters" | grep -q "^${clusterName}$"; then
-        echo -e "${red}\n🛑 Cluster '${clusterName}' already exists"
-        echo -e "${yellow}\nPlease choose a different name or delete the existing cluster first:"
+    # Check talos clusters (only if not already found in kind)
+    if [ -z "$existing_provider" ] && command -v talosctl &> /dev/null; then
+        if docker ps -a --filter "name=^${clusterName}-controlplane-1$" --format "{{.Names}}" 2>/dev/null | grep -q "^${clusterName}-controlplane-1$"; then
+            existing_provider="talos"
+        fi
+    fi
+    
+    # If cluster exists with any provider, show error
+    if [ -n "$existing_provider" ]; then
+        echo -e "${red}\n🛑 Cluster '${clusterName}' already exists (provider: ${existing_provider})${clear}"
+        echo -e "${yellow}\nPlease choose a different name or delete the existing cluster first:${clear}"
         echo -e "  ${blue}./kl.sh delete ${clusterName}${clear}"
+        echo -e "\n${yellow}Available clusters:${clear}"
+        list_clusters
         exit 1
     fi
 }
@@ -63,175 +65,105 @@ function validate_cluster_not_exists() {
 function show_missing_cluster_name_error() {
     local command_name="$1"
     local command_alias="$2"
-    
+
     echo -e "${red}\n🛑 Missing cluster name parameter${clear}"
     echo -e "${yellow}\nUsage:${clear}"
     echo -e "  ${blue}./kl.sh ${command_name} <cluster-name>${clear}"
-    
+
     if [ -n "$command_alias" ]; then
         echo -e "  ${blue}./kl.sh ${command_alias} <cluster-name>${clear}"
     fi
-    
+
     echo -e "\n${yellow}Example:${clear}"
     echo -e "  ${blue}./kl.sh ${command_name} mycluster${clear}"
-    
+
     echo -e "\n${yellow}To see available clusters, run:${clear}"
     echo -e "  ${blue}./kl.sh list${clear}"
-    
-    local clusters
-    clusters=$(kind get clusters 2>/dev/null)
-    
-    if [ -n "$clusters" ] && [ "$clusters" != "No kind clusters found." ]; then
-        echo -e "\n${yellow}Available clusters:${clear}"
-        kind get clusters
-    fi
-    
+
     exit 1
 }
 
-check_kind_clusters() {
-    local output
-    if output=$(kind get clusters -q); then
-        if [[ "$output" == "No kind clusters found." ]]; then
-            echo "No kind clusters found."
-            return 0
-        elif [[ -z "$output" ]]; then
-            echo "Cluster list is empty."
-            return 0
-        elif [[ $(echo "$output" | wc -l) -eq 1 ]]; then
-            echo "Exactly one kind cluster found."
-            return 1
-        elif [[ $(echo "$output" | wc -l) -ge 1 ]]; then
-            echo "One or more kind clusters found."
-            return 1
-        elif [[ $(echo "$output" | wc -l) -ge 2 ]]; then
-            echo "More than one kind cluster found."
-            return 1
-        else
-            echo "Unexpected output: $output"
-            return 1
-        fi
-        return 0
-    else
-        return 0
-    fi
-}
-
-function see_details_of_cluster() {
-    echo -e "$yellow
-    🚀 Cluster details
-    "
-    echo -e "$clear"
-    kubectl cluster-info
-    echo -e "$yellow
-    🚀 Nodes
-    "
-    echo -e "$clear"
-    kubectl get nodes
-    echo -e "$yellow
-    🚀 Pods
-    "
-    echo -e "$clear"
-    kubectl get pods --all-namespaces
-    echo -e "$yellow
-    🚀 Services
-    "
-    echo -e "$clear"
-    kubectl get services --all-namespaces
-    echo -e "$yellow
-    🚀 Ingresses
-    "
-    echo -e "$clear"
-    kubectl get ingresses --all-namespaces
-}
-
 function show_kubernetes_details() {
-    if [[ "$#" -lt 1 ]]; then 
+    if [[ "$#" -lt 1 ]]; then
         show_missing_cluster_name_error "k8sdetails" "k8s"
     fi
 
-    if [[ "$#" -gt 1 ]]; then 
-        echo "Too many arguments"; 
+    if [[ "$#" -gt 1 ]]; then
+        echo "Too many arguments"
         exit 1
     fi
 
     local clusterName="$1"
-    
+
     # Validate cluster exists
     validate_cluster_exists "$clusterName"
-    
-    echo -e "$yellow\n🔄 Switching to cluster context: $blue$clusterName"
-    kubectl config use-context "kind-$clusterName" 2>/dev/null || {
-        echo -e "$red 🛑 Could not switch to cluster context"
-        exit 1
-    }
-    echo -e "$clear"
-    
+
+    # Get provider and context
+    local provider=$(get_cluster_provider "$clusterName")
+    load_provider "$provider" || exit 1
+    local context=$(call_provider_function "$provider" "get_cluster_context" "$clusterName")
+
+    # Switch context
+    switch_to_cluster_context "$context"
+
     echo -e "$blue"
     echo "════════════════════════════════════════════════════════════════════════════════"
     echo "                    📊 Kubernetes Cluster Details                              "
     echo "════════════════════════════════════════════════════════════════════════════════"
     echo -e "$clear"
-    
-    see_details_of_cluster
-    
-    echo -e "$yellow
-    🚀 Deployments
-    "
-    echo -e "$clear"
-    kubectl get deployments --all-namespaces
-    
-    echo -e "$yellow
-    🚀 StatefulSets
-    "
-    echo -e "$clear"
-    kubectl get statefulsets --all-namespaces
-    
-    echo -e "$yellow
-    🚀 DaemonSets
-    "
-    echo -e "$clear"
-    kubectl get daemonsets --all-namespaces
-    
-    echo -e "$yellow
-    🚀 ConfigMaps
-    "
-    echo -e "$clear"
-    kubectl get configmaps --all-namespaces
-    
-    echo -e "$yellow
-    🚀 Secrets
-    "
-    echo -e "$clear"
-    kubectl get secrets --all-namespaces
-    
-    echo -e "$yellow
-    🚀 Persistent Volumes
-    "
-    echo -e "$clear"
-    kubectl get pv
-    
-    echo -e "$yellow
-    🚀 Persistent Volume Claims
-    "
-    echo -e "$clear"
-    kubectl get pvc --all-namespaces
-    
-    echo -e "$yellow
-    🚀 Storage Classes
-    "
-    echo -e "$clear"
-    kubectl get storageclass
-    
+
+    # Use provider-agnostic function
+    get_kubernetes_details
+
     echo -e "$blue"
     echo "════════════════════════════════════════════════════════════════════════════════"
     echo -e "$clear"
 }
 
 function list_clusters() {
-echo -e "$yellow 🚀 K8s local Clusters:"
-echo -e "$clear"
-kind get clusters
+    echo -e "$yellow 🚀 K8s local Clusters:$clear\n"
+
+    # List all clusters from all providers
+    local all_clusters=()
+
+    # Check kind clusters
+    if command -v kind &> /dev/null; then
+        local kind_clusters=$(kind get clusters 2>/dev/null)
+        if [ -n "$kind_clusters" ] && [ "$kind_clusters" != "No kind clusters found." ]; then
+            while IFS= read -r cluster; do
+                [ -z "$cluster" ] && continue
+                echo -e "  ${blue}$cluster${clear} ${yellow}(kind)${clear}"
+                all_clusters+=("$cluster")
+            done <<< "$kind_clusters"
+        fi
+    fi
+
+    # Check talos clusters
+    if command -v talosctl &> /dev/null; then
+        local talos_clusters=$(docker ps -a --filter "name=-controlplane-1$" --format "{{.Names}}" 2>/dev/null | sed 's/-controlplane-1$//' | sort -u)
+        if [ -n "$talos_clusters" ]; then
+            while IFS= read -r cluster; do
+                [ -z "$cluster" ] && continue
+                # Only list if not already listed as kind
+                local found=false
+                for existing_cluster in "${all_clusters[@]}"; do
+                    if [[ "$existing_cluster" == "$cluster" ]]; then
+                        found=true
+                        break
+                    fi
+                done
+
+                if ! $found; then
+                    echo -e "  ${blue}$cluster${clear} ${yellow}(talos)${clear}"
+                    all_clusters+=("$cluster")
+                fi
+            done <<< "$talos_clusters"
+        fi
+    fi
+
+    if [ ${#all_clusters[@]} -eq 0 ]; then
+        echo -e "  ${yellow}No clusters found${clear}"
+    fi
 }
 
 function get_kubeconfig() {
@@ -252,22 +184,31 @@ function get_kubeconfig() {
     # Validate cluster exists
     validate_cluster_exists "$clusterName"
 
-    echo "$(kind get kubeconfig --name "$clusterName")" > "$clustersDir/$clusterName-kube.config"
+    # Get provider
+    local provider=$(get_cluster_provider "$clusterName")
+    load_provider "$provider" || exit 1
 
-    echo -e "$yellow Kubeconfig saved to $clustersDir/$clusterName-kube.config"
-    echo -e "$yellow To use the kubeconfig, type:$red export KUBECONFIG=$clustersDir/$clusterName-kube.config"
+    # Use provider-specific kubeconfig function
+    local output_file="$clustersDir/$clusterName/kubeconfig"
+    if ! call_provider_function "$provider" "get_kubeconfig" "$clusterName" "$output_file"; then
+        echo -e "${red}\n🛑 Could not retrieve kubeconfig for cluster '${clusterName}'.${clear}"
+        return 1
+    fi
+
+    echo -e "$yellow Kubeconfig saved to $output_file"
+    echo -e "$yellow To use the kubeconfig, type:$red export KUBECONFIG=$output_file"
     echo -e "$yellow And then you can use $blue kubectl$yellow to interact with the cluster"
     echo -e "$yellow Example: $blue kubectl get nodes"
     echo ""
 }
 
 function delete_cluster() {
-    if [[ "$#" -lt 1 ]]; then 
+    if [[ "$#" -lt 1 ]]; then
         show_missing_cluster_name_error "delete" "d"
     fi
 
-    if [[ "$#" -gt 1 ]]; then 
-        echo "Too many arguments"; 
+    if [[ "$#" -gt 1 ]]; then
+        echo "Too many arguments"
         exit 1
     fi
 
@@ -295,22 +236,33 @@ function delete_cluster() {
             exit 0
     fi
 
-    (kind delete cluster --name "$clusterName" ||
-    { 
-        echo -e "$red 🛑 Could not delete cluster with name $clusterName"
-        die
-    }) & spinner
+    # Get provider
+    local provider=$(get_cluster_provider "$clusterName")
+    load_provider "$provider" || exit 1
+
+    # Use provider-specific delete function
+    call_provider_function "$provider" "delete_cluster" "$clusterName"
 
     echo -e "$yellow ✅ Done deleting cluster"
+
+    # Clean up cluster directory
+    rm -rf "$clustersDir/$clusterName" 2>/dev/null
+    
+    # Also clean up old-style files for backward compatibility
+    rm -f "$clustersDir/$clusterName-provider.txt" 2>/dev/null
+    rm -f "$clustersDir/$clusterName-clusterinfo.txt" 2>/dev/null
+    rm -f "$clustersDir/$clusterName-config.yaml" 2>/dev/null
+    rm -f "$clustersDir/$clusterName-kube.config" 2>/dev/null
+    rm -rf "$clustersDir/$clusterName-talos" 2>/dev/null
 }
 
 function details_for_cluster() {
-    if [[ "$#" -lt 1 ]]; then 
+    if [[ "$#" -lt 1 ]]; then
         show_missing_cluster_name_error "details" "dt"
     fi
 
-    if [[ "$#" -gt 1 ]]; then 
-        echo "Too many arguments"; 
+    if [[ "$#" -gt 1 ]]; then
+        echo "Too many arguments"
         exit 1
     fi
 
@@ -320,25 +272,32 @@ function details_for_cluster() {
     validate_cluster_exists "$clusterName"
 
     # Build file paths using the provided cluster name
+    local cluster_dir="$clustersDir/$clusterName"
     local cluster_info_file_path
-    local kind_config_file_path
-    cluster_info_file_path=$(get_abs_filename "$clustersDir/$clusterName-clusterinfo.txt")
-    kind_config_file_path=$(get_abs_filename "$clustersDir/$clusterName-config.yaml")
+    local config_file_path
+    cluster_info_file_path=$(get_abs_filename "$cluster_dir/clusterinfo.txt")
+
+    local provider=$(get_cluster_provider "$clusterName")
+    if [ "$provider" == "kind" ]; then
+        config_file_path=$(get_abs_filename "$cluster_dir/config.yaml")
+    else
+        config_file_path=$(get_abs_filename "$cluster_dir/talos/talosconfig")
+    fi
 
     echo -e "$yellow\nCluster details for $clusterName"
-    
+
     if [ -f "$cluster_info_file_path" ]; then
         cat "$cluster_info_file_path"
     else
         echo -e "$red\nCluster info file not found: $cluster_info_file_path"
     fi
 
-    echo -e "$yellow\nKind configuration for $clusterName"
+    echo -e "$yellow\nProvider configuration for $clusterName (provider: $provider)"
 
-    if [ -f "$kind_config_file_path" ]; then
-        cat "$kind_config_file_path"
+    if [ -f "$config_file_path" ]; then
+        cat "$config_file_path"
     else
-        echo -e "$red\nKind config file not found: $kind_config_file_path"
+        echo -e "$red\nConfig file not found: $config_file_path"
     fi
 }
 
@@ -348,9 +307,82 @@ function get_cluster_parameter() {
     ensure_docker_running
     check_docker_hub_login
 
-    if [[ "$#" -lt 1 ]]; then 
+    # Parse command line arguments for provider
+    local provider=""  # Will be set interactively or via flag
+    local provider_from_flag=false
+    local cluster_name_arg=""
+    local skip_next=false
+
+    for arg in "$@"; do
+        if [ "$skip_next" = true ]; then
+            skip_next=false
+            continue
+        fi
+
+        case "$arg" in
+            --provider)
+                skip_next=true
+                shift
+                provider="$1"
+                provider_from_flag=true
+                shift
+                ;;
+            --provider=*)
+                provider="${arg#*=}"
+                provider_from_flag=true
+                ;;
+            *)
+                if [ -z "$cluster_name_arg" ]; then
+                    cluster_name_arg="$arg"
+                fi
+                ;;
+        esac
+    done
+
+    # If provider not specified via flag, ask interactively
+    if [ -z "$provider" ]; then
         echo -e "$clear"
-        read -p "Enter the cluster name: (default: $cluster_name): " cluster_name_new
+        echo -e "$yellow Available providers:$clear"
+        echo -e "  ${blue}1)${clear} kind   - Kubernetes in Docker (fast, default)"
+        echo -e "  ${blue}2)${clear} talos  - Talos Linux (immutable, production-like)"
+        echo ""
+        read -p "Select provider (1 for kind, 2 for talos) [default: 1]: " provider_choice
+
+        case "$provider_choice" in
+            2)
+                provider="talos"
+                echo -e "$yellow ✅ Provider set to: ${blue}talos${clear}"
+                ;;
+            1|"")
+                provider="kind"
+                echo -e "$yellow ✅ Provider set to: ${blue}kind${clear}"
+                ;;
+            *)
+                echo -e "$red Invalid choice. Using default: kind${clear}"
+                provider="kind"
+                ;;
+        esac
+        echo -e "$clear"
+    fi
+
+    # Load the provider
+    load_provider "$provider" || {
+        echo -e "${red}Failed to load provider: $provider${clear}"
+        exit 1
+    }
+
+    # Check provider prerequisites
+    echo -e "${yellow}🔍 Checking prerequisites for provider '$provider'...${clear}"
+    if ! call_provider_function "$provider" "check_prerequisites"; then
+        echo -e "${red} 🛑 Prerequisite check failed for provider '$provider'. Please install missing tools.${clear}"
+        exit 1
+    fi
+    echo -e "${yellow}✅ Prerequisites check passed${clear}"
+
+    # Get cluster name
+    if [ -z "$cluster_name_arg" ]; then
+        echo -e "$clear"
+        read -p "Enter the cluster name (default: $cluster_name): " cluster_name_new
         if [ -n "$cluster_name_new" ]; then
             cluster_name=$cluster_name_new
             echo -e "$yellow ✅ Cluster name set to: $blue$cluster_name"
@@ -360,7 +392,7 @@ function get_cluster_parameter() {
             echo -e "$clear"
         fi
     else
-        cluster_name="$1"
+        cluster_name="$cluster_name_arg"
         echo -e "$yellow ✅ Cluster name: $blue$cluster_name"
         echo -e "$clear"
     fi
@@ -368,15 +400,9 @@ function get_cluster_parameter() {
     cluster_name=$(echo "$cluster_name" | tr '[:upper:]' '[:lower:]')
 
     # Validate cluster name is unique
-    validate_cluster_not_exists "$cluster_name"
+    validate_cluster_not_exists "$cluster_name" "$provider"
 
-    if [[ "$#" -gt 1 ]]; then 
-        echo -e  "$red Too many arguments"; 
-        echo -e "$clear"
-        echo -e "$yellow Use the following command to create a cluster: $blue ./create-cluster.sh create|c <cluster-name>"
-        exit 1
-    fi
-
+    # Get cluster parameters
     read -p "Enter number of control planes (default: 1): " controlplane_number_new
     if [ -n "$controlplane_number_new" ]; then
         controlplane_number=$controlplane_number_new
@@ -397,28 +423,64 @@ function get_cluster_parameter() {
         echo -e "$clear"
     fi
 
-    read -p "Enter version of Kubernetes (available:$kindk8spossibilities default: $kindk8sversion): " selected_k8s_version 
-    check_k8s_version=""
-    selected_k8s_version=$(echo "$selected_k8s_version" | tr '[:upper:]' '[:lower:]')
-    if [ -n "$selected_k8s_version" ]; then
-        for version in "${kindk8sversions[@]}"; do
-            IFS=':' read -r k8s_version kind_image <<< "$version"
-            if [ "$selected_k8s_version" == "$k8s_version" ]; then
-                kindk8simage=$kind_image
-                kindk8sversion=$k8s_version
-                check_k8s_version=$k8s_version
-            fi
-        done
+    # Only ask for Kubernetes version if using kind provider
+    if [ "$provider" == "kind" ]; then
+        read -p "Enter version of Kubernetes (available:$kindk8spossibilities default: $kindk8sversion): " selected_k8s_version
+        check_k8s_version=""
+        selected_k8s_version=$(echo "$selected_k8s_version" | tr '[:upper:]' '[:lower:]')
+        if [ -n "$selected_k8s_version" ]; then
+            for version in "${kindk8sversions[@]}"; do
+                IFS=':' read -r k8s_version kind_image <<< "$version"
+                if [ "$selected_k8s_version" == "$k8s_version" ]; then
+                    kindk8simage=$kind_image
+                    kindk8sversion=$k8s_version
+                    check_k8s_version=$k8s_version
+                fi
+            done
 
-        if [ -z "$check_k8s_version" ]; then
-            echo -e "$red 🛑 Kubernetes version $selected_k8s_version is not available. Next time, please select from the available versions: $kindk8spossibilities"
-            die
+            if [ -z "$check_k8s_version" ]; then
+                echo -e "$red 🛑 Kubernetes version $selected_k8s_version is not available. Next time, please select from the available versions: $kindk8spossibilities"
+                die
+            fi
+            echo -e "$yellow ✅ Selected Kubernetes version: $blue$kindk8sversion"
+            echo -e "$clear"
+        else
+            echo -e "$yellow ✅ Using default Kubernetes version: $blue$kindk8sversion"
+            echo -e "$clear"
         fi
-        echo -e "$yellow ✅ Selected Kubernetes version: $blue$kindk8sversion"
-        echo -e "$clear"
     else
-        echo -e "$yellow ✅ Using default Kubernetes version: $blue$kindk8sversion"
-        echo -e "$clear"
+        # For Talos, let user specify a version from a list of supported versions.
+        local talosk8sversion_default="${talosk8sversions[0]}"
+        
+        # More robustly join the array for display.
+        local joined_versions
+        printf -v joined_versions '%s,' "${talosk8sversions[@]}"
+        local talosk8spossibilities="${joined_versions%,}" # Remove trailing comma
+
+        # Set default for the script's generic variable
+        kindk8sversion=$talosk8sversion_default
+
+        read -p "Enter Kubernetes version for Talos (available: $talosk8spossibilities, default: $talosk8sversion_default): " selected_k8s_version
+        if [ -n "$selected_k8s_version" ]; then
+            local valid_version=false
+            for version in "${talosk8sversions[@]}"; do
+                if [[ "$selected_k8s_version" == "$version" ]]; then
+                    kindk8sversion=$selected_k8s_version
+                    valid_version=true
+                    break
+                fi
+            done
+
+            if ! $valid_version; then
+                echo -e "$red 🛑 Kubernetes version $selected_k8s_version is not available for Talos. Please select from the available versions: $talosk8spossibilities"
+                die
+            fi
+            echo -e "$yellow ✅ Selected Kubernetes version: $blue$kindk8sversion"
+            echo -e "$clear"
+        else
+            echo -e "$yellow ✅ Using default Kubernetes version: $blue$kindk8sversion"
+            echo -e "$clear"
+        fi
     fi
 
     install_nginx_controller="yes"
@@ -434,71 +496,40 @@ function get_cluster_parameter() {
         echo -e "$clear"
     fi
 
-    kind_config_file=$(get_abs_filename "$clustersDir/$cluster_name-config.yaml")
-    echo -e "$yellow\nKind config file: $kind_config_file"
-    if [ -e "$kind_config_file" ] && [ -r "$kind_config_file" ] && [ -w "$kind_config_file" ]; then
-        truncate -s 0 "$kind_config_file"
-    fi
-
-    if [ ! -f "$kind_config_file" ]; then
-        echo "Kind config file not found, creating it: $kind_config_file"
-        touch "$kind_config_file"; 
-    fi
-
-    controlplane_port_http=80
-    controlplane_port_https=443
-
-    if [[ "$(is_running_more_than_one_cluster)" == "yes" ]]; then
-        echo -e "$yellow\n🚨 You are running more than one kind cluster at once."
-        local http=$(find_free_port)
-        local https=$(find_free_port)
-
-        controlplane_port_http=$http
-        controlplane_port_https=$https
-    fi
+    # Determine ports
+    read -p "Determine cluster ports (http_port https_port)" ports <<< $(determine_cluster_ports "$provider")
+    controlplane_port_http=$(echo $ports | awk '{print $1}')
+    controlplane_port_https=$(echo $ports | awk '{print $2}')
 
     first_controlplane_port_http=$controlplane_port_http
     first_controlplane_port_https=$controlplane_port_https
 
-    echo "
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-networking:
-  ipFamily: dual
-nodes:" >> $kind_config_file
+    # Generate provider-specific config
+    if [ "$provider" == "kind" ]; then
+        local cluster_dir="$clustersDir/$cluster_name"
+        mkdir -p "$cluster_dir"
+        kind_config_file=$(get_abs_filename "$cluster_dir/config.yaml")
+        echo -e "$yellow\nKind config file: $kind_config_file"
 
-    for i in $(seq 1 $controlplane_number); do
-        # Only the first control plane gets port mappings
-        if [ $i -eq 1 ]; then
-            echo "  - role: control-plane
-    image: $kindk8simage
-    labels:
-        ingress-ready: \"true\"
-    extraPortMappings:
-      - containerPort: 80
-        hostPort: "$controlplane_port_http"
-        protocol: TCP
-      - containerPort: 443
-        hostPort: "$controlplane_port_https"
-        protocol: TCP" >> $kind_config_file
-        else
-            # Additional control planes don't get host port mappings
-            echo "  - role: control-plane
-    image: $kindk8simage" >> $kind_config_file
-        fi
-    done
+        kind_generate_config "$cluster_name" "$kind_config_file" "$kindk8simage" \
+            "$controlplane_number" "$worker_number" \
+            "$controlplane_port_http" "$controlplane_port_https"
 
-    if [ $worker_number -gt 0 ]; then
-        for i in $(seq 1 $worker_number); do
-            echo "  - role: worker" >> $kind_config_file
-            echo "    image: $kindk8simage" >> $kind_config_file
-        done
+        config_file="$kind_config_file"
+    elif [ "$provider" == "talos" ]; then
+        local cluster_dir="$clustersDir/$cluster_name"
+        mkdir -p "$cluster_dir/talos"
+        config_file="$cluster_dir/talos"
     fi
 
-    echo -e "$yellow\n⏰ Creating Kind cluster with the following configuration"
+    # Display summary
+    echo -e "$yellow\n⏰ Creating $provider cluster with the following configuration"
 
-    echo -en "$yellow\nCluster name:" 
+    echo -en "$yellow\nCluster name:"
     echo -en "$blue $cluster_name"
+
+    echo -en "$yellow\nProvider:"
+    echo -en "$blue $provider"
 
     echo -en "$yellow\nHow many control planes?:"
     echo -en "$blue $controlplane_number"
@@ -506,10 +537,10 @@ nodes:" >> $kind_config_file
     echo -en "$yellow\nHow many workers?:"
     echo -en "$blue $worker_number"
 
-    echo -en "$yellow\nWhich version of Kubernetes?:"
+    echo -en "$yellow\nKubernetes version:"
     echo -en "$blue $kindk8sversion"
 
-    echo -en "$yellow\nInstall Nginx ingress controller for kind?:"
+    echo -en "$yellow\nInstall Nginx ingress controller?:"
     echo -en "$blue $install_nginx_controller"
 
     echo -en "$yellow\nInstall ArgoCD with Helm?:"
@@ -517,143 +548,90 @@ nodes:" >> $kind_config_file
 
     echo -en "$yellow\nCluster http port:"
     echo -en "$blue $first_controlplane_port_http"
-    
+
     echo -en "$yellow\nCluster https port:"
     echo -en "$blue $first_controlplane_port_https"
 
-    cluster_info_file=$(get_abs_filename "$clustersDir/$cluster_name-clusterinfo.txt")
-    if [ -e "$cluster_info_file" ] && [ -r "$cluster_info_file" ] && [ -w "$cluster_info_file" ]; then
-        truncate -s 0 "$cluster_info_file"
-    fi
-
-    echo "
-Cluster name: $cluster_name
-Control plane number: $controlplane_number
-Worker number: $worker_number
-Kubernetes version: $kindk8sversion
-Cluster http port: $first_controlplane_port_http
-Cluster https port: $first_controlplane_port_https
-Install Nginx ingress controller: $install_nginx_controller
-Install ArgoCD: $install_argocd
-ArgoCD admin GUI port forwarding: kubectl port-forward -n argocd services/argocd-server 58080:443
-ArgoCD admin GUI URL: http://localhost:58080" >> $cluster_info_file
-
     echo ""
-    echo -e "$yellow\nKind command about to be run:"
-    echo -e "$blue\nkind cluster create $cluster_name --config "$kind_config_file""
-    
     echo -e "$clear"
     read -p "Looks ok (n | no | y | yes)? " ok
 
     if [ "$ok" == "yes" ] ;then
             echo "Excellent 👌"
-            create_kind_cluster
+            create_cluster "$provider"
         elif [ "$ok" == "y" ]; then
             echo "Good 🤌"
-            create_kind_cluster
+            create_cluster "$provider"
         else
             echo "🛑 Did not detect any confirmation, I need you to confirm with a yes or y 😀 ... quitting"
             exit 0
     fi
 }
 
-function install_nginx_controller_for_kind(){
-    echo -e "$yellow Creating Nginx Ingress Controller for kind"
-    (kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml||
-    {
-        echo -e "$red 🛑 Could not install Nginx controller in cluster ..."
-        die
-    }) & spinner
+function create_cluster() {
+    local provider="$1"
 
-    echo -e "$yellow\n⏰ Patching Nginx controller to run on control-plane node"
-    (kubectl patch deployment -n ingress-nginx ingress-nginx-controller -p '{"spec":{"template":{"spec":{"nodeSelector":{"ingress-ready":"true"}}}}}' ||
-    {
-        echo -e "$red 🛑 Could not patch Nginx controller ..."
-        die
-    }) & spinner
-
-    echo -e "$yellow\n⏰ Waiting for Nginx ingress controller for kind to be ready"
-    sleep 10
-    (kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s ||
-    {
-        echo -e "$red 🛑 Could not install Nginx ingress controller into cluster ..."
-        die
-    }) & spinner
-
-    echo -e "$yellow ✅ Done installing Nginx Ingress Controller"
-}
-
-function create_kind_cluster() {
     if [ -z "$cluster_name" ] || [ "$controlplane_number" -lt 1 ] || [ "$worker_number" -lt 0 ]; then
         echo "Not all parameters are valid ... quitting"
         die
     fi
 
     # Double-check cluster doesn't exist before creating
-    validate_cluster_not_exists "$cluster_name"
+    validate_cluster_not_exists "$cluster_name" "$provider"
 
-    echo -e "$yellow\n⏰ Creating Kind cluster"
-    echo -e "$clear"
-    (kind create cluster --name "$cluster_name" --config "$kind_config_file" || 
-    { 
-        echo -e "$red 🛑 Could not create cluster ..."
-        die
-    }) & spinner
+    # Save provider for this cluster
+    set_cluster_provider "$cluster_name" "$provider"
 
-    # Ensure kubectl is using the correct context for the newly created cluster
-    echo -e "$yellow\n🔄 Switching to cluster context: kind-$cluster_name"
-    kubectl config use-context "kind-$cluster_name" 2>/dev/null || {
-        echo -e "$red 🛑 Could not switch to cluster context"
-        die
-    }
-    
-    # Verify cluster is ready
-    echo -e "$yellow\n⏰ Waiting for cluster to be ready..."
-    kubectl wait --for=condition=Ready nodes --all --timeout=60s || {
-        echo -e "$red 🛑 Cluster nodes not ready in time"
+    # Use provider-specific cluster creation
+    call_provider_function "$provider" "create_cluster" \
+        "$cluster_name" "$config_file" "$kindk8sversion" \
+        "$controlplane_number" "$worker_number" \
+        "$first_controlplane_port_http" "$first_controlplane_port_https" || {
+        echo -e "${red} 🛑 Cluster creation failed${clear}"
         die
     }
 
-    install_nginx_controller_for_kind
+    # Get the context name
+    local context=$(call_provider_function "$provider" "get_cluster_context" "$cluster_name")
 
+    # Ensure kubectl is using the correct context
+    switch_to_cluster_context "$context"
+
+    # Setup ingress (provider-specific)
+    call_provider_function "$provider" "setup_ingress" "$cluster_name" \
+        "$first_controlplane_port_http" "$first_controlplane_port_https"
+
+    # Install ArgoCD if requested (provider-agnostic)
+    local argocd_password=""
     if [ "$install_argocd" == "yes" ]; then
-        install_helm_argocd
-        argocd_password="$(kubectl get secrets -n argocd argocd-initial-admin-secret -o json | jq -r '.data.password' | base64 -d)"
-
-        echo "ArgoCD password: $argocd_password" >> "$cluster_info_file"
+        install_argocd_generic "$cluster_name"
+        argocd_password=$(get_argocd_password)
     fi
 
-    echo -e "$yellow ✅ Done creating kind cluster"
+    # Write cluster info file
+    local cluster_info_file=$(get_abs_filename "$clustersDir/$cluster_name/clusterinfo.txt")
+    write_cluster_info_file "$cluster_name" "$provider" "$controlplane_number" \
+        "$worker_number" "$kindk8sversion" "$first_controlplane_port_http" \
+        "$first_controlplane_port_https" "$install_argocd" "$argocd_password" \
+        "$cluster_info_file"
 
-    if [ "$install_argocd" == "yes" ]; then
-    echo -e "$yellow 🚀 ArgoCD is ready to use"
-    
-    if [[ "$(is_running_more_than_one_cluster)" == "yes" ]]; then
-    echo -e "$yellow\nOpen the ArgoCD UI in your browser: http://argocd.localtest.me:$first_controlplane_port_http"
-    else
-    echo -e "$yellow\nOpen the ArgoCD UI in your browser: http://argocd.localtest.me"
-    fi
-    
-    echo -e "$yellow\n 🔑 ArgoCD Username:$blue admin"
-    echo -e "$yellow 🔑 ArgoCD Password:$blue $argocd_password"
-    fi
+    echo -e "$yellow ✅ Done creating cluster"
 
-    if [[ "$(is_running_more_than_one_cluster)" == "yes" ]]; then
-    echo -e "$yellow\n 🚀 Cluster default ports have been changed"
-    echo -e "$yellow Cluster http port: $first_controlplane_port_http"
-    echo -e "$yellow Cluster https port: $first_controlplane_port_https"
+    # Display cluster info
+    display_cluster_info "$cluster_name" "$provider" "$first_controlplane_port_http" \
+        "$first_controlplane_port_https" "$install_argocd" "$argocd_password"
 
-    echo -e "$yellow\n To access an application add the control plane port to the application as follows:"
-    echo -e "$yellow http://<application>.localtest.me:<control plane http port>"
-    echo -e "$yellow Example: http://nyancat.localtest.me:$first_controlplane_port_http"
-    fi
-
-    echo -e "$yellow\n To see all kind clusters, type: $red kind get clusters"
-    echo -e "$yellow To delete cluster, type: $red kind delete cluster --name $cluster_name"
-    echo -e "$clear"
-
+    # Get kubeconfig
     get_kubeconfig "$cluster_name"
+    
+    # For Talos multi-control-plane, show proxy container info
+    if [ "$provider" == "talos" ] && [ "$controlplane_number" -gt 1 ]; then
+        echo -e "${yellow}\n📦 Multi-control-plane Talos cluster uses a proxy container for ingress${clear}"
+        echo -e "${yellow}   Proxy container: ${blue}${cluster_name}-ingress-proxy${clear}"
+        echo -e "${yellow}   This container auto-restarts and forwards traffic to MetalLB${clear}"
+    fi
 
+    # Optionally install nyancat
     if [ "$install_argocd" == "yes" ]; then
         install_nyancat=""
         read -p "Install Nyan-cat ArgoCD application? (default: yes) (y/yes | n/no): " install_nyancat_new

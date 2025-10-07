@@ -38,3 +38,6 @@ clear='\033[0m'
 blue='\033[0;34m'
 red='\033[0;31m'
 green='\033[0;32m'
+
+# Talos Kubernetes versions
+talosk8sversions=("1.34.1" "1.33.3" "1.32.7" "1.31.11" "1.30.2")

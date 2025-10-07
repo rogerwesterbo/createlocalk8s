@@ -11,23 +11,27 @@ function print_logo() {
     echo "██║  ██╗╚█████╔╝███████║    ███████╗╚██████╔╝╚██████╗██║  ██║███████╗";
     echo "╚═╝  ╚═╝ ╚════╝ ╚══════╝    ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝";
     echo ""
-    echo "         Local Kubernetes Cluster Manager (kind + docker)             ";
+    echo "    Local Kubernetes Cluster Manager (kind + talos + docker)     ";
     echo ""
 }
 
 function print_help() {
     echo -e "$yellow"
-    echo "Kind specific:"    
-    echo "  list                            alias: ls      Show kind clusters"
-    echo "  create [cluster-name]           alias: c       Create a local cluster with kind and docker"
+    echo "Cluster Management:"
+    echo "  list                            alias: ls      Show all clusters (kind & talos)"
+    echo "  create [cluster-name]           alias: c       Create a local cluster (kind or talos)"
     echo "  details <cluster-name>          alias: dt      Show details for a cluster"
     echo "  k8sdetails <cluster-name>       alias: k8s     Show detailed Kubernetes resources info"
     echo "  kubeconfig <cluster-name>       alias: kc      Get kubeconfig for a cluster by name"
     echo "  delete <cluster-name>           alias: d       Delete a cluster by name"
     echo "  help                            alias: h       Print this Help"
     echo ""
+    echo "Provider Options:"
+    echo "  --provider <kind|talos>                        Specify cluster provider (skips interactive prompt)"
+    echo ""
     echo "Examples:"
-    echo "  ./kl.sh create mycluster                       Create cluster named 'mycluster'"
+    echo "  ./kl.sh create mycluster                       Create cluster (interactive provider selection)"
+    echo "  ./kl.sh create mycluster --provider talos      Create talos cluster (skip provider prompt)"
     echo "  ./kl.sh details mycluster                      Show details for cluster 'mycluster'"
     echo "  ./kl.sh k8sdetails mycluster                   Show K8s resources for cluster 'mycluster'"
     echo "  ./kl.sh delete mycluster                       Delete cluster 'mycluster'"

@@ -9,7 +9,13 @@
 ╚═╝  ╚═╝ ╚════╝ ╚══════╝    ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝
 ```
 
-Local Kubernetes Cluster Manager (kind + docker)
+Local Kubernetes Cluster Manager (kind + talos + docker)
+
+> **⚠️ IMPORTANT: FOR DEVELOPMENT AND TESTING ONLY**
+>
+> These clusters are designed for local development, testing, and learning purposes.
+> **DO NOT use in production environments.** They lack the security hardening, high availability,
+> and operational features required for production workloads.
 
 New to Kubernetes? Start here: [docs/kubernetes-101.md](./docs/kubernetes-101.md)
 
@@ -17,9 +23,18 @@ Need more info about ArgoCD (perhaps the most central part except kubernetes?) &
 
 Just need some information about the apps, see here: [docs/kubernetes-apps-overview.md](./docs/kubernetes-apps-overview.md)
 
-Create and experiment with local Kubernetes clusters using [kind](https://kind.sigs.k8s.io/) + Docker, then bootstrap common platform components (ArgoCD, ingress, databases, security, storage, cost / monitoring, etc.) either directly with Helm or via ArgoCD Applications.
+Create and experiment with local Kubernetes clusters using [kind](https://kind.sigs.k8s.io/) or [Talos](https://www.talos.dev/) + Docker, then bootstrap common platform components (ArgoCD, ingress, databases, security, storage, cost / monitoring, etc.) either directly with Helm or via ArgoCD Applications.
 
 > Currently supports macOS & Linux (also works under WSL2). Cygwin/MSYS shells may work but are not officially tested.
+
+## 🚀 Multi-Provider Support
+
+Choose your Kubernetes provider:
+
+-   **kind** (default) - Kubernetes in Docker, fast and lightweight
+-   **talos** - Talos Linux in Docker, immutable infrastructure
+
+📖 **[Read the full Multi-Provider Guide](./docs/providers.md)**
 
 ---
 
@@ -34,12 +49,14 @@ $ ./kl.sh
 ██║  ██╗╚█████╔╝███████║    ███████╗╚██████╔╝╚██████╗██║  ██║███████╗
 ╚═╝  ╚═╝ ╚════╝ ╚══════╝    ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝
 
-         Local Kubernetes Cluster Manager (kind + docker)
+         Local Kubernetes Cluster Manager (kind + talos + docker)
 
 
-Kind specific:
-  list                            alias: ls      Show kind clusters
-  create [cluster-name]           alias: c       Create a local cluster with kind and docker
+General commands:
+  list                            alias: ls      Show all clusters (kind and talos)
+  create [cluster-name]           alias: c       Create a local cluster (choose provider interactively)
+  create [cluster-name] --provider=kind          Create a kind cluster
+  create [cluster-name] --provider=talos         Create a talos cluster
   details <cluster-name>          alias: dt      Show details for a cluster
   k8sdetails <cluster-name>       alias: k8s     Show detailed Kubernetes resources info
   kubeconfig <cluster-name>       alias: kc      Get kubeconfig for a cluster by name
@@ -47,7 +64,8 @@ Kind specific:
   help                            alias: h       Print this Help
 
 Examples:
-  ./kl.sh create mycluster                       Create cluster named 'mycluster'
+  ./kl.sh create mycluster                       Create cluster named 'mycluster' (interactive provider selection)
+  ./kl.sh create mycluster --provider=talos      Create a talos cluster named 'mycluster'
   ./kl.sh details mycluster                      Show details for cluster 'mycluster'
   ./kl.sh k8sdetails mycluster                   Show K8s resources for cluster 'mycluster'
   ./kl.sh delete mycluster                       Delete cluster 'mycluster'
@@ -69,7 +87,10 @@ Notes:
   - Components are installed in the order specified
   - Use --dry-run to preview changes before applying
 
-dependencies: docker, kind, kubectl, jq, base64 and helm
+dependencies:
+  - Common: docker, kubectl, jq, base64, helm
+  - kind provider: kind CLI
+  - talos provider: talosctl CLI, yq
 
 Current date and time in Linux Thu Oct  2 10:38:20 CEST 2025
 ```
@@ -78,8 +99,12 @@ Current date and time in Linux Thu Oct  2 10:38:20 CEST 2025
 
 -   **Multiple script names**: Use `./kl.sh` (short), `./k8s-local.sh`, or `./create-cluster.sh` (legacy)
 -   **Dynamic shell completion**: Bash, Zsh, Fish (commands + components discovered at runtime)
--   Interactive cluster creation (name, control planes, workers, Kubernetes version)
--   Supported Kubernetes versions (kind node images) baked in: 1.34.x → 1.25.x (see `scripts/variables.sh` for full list)
+-   **Multi-Provider Support**: Choose between kind and Talos providers (interactive or via `--provider` flag)
+-   Interactive cluster creation (name, control planes, workers, Kubernetes version, provider selection)
+-   Supported Kubernetes versions:
+    -   **kind**: v1.25.x → v1.34.x (see `scripts/variables.sh` for full list)
+    -   **talos**: v1.30.x → v1.34.x (see `scripts/variables.sh` for full list)
+-   **Organized cluster storage**: Each cluster gets its own directory under `clusters/<cluster-name>/`
 -   Automatic port mapping adjustment when multiple clusters run simultaneously (avoids 80/443 conflicts)
 -   Optional automatic ArgoCD + Nginx Ingress install during cluster creation
 -   Post-create helper to install a sample Nyancat app (demo ingress + ArgoCD)
@@ -88,9 +113,66 @@ Current date and time in Linux Thu Oct  2 10:38:20 CEST 2025
 -   19 Helm installers: ArgoCD, Crossplane, Rook Ceph, Falco, Trivy, Vault, MetalLB, MinIO, NFS, MongoDB Operator, CNPG, PgAdmin, Redis Stack, NATS, cert-manager, kube-prometheus-stack, kubeview, nginx-ingress, OpenCost
 -   22 ArgoCD Application installers (GitOps style): monitoring (Prometheus), databases, security, storage, cost monitoring, etc.
 -   **Dry-run mode**: Preview what will be installed with `--dry-run`
--   Generates per-cluster info + kubeconfig files under `clusters/`
+-   Generates per-cluster info + kubeconfig files under `clusters/<cluster-name>/`
 -   Consistent colored output & spinners, with readiness waits for core components
 -   Uses `localtest.me` wildcard DNS (no /etc/hosts changes needed)
+
+---
+
+## 🔧 Provider-Specific Features
+
+### Kind Provider
+
+-   Fast cluster creation (~30 seconds)
+-   Multiple Kubernetes versions supported (v1.25-v1.34)
+-   Port mapping for ingress access
+-   Multi-cluster support on same host
+
+### Talos Provider
+
+-   **Immutable Infrastructure**: Talos Linux runs Kubernetes without a traditional OS
+-   **API-Driven**: All configuration via declarative YAML
+-   **Secure by Default**: Minimal attack surface, no SSH access
+-   **Production-Like**: Closer to real production Talos deployments
+-   **Docker-Based**: Runs Talos nodes as Docker containers for local development
+
+**Network Architecture:**
+
+-   **Single control plane**: Uses hostNetwork mode with direct port exposure
+-   **Multi control plane**: Uses MetalLB + HAProxy proxy container for load balancing
+    -   HAProxy container forwards traffic from host ports to MetalLB LoadBalancer IP
+    -   Automatic port assignment to avoid conflicts with other clusters
+
+**Talos-Specific Commands:**
+
+```bash
+# Get Talos node IPs
+docker ps --filter "name=mycluster-" --format "{{.Names}}: {{.Ports}}"
+
+# View ingress proxy container (multi-control-plane only)
+docker logs mycluster-ingress-proxy
+
+# Access Talos API directly
+talosctl --talosconfig clusters/mycluster/talos/talosconfig \
+  --nodes <node-ip> get services
+
+# View Talos logs
+talosctl --talosconfig clusters/mycluster/talos/talosconfig \
+  --nodes <node-ip> logs
+```
+
+**Key Differences:**
+
+| Feature             | kind              | talos                   |
+| ------------------- | ----------------- | ----------------------- |
+| Boot time           | ~30s              | ~60s                    |
+| OS                  | Generic container | Talos Linux             |
+| Config format       | kind YAML         | Talos machine config    |
+| SSH access          | Yes (to nodes)    | No (API only)           |
+| K8s versions        | v1.25-v1.34       | v1.30-v1.34             |
+| Ingress (single CP) | Port mapping      | hostNetwork mode        |
+| Ingress (multi CP)  | Port mapping      | MetalLB + HAProxy       |
+| Best for            | Quick testing     | Production-like testing |
 
 ---
 
@@ -104,8 +186,13 @@ scripts/
 	variables.sh             # Global defaults (versions, colors, flags)
 	core/
 		config.sh              # Help + command routing + logo
-		cluster.sh             # Interactive creation / deletion / info
+		cluster.sh             # Cluster operations (provider-agnostic)
+		cluster-common.sh      # Provider-agnostic K8s operations
 		utils.sh               # Prereq & utility helpers
+	providers/
+		provider-interface.sh  # Provider abstraction layer
+		kind-provider.sh       # Kind provider implementation
+		talos-provider.sh      # Talos provider implementation
 	installers/
 		registry.sh            # Component registry (Helm + ArgoCD apps)
 		helm.sh                # Helm installer functions
@@ -123,21 +210,34 @@ docs/                      # Additional documentation & diagram(s)
 
 The script checks and will exit if any of these are missing. Install them first:
 
+### Core Prerequisites (all providers)
+
 | Tool    | Purpose                                              | Install / Docs                                                |
 | ------- | ---------------------------------------------------- | ------------------------------------------------------------- |
-| Docker  | Container runtime used by kind                       | https://docs.docker.com/get-docker/                           |
-| kind    | Run Kubernetes in Docker                             | https://kind.sigs.k8s.io/docs/user/quick-start/               |
+| Docker  | Container runtime                                    | https://docs.docker.com/get-docker/                           |
 | kubectl | Kubernetes CLI                                       | https://kubernetes.io/docs/tasks/tools/                       |
 | Helm    | Package manager for Kubernetes                       | https://helm.sh/docs/intro/install/                           |
 | jq      | JSON processing in shell                             | https://jqlang.github.io/jq/download/                         |
 | base64  | Secret decoding (usually preinstalled via coreutils) | macOS/Linux: normally built-in (test with `base64 --version`) |
+
+### Provider-Specific Prerequisites
+
+| Provider | Tool     | Purpose                    | Install / Docs                                             |
+| -------- | -------- | -------------------------- | ---------------------------------------------------------- |
+| kind     | kind     | Run Kubernetes in Docker   | https://kind.sigs.k8s.io/docs/user/quick-start/            |
+| talos    | talosctl | Talos Linux management CLI | https://www.talos.dev/latest/introduction/getting-started/ |
 
 Optional (used later): `mongosh`, `pgcli`, `vault` CLI, etc.
 
 Homebrew (macOS/Linux) quick installs:
 
 ```bash
-brew install kind kubectl helm jq
+# Core tools
+brew install kubectl helm jq
+
+# Provider tools (install what you need)
+brew install kind                      # for kind provider
+brew install siderolabs/tap/talosctl   # for talos provider
 ```
 
 Docker Desktop (macOS) via Homebrew Cask:
@@ -178,17 +278,31 @@ Show help (also printed when no args supplied):
 Create a cluster (interactive prompts follow):
 
 ```bash
+# Interactive mode - choose provider during creation
 ./kl.sh create mycluster
 # or shorthand
 ./kl.sh c mycluster
+
+# You'll be prompted:
+# Available providers:
+#   1) kind   - Kubernetes in Docker (fast, default)
+#   2) talos  - Talos Linux (immutable, production-like)
+# Select provider (1 for kind, 2 for talos) [default: 1]:
+
+# Or specify provider via flag (skip provider prompt)
+./kl.sh create mycluster --provider talos
+./kl.sh create mycluster --provider kind
 ```
 
 During the prompts you can choose:
 
--   Kubernetes version (must match one of the listed supported versions)
+-   **Provider** (kind or talos)
+-   **Kubernetes version** (kind only - supports v1.25-v1.34; talos uses latest stable)
 -   Number of control planes & workers
 -   Whether to install ArgoCD (Helm) immediately
--   (Nginx ingress for kind is auto-installed)
+-   (Nginx ingress is auto-installed for all providers)
+
+📊 **[See detailed cluster creation flow diagram](./docs/cluster-creation-flow.md)**
 
 When finished you get:
 
@@ -441,13 +555,14 @@ rm clusters/clusterinfo-mycluster.txt clusters/kubeconfig-mycluster.config
 
 ## 🛠 Troubleshooting
 
-| Issue                                 | Hint                                                                                     |
-| ------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Script says a prerequisite is missing | Install it & re-run (brew / apt etc.)                                                    |
-| Ports 80/443 already in use           | Likely another kind cluster – new cluster auto-uses random ports; check clusterinfo file |
-| ArgoCD UI not reachable               | Ensure ingress controller pods are Ready; `kubectl get pods -n ingress-nginx`            |
-| Application stuck syncing             | Check ArgoCD `argocd app list` & pod logs in the target namespace                        |
-| Vault unseal problems                 | Re-run unseal using keys in `vault-init.json`                                            |
+| Issue                                 | Hint                                                                                |
+| ------------------------------------- | ----------------------------------------------------------------------------------- |
+| Script says a prerequisite is missing | Install it & re-run (brew / apt etc.)                                               |
+| Ports 80/443 already in use           | Likely another cluster – new cluster auto-uses random ports; check clusterinfo file |
+| ArgoCD UI not reachable               | Ensure ingress controller pods are Ready; `kubectl get pods -n ingress-nginx`       |
+| Talos multi-CP ingress not working    | Check HAProxy proxy container: `docker logs <cluster>-ingress-proxy`                |
+| Application stuck syncing             | Check ArgoCD `argocd app list` & pod logs in the target namespace                   |
+| Vault unseal problems                 | Re-run unseal using keys in `vault-init.json`                                       |
 
 ---
 
@@ -474,6 +589,11 @@ This project is licensed under the terms of the [LICENSE](./LICENSE).
 
 -   New to Kubernetes? Start here: [docs/kubernetes-101.md](./docs/kubernetes-101.md)
 -   Additional walkthrough & background: [docs/k8s.md](./docs/k8s.md)
+
+**Multi-Provider:**
+
+-   **Multi-Provider Guide**: [docs/providers.md](./docs/providers.md)
+-   Implementation details: [MULTI_PROVIDER_IMPLEMENTATION.md](./MULTI_PROVIDER_IMPLEMENTATION.md)
 
 **Components & Patterns:**
 

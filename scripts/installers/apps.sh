@@ -1,5 +1,30 @@
 #!/bin/bash
 
+function is_running_more_than_one_cluster() {
+    local total_clusters=0
+    local talos_count=0
+    local kind_count=0
+
+    # Count running Talos clusters by calling the provider function.
+    # This requires the talos-provider.sh script to be sourced.
+    if command -v talosctl &> /dev/null && type talos_list_clusters &> /dev/null; then
+        talos_count=$(talos_list_clusters | wc -l)
+    fi
+
+    # Count running Kind clusters using the kind CLI.
+    if command -v kind &> /dev/null; then
+        kind_count=$(kind get clusters 2>/dev/null | wc -l)
+    fi
+
+    total_clusters=$((talos_count + kind_count))
+
+    if [ "$total_clusters" -gt 1 ]; then
+        echo "yes"
+    else
+        echo "no"
+    fi
+}
+
 function install_minio_application() {
     echo -e "$yellow Installing Minio ArgoCD application "
     (kubectl apply -f $minio_app_yaml|| 
