@@ -60,17 +60,6 @@ talos_create_cluster() {
         return 1
     }) & spinner
 
-    # Modify the generated controlplane.yaml to disable PodSecurity admission controller
-    # echo -e "${yellow}\n🩹 Modifying Talos machine configuration for PodSecurity policy${clear}"
-    # (
-    #     yq -i 'del(.cluster.apiServer.admissionControl)' "$talos_dir/controlplane.yaml" && \
-    #     yq -i '.cluster.apiServer.extraArgs."disable-admission-plugins" = "PodSecurity"' "$talos_dir/controlplane.yaml" && \
-    #     yq -i '.cluster.apiServer.extraArgs."enable-admission-plugins" = ""' "$talos_dir/controlplane.yaml"
-    # ) || {
-    #     echo -e "${red} 🛑 Could not modify Talos config with yq. Is yq installed?${clear}"
-    #     return 1
-    # }
-
     echo -e "${yellow}\n⏰ Creating Talos cluster using talosctl${clear}"
 
     # Build talosctl cluster create command
@@ -85,8 +74,11 @@ talos_create_cluster() {
     create_cmd="$create_cmd --workers $worker_count"
     create_cmd="$create_cmd --kubernetes-version $k8s_version"
 
-    # Add port mappings for first control plane
-    create_cmd="$create_cmd --exposed-ports $http_port:80/tcp,$https_port:443/tcp"
+    # For single control plane: expose ports directly for hostNetwork mode
+    # For multi control plane: we'll use HAProxy proxy container to route to MetalLB
+    if [ "$controlplane_count" -eq 1 ]; then
+        create_cmd="$create_cmd --exposed-ports $http_port:80/tcp,$https_port:443/tcp"
+    fi
 
     # Wait for cluster to be ready
     create_cmd="$create_cmd --wait --wait-timeout 5m"
@@ -138,6 +130,14 @@ talos_delete_cluster() {
     local cluster_name="$1"
 
     echo -e "${yellow}\n⏰ Deleting Talos cluster using talosctl${clear}"
+
+    # Clean up proxy container if it exists
+    local proxy_container="${cluster_name}-ingress-proxy"
+    if docker ps -a --filter "name=^${proxy_container}$" --format "{{.Names}}" | grep -q "^${proxy_container}$"; then
+        echo -e "${yellow}Removing ingress proxy container${clear}"
+        docker stop "$proxy_container" >/dev/null 2>&1 || true
+        docker rm "$proxy_container" >/dev/null 2>&1 || true
+    fi
 
     # Use talosctl to destroy the cluster (handles all containers and networking)
     (talosctl cluster destroy --name "$cluster_name" ||
@@ -211,8 +211,8 @@ talos_get_kubeconfig() {
     local output_file="$2"
 
     # Find the host port mapped to the Talos API (50000)
-    local talos_api_port
-    talos_api_port=$(docker port "${cluster_name}-controlplane-1" 50000/tcp | awk -F: '{print $2}')
+    # local talos_api_port
+    # talos_api_port=$(docker port "${cluster_name}-controlplane-1" 50000/tcp | awk -F: '{print $2}')
 
     # if [ -z "$talos_api_port" ]; then
     #     echo -e "${red} 🛑 Could not find mapped Talos API port for ${cluster_name}-controlplane-1. Kubeconfig retrieval might fail.${clear}" >&2
@@ -223,6 +223,7 @@ talos_get_kubeconfig() {
 
     # talosctl can export kubeconfig directly by cluster name
     talosctl kubeconfig "$output_file" \
+        --merge=true \
         --cluster "$cluster_name" \
         --nodes "127.0.0.1" 2>/dev/null
 
@@ -255,9 +256,24 @@ talos_setup_ingress() {
     local http_port="$2"
     local https_port="$3"
 
-    # Talos uses standard Nginx ingress
-    echo -e "${yellow}Installing Nginx Ingress Controller for Talos${clear}"
+    # Get the number of control planes from the cluster
+    local controlplane_count
+    controlplane_count=$(kubectl get nodes -l node-role.kubernetes.io/control-plane --no-headers | wc -l | tr -d ' ')
 
+    if [ "$controlplane_count" -eq 1 ]; then
+        talos_setup_ingress_single_controlplane "$cluster_name" "$http_port" "$https_port"
+    else
+        talos_setup_ingress_multi_controlplane "$cluster_name" "$http_port" "$https_port"
+    fi
+}
+
+talos_setup_ingress_single_controlplane() {
+    local cluster_name="$1"
+    local http_port="$2"
+    local https_port="$3"
+
+    echo -e "${yellow}Installing Nginx Ingress Controller for Talos (single control plane, hostNetwork mode)${clear}"
+    
     (kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml ||
     {
         echo -e "${red} 🛑 Could not install Nginx controller${clear}"
@@ -274,8 +290,7 @@ talos_setup_ingress() {
         return 1
     }) & spinner
 
-    # Label the ingress-nginx namespace to allow hostNetwork pods, suppressing PodSecurity warnings.
-    # This is done *after* applying the manifest, as the manifest itself sets a restrictive policy.
+    # Label the ingress-nginx namespace
     echo -e "${yellow}\n⏰ Applying PodSecurity policy to ingress-nginx namespace${clear}"
     (kubectl label --overwrite ns ingress-nginx pod-security.kubernetes.io/enforce=privileged ||
     {
@@ -283,8 +298,7 @@ talos_setup_ingress() {
         return 1
     }) & spinner
 
-    # Patch the ingress deployment to use host network and run on the first control plane node.
-    # This is necessary to expose it via the Docker port mappings.
+    # Patch for hostNetwork
     echo -e "${yellow}\n⏰ Configuring ingress for host network access on the control plane${clear}"
     local controlplane_hostname
     controlplane_hostname=$(echo "$cluster_name" | tr '[:upper:]' '[:lower:]')-controlplane-1
@@ -309,6 +323,210 @@ talos_setup_ingress() {
     return 0
 }
 
+talos_setup_ingress_multi_controlplane() {
+    local cluster_name="$1"
+    local http_port="$2"
+    local https_port="$3"
+
+    echo -e "${yellow}Installing MetalLB for Talos (multi control plane setup)${clear}"
+    
+    # Determine the CIDR octet from existing cluster
+    local cluster_count
+    cluster_count=$(talos_list_clusters | wc -l | tr -d ' ')
+    local cidr_octet=$((5 + cluster_count - 1))
+    
+    # Calculate MetalLB IP address pool - 2 IPs per cluster
+    # First cluster: 101-102, Second: 103-104, Third: 105-106, etc.
+    local cluster_index=$((cluster_count - 1))
+    local ip_start=$((101 + (cluster_index * 2)))
+    local ip_end=$((ip_start + 1))
+    
+    local metallb_start="10.${cidr_octet}.0.${ip_start}"
+    local metallb_end="10.${cidr_octet}.0.${ip_end}"
+    
+    echo -e "${yellow}Using MetalLB IP range: ${metallb_start}-${metallb_end}${clear}"
+
+    # Create metallb-system namespace with PodSecurity labels
+    echo -e "${yellow}\n⏰ Creating metallb-system namespace with PodSecurity labels${clear}"
+    cat <<EOF | kubectl apply -f - || { echo -e "${red} 🛑 Could not create metallb-system namespace${clear}"; return 1; }
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: metallb-system
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+EOF
+
+    # Install MetalLB using Helm
+    echo -e "${yellow}\n⏰ Installing MetalLB using Helm${clear}"
+    (helm repo add metallb https://metallb.github.io/metallb 2>/dev/null || true) & spinner
+    (helm repo update metallb ||
+    {
+        echo -e "${red} 🛑 Could not update MetalLB Helm repo${clear}"
+        return 1
+    }) & spinner
+
+    (helm install metallb metallb/metallb --namespace metallb-system --wait --timeout 180s ||
+    {
+        echo -e "${red} 🛑 Could not install MetalLB with Helm${clear}"
+        return 1
+    }) & spinner
+
+    echo -e "${yellow}\n⏰ Waiting for MetalLB controller to be ready${clear}"
+    (kubectl wait --namespace metallb-system \
+        --for=condition=ready pod \
+        --selector=app.kubernetes.io/name=metallb \
+        --timeout=180s ||
+    {
+        echo -e "${red} 🛑 MetalLB pods not ready in time${clear}"
+        return 1
+    }) & spinner
+
+    # Create IPAddressPool and L2Advertisement
+    echo -e "${yellow}\n⏰ Configuring MetalLB IP address pool${clear}"
+    
+    cat <<EOF | kubectl apply -f - || { echo -e "${red} 🛑 Could not configure MetalLB${clear}"; return 1; }
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: default-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - ${metallb_start}-${metallb_end}
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: default-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - default-pool
+EOF
+
+    # Install Nginx Ingress Controller with LoadBalancer service type
+    echo -e "${yellow}\n⏰ Installing Nginx Ingress Controller${clear}"
+    (kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/cloud/deploy.yaml ||
+    {
+        echo -e "${red} 🛑 Could not install Nginx controller${clear}"
+        return 1
+    }) & spinner
+
+    echo -e "${yellow}\n⏰ Waiting for Nginx ingress controller to be ready${clear}"
+    (kubectl wait --namespace ingress-nginx \
+        --for=condition=available deployment \
+        --selector=app.kubernetes.io/component=controller \
+        --timeout=180s ||
+    {
+        echo -e "${red} 🛑 Nginx ingress controller deployment not available in time${clear}"
+        return 1
+    }) & spinner
+
+    # Wait for LoadBalancer IP to be assigned
+    echo -e "${yellow}\n⏰ Waiting for LoadBalancer IP assignment${clear}"
+    local retries=30
+    local lb_ip=""
+    while [ $retries -gt 0 ]; do
+        lb_ip=$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+        if [ -n "$lb_ip" ]; then
+            echo -e "${yellow} ✅ LoadBalancer IP assigned: ${blue}${lb_ip}${clear}"
+            break
+        fi
+        retries=$((retries - 1))
+        sleep 2
+    done
+
+    if [ -z "$lb_ip" ]; then
+        echo -e "${red} 🛑 LoadBalancer IP not assigned in time${clear}"
+        return 1
+    fi
+
+    # Set up proxy container for routing traffic from host to MetalLB IP
+    echo -e "${yellow}\n⏰ Setting up proxy container for ingress routing${clear}"
+    
+    local proxy_container="${cluster_name}-ingress-proxy"
+    
+    # Get the Docker network name from the control plane container
+    local network_name=$(docker inspect "${cluster_name}-controlplane-1" --format='{{range $net,$v := .NetworkSettings.Networks}}{{$net}}{{end}}' 2>/dev/null | head -1)
+    
+    if [ -z "$network_name" ]; then
+        echo -e "${red} 🛑 Could not find Docker network for cluster${clear}"
+        return 1
+    fi
+    
+    echo -e "${yellow}Using Docker network: ${blue}${network_name}${clear}"
+    
+    # Stop and remove proxy container if it exists
+    docker stop "$proxy_container" >/dev/null 2>&1 || true
+    docker rm "$proxy_container" >/dev/null 2>&1 || true
+    
+    # Start proxy container
+    # This container runs HAProxy to forward traffic from host ports to MetalLB IP
+    echo -e "${yellow}Creating proxy container: ${blue}${proxy_container}${clear}"
+    
+    # Create HAProxy config in /tmp (writable location)
+    local haproxy_config="
+global
+    log stdout format raw local0
+    maxconn 4096
+
+defaults
+    log global
+    mode tcp
+    option tcplog
+    timeout connect 5000ms
+    timeout client 50000ms
+    timeout server 50000ms
+
+frontend http_front
+    bind :80
+    default_backend http_back
+
+frontend https_front
+    bind :443
+    default_backend https_back
+
+backend http_back
+    server metallb ${lb_ip}:80 check
+
+backend https_back
+    server metallb ${lb_ip}:443 check
+"
+    
+    docker run -d \
+        --name "$proxy_container" \
+        --network "$network_name" \
+        --restart unless-stopped \
+        -p "${http_port}:80" \
+        -p "${https_port}:443" \
+        haproxy:alpine \
+        sh -c "echo '$haproxy_config' > /tmp/haproxy.cfg && haproxy -f /tmp/haproxy.cfg" \
+        >/dev/null 2>&1 || {
+        echo -e "${red} 🛑 Could not create proxy container${clear}"
+        docker logs "$proxy_container" 2>&1 | tail -10
+        return 1
+    }
+    
+    # Wait for proxy to be ready
+    sleep 3
+    
+    # Verify proxy container is running
+    if ! docker ps --filter "name=^${proxy_container}$" --format "{{.Names}}" | grep -q "^${proxy_container}$"; then
+        echo -e "${red} 🛑 Proxy container failed to start${clear}"
+        echo -e "${yellow}Container logs:${clear}"
+        docker logs "$proxy_container" 2>&1
+        return 1
+    fi
+
+    echo -e "${yellow} ✅ Done installing Nginx Ingress Controller with MetalLB${clear}"
+    echo -e "${yellow} ✅ Traffic flow: localhost:${http_port}/${https_port} → Proxy Container → MetalLB ${lb_ip} → Ingress${clear}"
+    echo -e "${yellow} ℹ️  Proxy container: ${blue}${proxy_container}${clear} (auto-restarts)${clear}"
+    return 0
+}
+
 talos_get_info() {
     echo "Provider: talos"
     echo "Provider URL: https://www.talos.dev/"
@@ -318,15 +536,6 @@ talos_get_info() {
 talos_supports_multi_cluster() {
     echo "yes"
 }
-
-# # Talos-specific helper: Get node IPs
-# talos_get_node_ips() {
-#     local cluster_name="$1"
-#     docker ps --filter "name=${cluster_name}-" --format "{{.Names}}" | while read container; do
-#         local ip=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container")
-#         echo "$container: $ip"
-#     done
-# }
 
 # Talos-specific helper: Get node IPs
 talos_get_node_ips() {

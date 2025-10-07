@@ -29,13 +29,36 @@ function validate_cluster_not_exists() {
     local provider="${2:-kind}"  # Default to kind for new clusters
 
     if [ -z "$clusterName" ]; then
-        echo -e "${red}\n🛑 Cluster name cannot be.empty${clear}"
+        echo -e "${red}\n🛑 Cluster name cannot be empty${clear}"
         exit 1
     fi
 
-    # Load provider and validate
-    load_provider "$provider" || exit 1
-    call_provider_function "$provider" "validate_cluster_not_exists" "$clusterName"
+    # Check if cluster exists across ALL providers, not just the one being created
+    local existing_provider=""
+    
+    # Check kind clusters
+    if command -v kind &> /dev/null; then
+        if kind get clusters 2>/dev/null | grep -q "^${clusterName}$"; then
+            existing_provider="kind"
+        fi
+    fi
+    
+    # Check talos clusters (only if not already found in kind)
+    if [ -z "$existing_provider" ] && command -v talosctl &> /dev/null; then
+        if docker ps -a --filter "name=^${clusterName}-controlplane-1$" --format "{{.Names}}" 2>/dev/null | grep -q "^${clusterName}-controlplane-1$"; then
+            existing_provider="talos"
+        fi
+    fi
+    
+    # If cluster exists with any provider, show error
+    if [ -n "$existing_provider" ]; then
+        echo -e "${red}\n🛑 Cluster '${clusterName}' already exists (provider: ${existing_provider})${clear}"
+        echo -e "${yellow}\nPlease choose a different name or delete the existing cluster first:${clear}"
+        echo -e "  ${blue}./kl.sh delete ${clusterName}${clear}"
+        echo -e "\n${yellow}Available clusters:${clear}"
+        list_clusters
+        exit 1
+    fi
 }
 
 # Show error when cluster name parameter is missing
@@ -600,6 +623,13 @@ function create_cluster() {
 
     # Get kubeconfig
     get_kubeconfig "$cluster_name"
+    
+    # For Talos multi-control-plane, show proxy container info
+    if [ "$provider" == "talos" ] && [ "$controlplane_number" -gt 1 ]; then
+        echo -e "${yellow}\n📦 Multi-control-plane Talos cluster uses a proxy container for ingress${clear}"
+        echo -e "${yellow}   Proxy container: ${blue}${cluster_name}-ingress-proxy${clear}"
+        echo -e "${yellow}   This container auto-restarts and forwards traffic to MetalLB${clear}"
+    fi
 
     # Optionally install nyancat
     if [ "$install_argocd" == "yes" ]; then

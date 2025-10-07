@@ -25,7 +25,6 @@ spec:
             fileStorage:
               enabled: true
               size: 1Gi
-              storageClassName: standard
           
         natsbox:
           enabled: true
