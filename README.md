@@ -12,9 +12,9 @@
 Local Kubernetes Cluster Manager (kind + talos + docker)
 
 > **⚠️ IMPORTANT: FOR DEVELOPMENT AND TESTING ONLY**
-> 
-> These clusters are designed for local development, testing, and learning purposes. 
-> **DO NOT use in production environments.** They lack the security hardening, high availability, 
+>
+> These clusters are designed for local development, testing, and learning purposes.
+> **DO NOT use in production environments.** They lack the security hardening, high availability,
 > and operational features required for production workloads.
 
 New to Kubernetes? Start here: [docs/kubernetes-101.md](./docs/kubernetes-101.md)
@@ -30,8 +30,9 @@ Create and experiment with local Kubernetes clusters using [kind](https://kind.s
 ## 🚀 Multi-Provider Support
 
 Choose your Kubernetes provider:
-- **kind** (default) - Kubernetes in Docker, fast and lightweight
-- **talos** - Talos Linux in Docker, immutable infrastructure
+
+-   **kind** (default) - Kubernetes in Docker, fast and lightweight
+-   **talos** - Talos Linux in Docker, immutable infrastructure
 
 📖 **[Read the full Multi-Provider Guide](./docs/providers.md)**
 
@@ -101,8 +102,8 @@ Current date and time in Linux Thu Oct  2 10:38:20 CEST 2025
 -   **Multi-Provider Support**: Choose between kind and Talos providers (interactive or via `--provider` flag)
 -   Interactive cluster creation (name, control planes, workers, Kubernetes version, provider selection)
 -   Supported Kubernetes versions:
-    - **kind**: v1.25.x → v1.34.x (see `scripts/variables.sh` for full list)
-    - **talos**: v1.30.x → v1.34.x (see `scripts/variables.sh` for full list)
+    -   **kind**: v1.25.x → v1.34.x (see `scripts/variables.sh` for full list)
+    -   **talos**: v1.30.x → v1.34.x (see `scripts/variables.sh` for full list)
 -   **Organized cluster storage**: Each cluster gets its own directory under `clusters/<cluster-name>/`
 -   Automatic port mapping adjustment when multiple clusters run simultaneously (avoids 80/443 conflicts)
 -   Optional automatic ArgoCD + Nginx Ingress install during cluster creation
@@ -122,24 +123,34 @@ Current date and time in Linux Thu Oct  2 10:38:20 CEST 2025
 
 ### Kind Provider
 
-- Fast cluster creation (~30 seconds)
-- Multiple Kubernetes versions supported (v1.25-v1.34)
-- Port mapping for ingress access
-- Multi-cluster support on same host
+-   Fast cluster creation (~30 seconds)
+-   Multiple Kubernetes versions supported (v1.25-v1.34)
+-   Port mapping for ingress access
+-   Multi-cluster support on same host
 
 ### Talos Provider
 
-- **Immutable Infrastructure**: Talos Linux runs Kubernetes without a traditional OS
-- **API-Driven**: All configuration via declarative YAML
-- **Secure by Default**: Minimal attack surface, no SSH access
-- **Production-Like**: Closer to real production Talos deployments
-- **Docker-Based**: Runs Talos nodes as Docker containers for local development
+-   **Immutable Infrastructure**: Talos Linux runs Kubernetes without a traditional OS
+-   **API-Driven**: All configuration via declarative YAML
+-   **Secure by Default**: Minimal attack surface, no SSH access
+-   **Production-Like**: Closer to real production Talos deployments
+-   **Docker-Based**: Runs Talos nodes as Docker containers for local development
+
+**Network Architecture:**
+
+-   **Single control plane**: Uses hostNetwork mode with direct port exposure
+-   **Multi control plane**: Uses MetalLB + HAProxy proxy container for load balancing
+    -   HAProxy container forwards traffic from host ports to MetalLB LoadBalancer IP
+    -   Automatic port assignment to avoid conflicts with other clusters
 
 **Talos-Specific Commands:**
 
 ```bash
 # Get Talos node IPs
 docker ps --filter "name=mycluster-" --format "{{.Names}}: {{.Ports}}"
+
+# View ingress proxy container (multi-control-plane only)
+docker logs mycluster-ingress-proxy
 
 # Access Talos API directly
 talosctl --talosconfig clusters/mycluster/talos/talosconfig \
@@ -152,14 +163,16 @@ talosctl --talosconfig clusters/mycluster/talos/talosconfig \
 
 **Key Differences:**
 
-| Feature | kind | talos |
-|---------|------|-------|
-| Boot time | ~30s | ~60s |
-| OS | Generic container | Talos Linux |
-| Config format | kind YAML | Talos machine config |
-| SSH access | Yes (to nodes) | No (API only) |
-| K8s versions | v1.25-v1.34 (selectable) | Latest stable only |
-| Best for | Quick testing | Production-like testing |
+| Feature             | kind              | talos                   |
+| ------------------- | ----------------- | ----------------------- |
+| Boot time           | ~30s              | ~60s                    |
+| OS                  | Generic container | Talos Linux             |
+| Config format       | kind YAML         | Talos machine config    |
+| SSH access          | Yes (to nodes)    | No (API only)           |
+| K8s versions        | v1.25-v1.34       | v1.30-v1.34             |
+| Ingress (single CP) | Port mapping      | hostNetwork mode        |
+| Ingress (multi CP)  | Port mapping      | MetalLB + HAProxy       |
+| Best for            | Quick testing     | Production-like testing |
 
 ---
 
@@ -209,10 +222,10 @@ The script checks and will exit if any of these are missing. Install them first:
 
 ### Provider-Specific Prerequisites
 
-| Provider | Tool     | Purpose                          | Install / Docs                                                |
-| -------- | -------- | -------------------------------- | ------------------------------------------------------------- |
-| kind     | kind     | Run Kubernetes in Docker         | https://kind.sigs.k8s.io/docs/user/quick-start/               |
-| talos    | talosctl | Talos Linux management CLI       | https://www.talos.dev/latest/introduction/getting-started/    |
+| Provider | Tool     | Purpose                    | Install / Docs                                             |
+| -------- | -------- | -------------------------- | ---------------------------------------------------------- |
+| kind     | kind     | Run Kubernetes in Docker   | https://kind.sigs.k8s.io/docs/user/quick-start/            |
+| talos    | talosctl | Talos Linux management CLI | https://www.talos.dev/latest/introduction/getting-started/ |
 
 Optional (used later): `mongosh`, `pgcli`, `vault` CLI, etc.
 
@@ -542,13 +555,14 @@ rm clusters/clusterinfo-mycluster.txt clusters/kubeconfig-mycluster.config
 
 ## 🛠 Troubleshooting
 
-| Issue                                 | Hint                                                                                     |
-| ------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Script says a prerequisite is missing | Install it & re-run (brew / apt etc.)                                                    |
-| Ports 80/443 already in use           | Likely another kind cluster – new cluster auto-uses random ports; check clusterinfo file |
-| ArgoCD UI not reachable               | Ensure ingress controller pods are Ready; `kubectl get pods -n ingress-nginx`            |
-| Application stuck syncing             | Check ArgoCD `argocd app list` & pod logs in the target namespace                        |
-| Vault unseal problems                 | Re-run unseal using keys in `vault-init.json`                                            |
+| Issue                                 | Hint                                                                                |
+| ------------------------------------- | ----------------------------------------------------------------------------------- |
+| Script says a prerequisite is missing | Install it & re-run (brew / apt etc.)                                               |
+| Ports 80/443 already in use           | Likely another cluster – new cluster auto-uses random ports; check clusterinfo file |
+| ArgoCD UI not reachable               | Ensure ingress controller pods are Ready; `kubectl get pods -n ingress-nginx`       |
+| Talos multi-CP ingress not working    | Check HAProxy proxy container: `docker logs <cluster>-ingress-proxy`                |
+| Application stuck syncing             | Check ArgoCD `argocd app list` & pod logs in the target namespace                   |
+| Vault unseal problems                 | Re-run unseal using keys in `vault-init.json`                                       |
 
 ---
 
