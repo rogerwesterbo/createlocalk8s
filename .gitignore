@@ -1,2 +1,7 @@
 clusters
 !clusters/.gitkeep
+
+bin/*
+
+coverage.out
+coverage.html
