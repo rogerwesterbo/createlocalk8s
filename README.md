@@ -298,9 +298,38 @@ During the prompts you can choose:
 
 -   **Provider** (kind or talos)
 -   **Kubernetes version** (kind only - supports v1.25-v1.34; talos uses latest stable)
+-   **CNI** (Container Network Interface): default, cilium, or calico
+-   **Multus CNI** (optional add-on for multiple network interfaces per pod)
 -   Number of control planes & workers
 -   Whether to install ArgoCD (Helm) immediately
 -   (Nginx ingress is auto-installed for all providers)
+
+### 🌐 CNI (Container Network Interface) Options
+
+Choose your networking layer during cluster creation:
+
+| CNI         | Description                             | Best For                             | Documentation                      |
+| ----------- | --------------------------------------- | ------------------------------------ | ---------------------------------- |
+| **default** | Provider's default CNI                  | Quick testing, simple setups         | -                                  |
+| **cilium**  | eBPF-based, high-performance networking | Observability, security, performance | [docs/cilium.md](./docs/cilium.md) |
+| **calico**  | Policy-driven networking                | Network policies, multi-tenancy      | [docs/calico.md](./docs/calico.md) |
+
+**Multus CNI Add-on** (available after selecting Cilium or Calico):
+
+-   Enables multiple network interfaces per pod
+-   **thin plugin** (recommended): Lightweight, delegates to primary CNI
+-   **thick plugin**: Standalone with built-in IPAM
+-   📚 [Read Multus CNI Guide](./docs/multus-cni.md)
+
+**Example cluster creation with CNI:**
+
+```bash
+./kl.sh create mycluster --provider=talos
+# Prompts will include:
+# Use custom CNI? (default/cilium/calico) (default: default): cilium
+# Install Multus CNI? (yes/no) (default: no): yes
+# Multus plugin type? (thin/thick) (default: thin): thin
+```
 
 📊 **[See detailed cluster creation flow diagram](./docs/cluster-creation-flow.md)**
 

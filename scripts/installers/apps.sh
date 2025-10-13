@@ -541,3 +541,63 @@ function unseal_vault() {
         kubectl exec -i -n vault vault-0 -- vault operator unseal "$i"
     done
 }
+
+function restart_argocd_after_cni() {
+    # Check if ArgoCD is installed
+    if kubectl get namespace argocd >/dev/null 2>&1; then
+        echo -e "$yellow\n🔄 Restarting ArgoCD deployments after CNI installation..."
+        (kubectl rollout restart deployment -n argocd >/dev/null 2>&1 || true) & spinner
+        echo -e "$yellow⏰ Waiting for ArgoCD deployments to be ready..."
+        sleep 5
+        (kubectl rollout status deployment -n argocd --timeout=120s || {
+            echo -e "$yellow ⚠️  ArgoCD deployments may need more time to stabilize"
+        }) & spinner
+        echo -e "$yellow✅ ArgoCD deployments restarted${clear}"
+    fi
+}
+
+function post_cilium_installation() {
+    echo -e "$yellow Post Cilium installation steps"
+    echo -e "$yellow\n⏰ Waiting for Cilium to be ready"
+    sleep 15
+    
+    # Wait for Cilium agent daemonset to be ready (core component)
+    (kubectl rollout status daemonset/cilium -n kube-system --timeout=180s || 
+    { 
+        echo -e "$red 🛑 Cilium is not running, and is not ready to use ..."
+        die
+    }) & spinner
+    
+    # Wait for Cilium operator deployment to be ready
+    (kubectl rollout status deployment/cilium-operator -n kube-system --timeout=60s 2>/dev/null || true) & spinner
+
+    echo -e "$yellow ✅ Cilium is ready to use"
+    echo -e "$yellow Check Cilium status:$blue kubectl -n kube-system exec ds/cilium -- cilium status"
+    echo -e "$yellow Run connectivity test:$blue cilium connectivity test"
+    
+    # Restart ArgoCD if it exists
+    restart_argocd_after_cni
+}
+
+function post_calico_installation() {
+    echo -e "$yellow Post Calico installation steps"
+    echo -e "$yellow\n⏰ Waiting for Calico to be ready"
+    sleep 15
+    
+    # Wait for Calico node daemonset to be ready (core component)
+    (kubectl rollout status daemonset/calico-node -n calico-system --timeout=180s || 
+    { 
+        echo -e "$red 🛑 Calico is not running, and is not ready to use ..."
+        die
+    }) & spinner
+    
+    # Wait for Calico controller deployment to be ready
+    (kubectl rollout status deployment/calico-kube-controllers -n calico-system --timeout=60s 2>/dev/null || true) & spinner
+
+    echo -e "$yellow ✅ Calico is ready to use"
+    echo -e "$yellow Check Calico status:$blue kubectl get pods -n calico-system"
+    echo -e "$yellow Check Calico nodes:$blue kubectl get nodes -o wide"
+    
+    # Restart ArgoCD if it exists
+    restart_argocd_after_cni
+}
