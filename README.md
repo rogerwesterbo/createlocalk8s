@@ -49,23 +49,24 @@ $ ./kl.sh
 ██║  ██╗╚█████╔╝███████║    ███████╗╚██████╔╝╚██████╗██║  ██║███████╗
 ╚═╝  ╚═╝ ╚════╝ ╚══════╝    ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝
 
-         Local Kubernetes Cluster Manager (kind + talos + docker)
+    Local Kubernetes Cluster Manager (kind + talos + docker)
 
 
-General commands:
-  list                            alias: ls      Show all clusters (kind and talos)
-  create [cluster-name]           alias: c       Create a local cluster (choose provider interactively)
-  create [cluster-name] --provider=kind          Create a kind cluster
-  create [cluster-name] --provider=talos         Create a talos cluster
+Cluster Management:
+  list                            alias: ls      Show all clusters (kind & talos)
+  create [cluster-name]           alias: c       Create a local cluster (kind or talos)
   details <cluster-name>          alias: dt      Show details for a cluster
   k8sdetails <cluster-name>       alias: k8s     Show detailed Kubernetes resources info
   kubeconfig <cluster-name>       alias: kc      Get kubeconfig for a cluster by name
   delete <cluster-name>           alias: d       Delete a cluster by name
   help                            alias: h       Print this Help
 
+Provider Options:
+  --provider <kind|talos>                        Specify cluster provider (skips interactive prompt)
+
 Examples:
-  ./kl.sh create mycluster                       Create cluster named 'mycluster' (interactive provider selection)
-  ./kl.sh create mycluster --provider=talos      Create a talos cluster named 'mycluster'
+  ./kl.sh create mycluster                       Create cluster (interactive provider selection)
+  ./kl.sh create mycluster --provider talos      Create talos cluster (skip provider prompt)
   ./kl.sh details mycluster                      Show details for cluster 'mycluster'
   ./kl.sh k8sdetails mycluster                   Show K8s resources for cluster 'mycluster'
   ./kl.sh delete mycluster                       Delete cluster 'mycluster'
@@ -87,12 +88,9 @@ Notes:
   - Components are installed in the order specified
   - Use --dry-run to preview changes before applying
 
-dependencies:
-  - Common: docker, kubectl, jq, base64, helm
-  - kind provider: kind CLI
-  - talos provider: talosctl CLI, yq
+dependencies: docker, kind, kubectl, jq, base64 and helm
 
-Current date and time in Linux Thu Oct  2 10:38:20 CEST 2025
+Current date and time in Linux Mon Oct 13 23:29:08 CEST 2025
 ```
 
 ## ✨ Key Features
