@@ -13,11 +13,27 @@ label_namespace_for_talos() {
     return 1
   fi
   
+  # Detect provider from current context if K8S_PROVIDER is not set
+  local provider="${K8S_PROVIDER:-}"
+  if [ -z "$provider" ]; then
+    # Try to detect from kubectl context
+    local context=$(kubectl config current-context 2>/dev/null)
+    if [[ "$context" == admin@* ]]; then
+      # Talos context format: admin@clustername
+      provider="talos"
+    elif [[ "$context" == kind-* ]]; then
+      # Kind context format: kind-clustername
+      provider="kind"
+    fi
+  fi
+  
   # Check if provider is Talos
-  if [ "$K8S_PROVIDER" = "talos" ]; then
+  if [ "$provider" = "talos" ]; then
     echo -e "${yellow}[Talos] Labeling namespace '$ns' with pod-security.kubernetes.io/enforce=privileged${clear}"
+    # Create namespace if it doesn't exist
+    kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
     kubectl label ns "$ns" pod-security.kubernetes.io/enforce=privileged --overwrite 2>/dev/null || {
-      echo -e "${yellow}[WARN] Could not label namespace $ns (may not exist yet)${clear}" >&2
+      echo -e "${yellow}[WARN] Could not label namespace $ns${clear}" >&2
     }
   fi
 }
@@ -40,6 +56,8 @@ minio|helm|install_helm_minio|MinIO operator
 nfs|helm|install_helm_nfs|NFS external provisioner
 redis-stack|helm|install_helm_redis_stack|Redis Stack server|redis
 nats|helm|install_helm_nats|NATS messaging server
+cilium|helm|install_helm_cilium|Cilium CNI networking and security|kube-system
+calico|helm|install_helm_calico|Calico CNI networking and security|tigera-operator
 EOF
 )"
 

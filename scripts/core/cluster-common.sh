@@ -282,6 +282,9 @@ write_cluster_info_file() {
     local argocd_installed="${8:-no}"
     local argocd_password="${9:-}"
     local cluster_info_file="${10}"
+    local cni="${11:-default}"
+    local multus="${12:-no}"
+    local multus_type="${13:-}"
 
     # Clear or create file
     if [ -e "$cluster_info_file" ] && [ -r "$cluster_info_file" ] && [ -w "$cluster_info_file" ]; then
@@ -294,10 +297,17 @@ Provider: $provider
 Control plane count: $controlplane_count
 Worker count: $worker_count
 Kubernetes version: $k8s_version
+CNI: $cni
 Cluster http port: $http_port
 Cluster https port: $https_port
 Install ArgoCD: $argocd_installed
 EOF
+
+    if [ "$multus" == "yes" ] && [ -n "$multus_type" ]; then
+        cat >> "$cluster_info_file" <<EOF
+Multus CNI: installed ($multus_type plugin)
+EOF
+    fi
 
     if [ "$argocd_installed" == "yes" ] && [ -n "$argocd_password" ]; then
         cat >> "$cluster_info_file" <<EOF

@@ -41,6 +41,7 @@ talos_create_cluster() {
     local worker_count="$5"
     local http_port="$6"
     local https_port="$7"
+    local custom_cni="${8:-default}"
 
     local cluster_dir="$clustersDir/$cluster_name"
     local talos_dir="$cluster_dir/talos"
@@ -54,7 +55,16 @@ talos_create_cluster() {
     # In the docker network created by talosctl, this will be the container name.
     local endpoint_host
     endpoint_host=$(echo "$cluster_name" | tr '[:upper:]' '[:lower:]')-controlplane-1
-    (cd "$talos_dir" && talosctl gen config "$cluster_name" "https://$endpoint_host:6443" --kubernetes-version "$k8s_version" --additional-sans "127.0.0.1" >/dev/null ||
+    
+    # Build talosctl gen config command with optional CNI flags
+    local gen_config_cmd="talosctl gen config \"$cluster_name\" \"https://$endpoint_host:6443\" --kubernetes-version \"$k8s_version\" --additional-sans \"127.0.0.1\""
+    
+    # Add CNI flags if custom CNI is requested
+    if [ "$custom_cni" != "default" ]; then
+        gen_config_cmd="$gen_config_cmd --config-patch '[{\"op\":\"add\",\"path\":\"/cluster/network/cni\",\"value\":{\"name\":\"none\"}},{\"op\":\"add\",\"path\":\"/cluster/proxy\",\"value\":{\"disabled\":true}}]'"
+    fi
+    
+    (cd "$talos_dir" && eval $gen_config_cmd >/dev/null ||
     {
         echo -e "${red} 🛑 Could not generate Talos config${clear}"
         return 1
@@ -114,13 +124,22 @@ talos_create_cluster() {
     # Update context name to match our convention
     kubectl config rename-context "admin@$cluster_name" "admin@$cluster_name" 2>/dev/null || true
 
-    # Wait for nodes to be ready (talosctl should have done this, but double-check)
-    echo -e "${yellow}\n⏰ Verifying cluster nodes are ready${clear}"
-    (kubectl wait --for=condition=Ready nodes --all --timeout=60s ||
-    {
-        echo -e "${red} 🛑 Cluster nodes not ready in time${clear}"
-        return 1
-    }) & spinner
+    # Wait for nodes to be ready (skip if custom CNI as nodes need CNI to be ready)
+    if [ "$custom_cni" == "default" ]; then
+        echo -e "${yellow}\n⏰ Verifying cluster nodes are ready${clear}"
+        (kubectl wait --for=condition=Ready nodes --all --timeout=60s ||
+        {
+            echo -e "${red} 🛑 Cluster nodes not ready in time${clear}"
+            return 1
+        }) & spinner
+    else
+        echo -e "${yellow}\n⏰ Cluster created (nodes will be ready after CNI installation)${clear}"
+        # Just verify API server is reachable
+        kubectl get nodes >/dev/null 2>&1 || {
+            echo -e "${red} 🛑 Cannot communicate with cluster API server${clear}"
+            return 1
+        }
+    fi
 
     echo -e "${yellow} ✅ Talos cluster created successfully${clear}"
     return 0

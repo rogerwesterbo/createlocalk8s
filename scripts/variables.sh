@@ -32,6 +32,7 @@ controlplane_number=1
 install_nginx_controller="yes"
 install_argocd="yes"
 argocd_password=""
+custom_cni="default"
 
 yellow='\033[0;33m'
 clear='\033[0m'

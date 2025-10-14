@@ -49,23 +49,24 @@ $ ./kl.sh
 ██║  ██╗╚█████╔╝███████║    ███████╗╚██████╔╝╚██████╗██║  ██║███████╗
 ╚═╝  ╚═╝ ╚════╝ ╚══════╝    ╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝
 
-         Local Kubernetes Cluster Manager (kind + talos + docker)
+    Local Kubernetes Cluster Manager (kind + talos + docker)
 
 
-General commands:
-  list                            alias: ls      Show all clusters (kind and talos)
-  create [cluster-name]           alias: c       Create a local cluster (choose provider interactively)
-  create [cluster-name] --provider=kind          Create a kind cluster
-  create [cluster-name] --provider=talos         Create a talos cluster
+Cluster Management:
+  list                            alias: ls      Show all clusters (kind & talos)
+  create [cluster-name]           alias: c       Create a local cluster (kind or talos)
   details <cluster-name>          alias: dt      Show details for a cluster
   k8sdetails <cluster-name>       alias: k8s     Show detailed Kubernetes resources info
   kubeconfig <cluster-name>       alias: kc      Get kubeconfig for a cluster by name
   delete <cluster-name>           alias: d       Delete a cluster by name
   help                            alias: h       Print this Help
 
+Provider Options:
+  --provider <kind|talos>                        Specify cluster provider (skips interactive prompt)
+
 Examples:
-  ./kl.sh create mycluster                       Create cluster named 'mycluster' (interactive provider selection)
-  ./kl.sh create mycluster --provider=talos      Create a talos cluster named 'mycluster'
+  ./kl.sh create mycluster                       Create cluster (interactive provider selection)
+  ./kl.sh create mycluster --provider talos      Create talos cluster (skip provider prompt)
   ./kl.sh details mycluster                      Show details for cluster 'mycluster'
   ./kl.sh k8sdetails mycluster                   Show K8s resources for cluster 'mycluster'
   ./kl.sh delete mycluster                       Delete cluster 'mycluster'
@@ -87,12 +88,9 @@ Notes:
   - Components are installed in the order specified
   - Use --dry-run to preview changes before applying
 
-dependencies:
-  - Common: docker, kubectl, jq, base64, helm
-  - kind provider: kind CLI
-  - talos provider: talosctl CLI, yq
+dependencies: docker, kind, kubectl, jq, base64 and helm
 
-Current date and time in Linux Thu Oct  2 10:38:20 CEST 2025
+Current date and time in Linux Mon Oct 13 23:29:08 CEST 2025
 ```
 
 ## ✨ Key Features
@@ -298,9 +296,38 @@ During the prompts you can choose:
 
 -   **Provider** (kind or talos)
 -   **Kubernetes version** (kind only - supports v1.25-v1.34; talos uses latest stable)
+-   **CNI** (Container Network Interface): default, cilium, or calico
+-   **Multus CNI** (optional add-on for multiple network interfaces per pod)
 -   Number of control planes & workers
 -   Whether to install ArgoCD (Helm) immediately
 -   (Nginx ingress is auto-installed for all providers)
+
+### 🌐 CNI (Container Network Interface) Options
+
+Choose your networking layer during cluster creation:
+
+| CNI         | Description                             | Best For                             | Documentation                      |
+| ----------- | --------------------------------------- | ------------------------------------ | ---------------------------------- |
+| **default** | Provider's default CNI                  | Quick testing, simple setups         | -                                  |
+| **cilium**  | eBPF-based, high-performance networking | Observability, security, performance | [docs/cilium.md](./docs/cilium.md) |
+| **calico**  | Policy-driven networking                | Network policies, multi-tenancy      | [docs/calico.md](./docs/calico.md) |
+
+**Multus CNI Add-on** (available after selecting Cilium or Calico):
+
+-   Enables multiple network interfaces per pod
+-   **thin plugin** (recommended): Lightweight, delegates to primary CNI
+-   **thick plugin**: Standalone with built-in IPAM
+-   📚 [Read Multus CNI Guide](./docs/multus-cni.md)
+
+**Example cluster creation with CNI:**
+
+```bash
+./kl.sh create mycluster --provider=talos
+# Prompts will include:
+# Use custom CNI? (default/cilium/calico) (default: default): cilium
+# Install Multus CNI? (yes/no) (default: no): yes
+# Multus plugin type? (thin/thick) (default: thin): thin
+```
 
 📊 **[See detailed cluster creation flow diagram](./docs/cluster-creation-flow.md)**
 

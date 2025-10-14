@@ -32,6 +32,7 @@ kind_create_cluster() {
     local worker_count="$5"
     local http_port="$6"
     local https_port="$7"
+    local custom_cni="${8:-default}"
 
     echo -e "${yellow}\n⏰ Creating Kind cluster${clear}"
 
@@ -48,12 +49,21 @@ kind_create_cluster() {
         return 1
     }
 
-    # Verify cluster is ready
-    echo -e "${yellow}\n⏰ Waiting for cluster to be ready...${clear}"
-    kubectl wait --for=condition=Ready nodes --all --timeout=60s || {
-        echo -e "${red} 🛑 Cluster nodes not ready in time${clear}"
-        return 1
-    }
+    # Verify cluster is ready (skip if custom CNI as nodes need CNI to be ready)
+    if [ "$custom_cni" == "default" ]; then
+        echo -e "${yellow}\n⏰ Waiting for cluster nodes to be ready...${clear}"
+        kubectl wait --for=condition=Ready nodes --all --timeout=60s || {
+            echo -e "${red} 🛑 Cluster nodes not ready in time${clear}"
+            return 1
+        }
+    else
+        echo -e "${yellow}\n⏰ Cluster created (nodes will be ready after CNI installation)${clear}"
+        # Just verify API server is reachable
+        kubectl get nodes >/dev/null 2>&1 || {
+            echo -e "${red} 🛑 Cannot communicate with cluster API server${clear}"
+            return 1
+        }
+    fi
 
     return 0
 }
@@ -175,6 +185,7 @@ kind_generate_config() {
     local worker_count="$5"
     local http_port="$6"
     local https_port="$7"
+    local custom_cni="${8:-default}"
 
     # Clear or create config file
     if [ -e "$config_file" ] && [ -r "$config_file" ] && [ -w "$config_file" ]; then
@@ -189,8 +200,14 @@ kind_generate_config() {
     echo "kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 networking:
-  ipFamily: dual
-nodes:" >> "$config_file"
+  ipFamily: dual" >> "$config_file"
+
+    # Add disableDefaultCNI if custom CNI is requested
+    if [ "$custom_cni" != "default" ]; then
+        echo "  disableDefaultCNI: true" >> "$config_file"
+    fi
+
+    echo "nodes:" >> "$config_file"
 
     # Add control plane nodes
     for i in $(seq 1 "$controlplane_count"); do
