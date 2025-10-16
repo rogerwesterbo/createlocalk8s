@@ -334,3 +334,180 @@ function install_helm_nats(){
     echo -e "$yellow To publish test message:$blue kubectl -n nats exec -it deploy/nats-box -- nats pub test hi"
     echo -e "$yellow To subscribe:$blue kubectl -n nats exec -it deploy/nats-box -- nats sub test"
 }
+
+function install_helm_cilium(){
+    local cluster_name="${1:-}"
+    local provider="${2:-}"
+    
+    echo -e "$yellow Installing Cilium CNI"
+    
+    # Detect provider if not provided
+    if [ -z "$provider" ] && [ -n "$cluster_name" ]; then
+        provider=$(get_cluster_provider "$cluster_name")
+    fi
+    
+    # Label namespace for Talos if needed (must be done before helm install)
+    source "$PWD/scripts/installers/registry.sh"
+    label_namespace_for_talos "kube-system"
+    
+    # Set provider-specific parameters
+    local k8s_service_host=""
+    local k8s_service_port=""
+    local extra_cilium_params=()
+    
+    if [ "$provider" == "talos" ]; then
+        # Talos-specific configuration (Docker-based)
+        k8s_service_host="localhost"
+        k8s_service_port="7445"
+        extra_cilium_params=(
+            --set "securityContext.capabilities.ciliumAgent={CHOWN,KILL,NET_ADMIN,NET_RAW,IPC_LOCK,SYS_ADMIN,SYS_RESOURCE,DAC_OVERRIDE,FOWNER,SETGID,SETUID}"
+            --set "securityContext.capabilities.cleanCiliumState={NET_ADMIN,SYS_ADMIN,SYS_RESOURCE}"
+            --set "cgroup.autoMount.enabled=false"
+            --set "cgroup.hostRoot=/sys/fs/cgroup"
+            --set "bpf.hostLegacyRouting=true"
+            --set "image.pullPolicy=IfNotPresent"
+            --set "k8sServiceHost=$k8s_service_host"
+            --set "k8sServicePort=$k8s_service_port"
+        )
+    elif [ "$provider" == "kind" ]; then
+        # Kind-specific configuration (Docker-based)
+        # For Kind, use default in-cluster API server discovery (don't set k8sServiceHost/Port)
+        extra_cilium_params=(
+            --set "image.pullPolicy=IfNotPresent"
+        )
+    fi
+    
+    helm repo add cilium https://helm.cilium.io/
+    (helm upgrade --install cilium cilium/cilium \
+        --namespace kube-system \
+        --set operator.replicas=1 \
+        --set ipam.mode=kubernetes \
+        --set kubeProxyReplacement=true \
+        --set "tolerations[0].operator=Exists" \
+        --set "operator.tolerations[0].operator=Exists" \
+        "${extra_cilium_params[@]}" || { 
+        echo -e "$red 🛑 Could not install Cilium into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Cilium to be ready"
+    sleep 15
+    
+    # Wait for Cilium agent daemonset to be ready (core component)
+    (kubectl rollout status daemonset/cilium -n kube-system --timeout=180s || { 
+        echo -e "$red 🛑 Cilium agent daemonset not ready ..."; 
+        die 
+    }) & spinner
+    
+    # Wait for Cilium operator deployment to be ready
+    (kubectl rollout status deployment/cilium-operator -n kube-system --timeout=60s 2>/dev/null || true) & spinner
+
+    echo -e "$yellow ✅ Done installing Cilium"
+    echo -e "$yellow Check Cilium status:$blue kubectl -n kube-system exec ds/cilium -- cilium status"
+    echo -e "$yellow Run connectivity test:$blue cilium connectivity test"
+}
+
+function install_helm_calico(){
+    local cluster_name="${1:-}"
+    local provider="${2:-}"
+    
+    echo -e "$yellow Installing Calico CNI"
+    
+    # Detect provider if not provided
+    if [ -z "$provider" ] && [ -n "$cluster_name" ]; then
+        provider=$(get_cluster_provider "$cluster_name")
+    fi
+    
+    # Label namespace for Talos if needed (must be done before helm install)
+    source "$PWD/scripts/installers/registry.sh"
+    label_namespace_for_talos "tigera-operator"
+    
+    # Set provider-specific parameters
+    local extra_calico_params=()
+    
+    if [ "$provider" == "talos" ]; then
+        # Talos-specific configuration
+        extra_calico_params=(
+            --set "installation.cni.type=Calico"
+        )
+    fi
+    
+    helm repo add projectcalico https://docs.tigera.io/calico/charts
+    (helm upgrade --install calico projectcalico/tigera-operator \
+        --namespace tigera-operator \
+        --create-namespace \
+        --set installation.kubernetesProvider="" \
+        "${extra_calico_params[@]}" || { 
+        echo -e "$red 🛑 Could not install Calico into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Calico to be ready"
+    sleep 15
+    
+    # Wait for Calico node daemonset to be ready (core component)
+    (kubectl rollout status daemonset/calico-node -n calico-system --timeout=180s || { 
+        echo -e "$red 🛑 Calico node daemonset not ready ..."; 
+        die 
+    }) & spinner
+    
+    # Wait for Calico controller deployment to be ready
+    (kubectl rollout status deployment/calico-kube-controllers -n calico-system --timeout=60s 2>/dev/null || true) & spinner
+
+    echo -e "$yellow ✅ Done installing Calico"
+    echo -e "$yellow Check Calico status:$blue kubectl get pods -n calico-system"
+    echo -e "$yellow Check Calico nodes:$blue kubectl get nodes -o wide"
+}
+
+function install_multus_cni(){
+    local multus_type="${1:-thin}"  # thin or thick
+    
+    echo -e "$yellow Installing Multus CNI ($multus_type plugin)"
+    echo -e "$yellow"
+    echo -e "$yellow 📝 Multus plugin types:"
+    echo -e "$yellow   • thin:  Lightweight shim that delegates to your primary CNI (Cilium/Calico)"
+    echo -e "$yellow            Best for most use cases, minimal overhead, depends on main CNI"
+    echo -e "$yellow   • thick: Standalone binary with built-in IPAM and network configuration"
+    echo -e "$yellow            Independent of main CNI, can manage networks directly"
+    echo -e "$clear"
+    
+    # Set manifest URL based on type
+    local multus_manifest_url=""
+    if [ "$multus_type" == "thick" ]; then
+        multus_manifest_url="https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset-thick.yml"
+        echo -e "$yellow Using thick plugin (standalone with full features)"
+    else
+        multus_manifest_url="https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/master/deployments/multus-daemonset.yml"
+        echo -e "$yellow Using thin plugin (delegates to main CNI, recommended)"
+    fi
+    
+    echo -e "$yellow Applying Multus manifest from: $multus_manifest_url"
+    (kubectl apply -f "$multus_manifest_url" || { 
+        echo -e "$red 🛑 Could not install Multus CNI into cluster ..."; 
+        echo -e "$red Manifest URL: $multus_manifest_url";
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Multus CNI to be ready"
+    sleep 10
+    
+    # Wait for Multus daemonset to be ready
+    (kubectl rollout status daemonset/kube-multus-ds -n kube-system --timeout=120s || { 
+        echo -e "$red 🛑 Multus CNI daemonset not ready ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Multus CNI"
+    echo -e "$yellow"
+    echo -e "$yellow 📚 Multus allows attaching multiple network interfaces to pods"
+    echo -e "$yellow    Use cases: SR-IOV, macvlan, bridge networks, network segmentation"
+    echo -e "$yellow"
+    echo -e "$yellow 📖 Next steps:"
+    echo -e "$yellow    1. Create NetworkAttachmentDefinition CRDs to define additional networks"
+    echo -e "$yellow    2. Annotate pods with: k8s.v1.cni.cncf.io/networks=<net-attach-def-name>"
+    echo -e "$yellow"
+    echo -e "$yellow 🔍 Check status:$blue"
+    echo -e "$blue    kubectl get network-attachment-definitions -A"
+    echo -e "$blue    kubectl get pods -n kube-system -l app=multus"
+    echo -e "$clear"
+}

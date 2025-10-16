@@ -496,6 +496,64 @@ function get_cluster_parameter() {
         echo -e "$clear"
     fi
 
+    # Ask about CNI
+    custom_cni="default"
+    install_multus="no"
+    multus_type="thin"
+    
+    echo -e "$yellow Available CNI (Container Network Interface) options:$clear"
+    read -p "Use custom CNI? (default/cilium/calico) (default: default): " cni_choice
+    if [ "$cni_choice" == "cilium" ]; then
+        custom_cni="cilium"
+        echo -e "$yellow ✅ Will disable default CNI and allow Cilium installation"
+        echo -e "$clear"
+    elif [ "$cni_choice" == "calico" ]; then
+        custom_cni="calico"
+        echo -e "$yellow ✅ Will disable default CNI and allow Calico installation"
+        echo -e "$clear"
+    else
+        custom_cni="default"
+        echo -e "$yellow ✅ Using default CNI"
+        echo -e "$clear"
+    fi
+
+    # Ask about Multus CNI (only if Cilium or Calico is selected)
+    if [ "$custom_cni" == "cilium" ] || [ "$custom_cni" == "calico" ]; then
+        echo -e "$yellow"
+        echo -e "$yellow 📡 Multus CNI - Multiple Network Interfaces for Pods$clear"
+        echo -e "$yellow    Enables pods to have multiple network interfaces (SR-IOV, macvlan, bridge, etc.)$clear"
+        echo -e "$yellow    Useful for: Network segmentation, high-performance networking, legacy apps$clear"
+        echo -e "$clear"
+        read -p "Install Multus CNI? (yes/no) (default: no): " multus_choice
+        if [ "$multus_choice" == "yes" ]; then
+            install_multus="yes"
+            echo -e "$yellow"
+            echo -e "$yellow Choose Multus plugin type:$clear"
+            echo -e "$yellow   📌 thin  (recommended): Lightweight shim, delegates to $custom_cni$clear"
+            echo -e "$yellow      • Low overhead, simple configuration$clear"
+            echo -e "$yellow      • Depends on primary CNI for pod networking$clear"
+            echo -e "$yellow      • Best for most use cases$clear"
+            echo -e "$yellow"
+            echo -e "$yellow   📌 thick: Standalone binary with built-in IPAM$clear"
+            echo -e "$yellow      • Independent network management$clear"
+            echo -e "$yellow      • Can manage networks without primary CNI$clear"
+            echo -e "$yellow      • More complex, use for advanced scenarios$clear"
+            echo -e "$clear"
+            read -p "Multus plugin type? (thin/thick) (default: thin): " multus_type_choice
+            if [ "$multus_type_choice" == "thick" ]; then
+                multus_type="thick"
+                echo -e "$yellow ✅ Will install Multus CNI with thick plugin (standalone)"
+            else
+                multus_type="thin"
+                echo -e "$yellow ✅ Will install Multus CNI with thin plugin (delegates to $custom_cni)"
+            fi
+            echo -e "$clear"
+        else
+            echo -e "$yellow ℹ️  Multus CNI will NOT be installed"
+            echo -e "$clear"
+        fi
+    fi
+
     # Determine ports
     read -p "Determine cluster ports (http_port https_port)" ports <<< $(determine_cluster_ports "$provider")
     controlplane_port_http=$(echo $ports | awk '{print $1}')
@@ -513,7 +571,7 @@ function get_cluster_parameter() {
 
         kind_generate_config "$cluster_name" "$kind_config_file" "$kindk8simage" \
             "$controlplane_number" "$worker_number" \
-            "$controlplane_port_http" "$controlplane_port_https"
+            "$controlplane_port_http" "$controlplane_port_https" "$custom_cni"
 
         config_file="$kind_config_file"
     elif [ "$provider" == "talos" ]; then
@@ -545,6 +603,14 @@ function get_cluster_parameter() {
 
     echo -en "$yellow\nInstall ArgoCD with Helm?:"
     echo -en "$blue $install_argocd"
+
+    echo -en "$yellow\nCNI:"
+    echo -en "$blue $custom_cni"
+
+    if [ "$install_multus" == "yes" ]; then
+        echo -en "$yellow\nMultus CNI:"
+        echo -en "$blue yes ($multus_type plugin)"
+    fi
 
     echo -en "$yellow\nCluster http port:"
     echo -en "$blue $first_controlplane_port_http"
@@ -586,7 +652,7 @@ function create_cluster() {
     call_provider_function "$provider" "create_cluster" \
         "$cluster_name" "$config_file" "$kindk8sversion" \
         "$controlplane_number" "$worker_number" \
-        "$first_controlplane_port_http" "$first_controlplane_port_https" || {
+        "$first_controlplane_port_http" "$first_controlplane_port_https" "$custom_cni" || {
         echo -e "${red} 🛑 Cluster creation failed${clear}"
         die
     }
@@ -597,11 +663,27 @@ function create_cluster() {
     # Ensure kubectl is using the correct context
     switch_to_cluster_context "$context"
 
+    # Install CNI first if custom CNI is selected (nodes need to be ready before other components)
+    if [ "$custom_cni" != "default" ]; then
+        echo -e "${yellow}\n📦 Installing $custom_cni CNI via Helm (making nodes ready first)...${clear}"
+        if [ "$custom_cni" == "cilium" ]; then
+            install_helm_cilium "$cluster_name" "$provider"
+        elif [ "$custom_cni" == "calico" ]; then
+            install_helm_calico "$cluster_name" "$provider"
+        fi
+        
+        # Install Multus CNI if requested (after primary CNI is ready)
+        if [ "$install_multus" == "yes" ]; then
+            echo -e "${yellow}\n📦 Installing Multus CNI ($multus_type plugin)...${clear}"
+            install_multus_cni "$multus_type"
+        fi
+    fi
+
     # Setup ingress (provider-specific)
     call_provider_function "$provider" "setup_ingress" "$cluster_name" \
         "$first_controlplane_port_http" "$first_controlplane_port_https"
 
-    # Install ArgoCD if requested (provider-agnostic)
+    # Install ArgoCD after CNI (provider-agnostic)
     local argocd_password=""
     if [ "$install_argocd" == "yes" ]; then
         install_argocd_generic "$cluster_name"
