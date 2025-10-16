@@ -1,10 +1,76 @@
 package cobra
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"text/tabwriter"
 
 	"github.com/spf13/cobra"
 )
+
+type ClusterInfo struct {
+	Name     string
+	Provider string
+}
+
+func listClusters() ([]ClusterInfo, error) {
+	var clusters []ClusterInfo
+	clusterNames := make(map[string]bool)
+
+	// Get Kind clusters
+	cmd := exec.Command("kind", "get", "clusters")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err == nil {
+		scanner := bufio.NewScanner(&out)
+		for scanner.Scan() {
+			clusterName := scanner.Text()
+			if !clusterNames[clusterName] {
+				clusters = append(clusters, ClusterInfo{Name: clusterName, Provider: "kind"})
+				clusterNames[clusterName] = true
+			}
+		}
+	}
+
+	// Get Talos clusters (and others) from the clusters directory
+	const clustersDir = "clusters"
+	files, err := os.ReadDir(clustersDir)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("reading clusters directory: %w", err)
+		}
+		// if clusters dir does not exist, just return kind clusters
+		return clusters, nil
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			clusterName := file.Name()
+			// Sanitize clusterName to prevent path traversal
+			cleanClusterName := filepath.Clean(clusterName)
+			if cleanClusterName != clusterName || strings.Contains(cleanClusterName, "..") {
+				continue // Skip potentially malicious directory names
+			}
+			if !clusterNames[cleanClusterName] {
+				provider := "unknown"
+				providerFile := filepath.Join(clustersDir, cleanClusterName, "provider.txt")
+				if providerBytes, err := os.ReadFile(providerFile); err == nil {
+					provider = strings.TrimSpace(string(providerBytes))
+				}
+				clusters = append(clusters, ClusterInfo{Name: cleanClusterName, Provider: provider})
+				clusterNames[cleanClusterName] = true
+			}
+		}
+	}
+
+	return clusters, nil
+}
 
 var clusterCmd = &cobra.Command{
 	Use:   "cluster",
@@ -15,9 +81,23 @@ var clusterListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all local clusters",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Listing clusters...")
-		// TODO: implement cluster listing
-		fmt.Println("No clusters found")
+		clusters, err := listClusters()
+		if err != nil {
+			fmt.Printf("Error listing clusters: %v\n", err)
+			return
+		}
+
+		if len(clusters) == 0 {
+			fmt.Println("No clusters found.")
+			return
+		}
+
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+		_, _ = fmt.Fprintln(w, "NAME\tPROVIDER")
+		for _, cluster := range clusters {
+			_, _ = fmt.Fprintf(w, "%s\t%s\n", cluster.Name, cluster.Provider)
+		}
+		_ = w.Flush()
 	},
 }
 
