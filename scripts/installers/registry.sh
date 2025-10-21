@@ -56,6 +56,7 @@ minio|helm|install_helm_minio|MinIO operator
 nfs|helm|install_helm_nfs|NFS external provisioner
 redis-stack|helm|install_helm_redis_stack|Redis Stack server|redis
 nats|helm|install_helm_nats|NATS messaging server
+kite|helm|install_helm_kite|Kite Kubernetes dashboard
 cilium|helm|install_helm_cilium|Cilium CNI networking and security|kube-system
 calico|helm|install_helm_calico|Calico CNI networking and security|tigera-operator
 EOF
@@ -83,6 +84,7 @@ minio|app|install_minio_application|MinIO operator
 nfs|app|install_nfs_application|NFS external provisioner
 redis-stack|app|install_redis_stack_application|Redis Stack server|redis
 nats|app|install_nats_application|NATS messaging server
+kite|app|install_kite_application|Kite Kubernetes dashboard
 EOF
 )"
 

@@ -29,6 +29,7 @@ This repo can install a curated set of platform + demo components using either H
 | Crossplane                      | Infra Abstraction     | Compose infra APIs / claim external services   | Exploring platform engineering patterns | `ihcr`               | `iacr`                 |
 | Kube-Prometheus-Stack           | Observability         | Prometheus + Alertmanager + Grafana            | Metrics / dashboards & alerting basics  | —                    | `iap`                  |
 | Kubeview                        | Cluster Visualization | UI to explore resources graphically            | Visualizing relationships               | —                    | `iakv`                 |
+| Kite Kubernetes Dashboard       | Cluster Visualization | Lightweight dashboard for cluster insights     | Quick inspection of workloads and logs  | `ihkite`             | `iakite`               |
 | OpenCost                        | Cost Analysis         | Estimation of per‑resource cost                | Understanding resource cost attribution | —                    | `iaoc`                 |
 | Nyancat App                     | Demo                  | Simple sample workload via ingress             | Smoke testing ingress + ArgoCD          | —                    | `iac`                  |
 | Vault (Unseal Automation)       | Bootstrap             | Auto init/unseal & output keys                 | Rapid experimentation                   | (within `ihv`)       | (within `iav`)         |
@@ -139,6 +140,13 @@ This repo can install a curated set of platform + demo components using either H
 **Kubeview**
 
 -   Visual representation of cluster objects; lowers barrier for newcomers to navigate relationships.
+
+**Kite Kubernetes Dashboard**
+
+-   Single-page dashboard for searching namespaces, pods, logs, and events with keyboard-driven navigation.
+-   Ideal when you want a fast, zero-config UI without exposing an ingress.
+-   Access via port-forward: `kubectl -n kite port-forward svc/kite 8080:8080`, then open `http://localhost:8080`.
+-   Stays on HTTP intentionally to avoid secure-context browser issues when served from wildcard hosts.
 
 **OpenCost**
 
