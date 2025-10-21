@@ -25,6 +25,49 @@ function is_running_more_than_one_cluster() {
     fi
 }
 
+function get_current_cluster_http_port() {
+    if [ -n "${cluster_http_port_cached:-}" ]; then
+        echo "$cluster_http_port_cached"
+        return
+    fi
+
+    local info_file="${cluster_info_file:-}"
+
+    if [ -z "$info_file" ] || [ ! -f "$info_file" ]; then
+        if command -v kubectl >/dev/null 2>&1; then
+            local context cluster_name
+            context=$(kubectl config current-context 2>/dev/null || true)
+            if [[ "$context" == kind-* ]]; then
+                cluster_name="${context#kind-}"
+            elif [[ "$context" == admin@* ]]; then
+                cluster_name="${context#admin@}"
+            fi
+
+            if [ -n "$cluster_name" ] && [ -n "${clustersDir:-}" ]; then
+                local candidate="$clustersDir/$cluster_name/clusterinfo.txt"
+                if [ -f "$candidate" ]; then
+                    info_file="$candidate"
+                    if [ -z "${cluster_info_file:-}" ]; then
+                        cluster_info_file="$candidate"
+                    fi
+                fi
+            fi
+        fi
+    fi
+
+    local port=""
+    if [ -n "$info_file" ] && [ -f "$info_file" ]; then
+        port=$(grep -m1 "Cluster http port" "$info_file" | awk -F': *' '{print $2}' | tr -d '[:space:]')
+    fi
+
+    if [ -z "$port" ]; then
+        port="80"
+    fi
+
+    cluster_http_port_cached="$port"
+    echo "$port"
+}
+
 function install_minio_application() {
     echo -e "$yellow Installing Minio ArgoCD application "
     (kubectl apply -f $minio_app_yaml|| 
@@ -161,11 +204,17 @@ function install_nyancat_application(){
     echo "Nyancat argocd application installed: yes" >> $cluster_info_file
 
     echo -e "$yellow To access the Nyancat application:"
+    local http_port
+    http_port=$(get_current_cluster_http_port)
     if [[ $(is_running_more_than_one_cluster) == "yes" ]]; then
-        echo -e "$yellow Open the following URL in your browser:$blue http://nyancat.localtest.me:<cluster http port>"
-        echo -e "$yellow Find the cluster http port in file: $cluster_info_file)"
+        echo -e "$yellow Open the following URL in your browser:$blue http://nyancat.localtest.me:$http_port"
+    elif [ "$http_port" != "80" ]; then
+        echo -e "$yellow Open the following URL in your browser:$blue http://nyancat.localtest.me:$http_port"
     else
         echo -e "$yellow Open the following URL in your browser:$blue http://nyancat.localtest.me"
+    fi
+    if [ -n "${cluster_info_file:-}" ]; then
+        echo -e "$yellow Cluster details: $cluster_info_file"
     fi
 }
 
@@ -234,6 +283,25 @@ function install_metallb_application() {
 
     echo -e "$yellow ✅ Done installing Metallb ArgoCD application"
     echo "Metallb application installed: yes" >> $cluster_info_file
+}
+
+function install_kite_application() {
+    echo -e "$yellow Installing Kite ArgoCD application"
+    (kubectl apply -f $kite_app_yaml|| 
+    { 
+        echo -e "$red 🛑 Could not install Kite ArgoCD application into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Kite ArgoCD application"
+    echo "Kite application installed: yes" >> $cluster_info_file
+
+    echo -e "$yellow To access the Kite dashboard:"
+    echo -e "$yellow Run:$blue kubectl -n kite port-forward svc/kite 8080:8080"
+    echo -e "$yellow Then open your browser at:$blue http://localhost:8080"
+    if [ -n "${cluster_info_file:-}" ]; then
+        echo -e "$yellow Cluster details: $cluster_info_file"
+    fi
 }
 
 function install_trivy_application() {

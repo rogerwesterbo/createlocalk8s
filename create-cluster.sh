@@ -43,6 +43,7 @@ minio_app_yaml=$(get_abs_filename "$manifestDir/minio-app.yaml")
 nfs_app_yaml=$(get_abs_filename "$manifestDir/nfs-app.yaml")
 redis_stack_app_yaml=$(get_abs_filename "$manifestDir/redis-stack-app.yaml")
 nats_app_yaml=$(get_abs_filename "$manifestDir/nats-app.yaml")
+kite_app_yaml=$(get_abs_filename "$manifestDir/kite-app.yaml")
 nats_ingress_yaml=$(get_abs_filename "$configs_dir/nats-ingress.yaml")
 nats_gateway_yaml=$(get_abs_filename "$configs_dir/nats-gateway.yaml")
 

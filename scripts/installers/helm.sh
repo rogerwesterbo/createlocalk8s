@@ -315,6 +315,20 @@ function install_helm_nginx_controller(){
     echo -e "$yellow ✅ Done installing Nginx Controller"
 }
 
+function install_helm_kite(){
+    local post_msg="\nPort forward: kubectl -n kite port-forward svc/kite 8080:8080\nOpen: http://localhost:8080\n"
+
+    helm_install_generic \
+        "kite" \
+        "kite" \
+        "https://zxh326.github.io/kite" \
+        "kite" \
+        "kite" \
+        "" \
+        "kubectl wait pods --for=condition=Ready --all -n kite --timeout=180s" \
+        "$post_msg"
+}
+
 function install_helm_nats(){
     echo -e "$yellow Installing NATS"
     helm repo add nats https://nats-io.github.io/k8s/helm/charts/
