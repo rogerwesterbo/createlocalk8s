@@ -27,7 +27,8 @@ This repo can install a curated set of platform + demo components using either H
 | Redis Stack                     | Cache / Data          | Redis + modules (JSON, Search, etc.)           | Caching patterns, pub/sub, JSON docs    | `ihrs`               | `iars`                 |
 | NATS                            | Messaging / Streaming | Lightweight high-speed pub/sub + JetStream     | Event-driven prototypes, decoupling     | `ihnats`             | `ianats`               |
 | Crossplane                      | Infra Abstraction     | Compose infra APIs / claim external services   | Exploring platform engineering patterns | `ihcr`               | `iacr`                 |
-| Kube-Prometheus-Stack           | Observability         | Prometheus + Alertmanager + Grafana            | Metrics / dashboards & alerting basics  | —                    | `iap`                  |
+| Kube-Prometheus-Stack           | Observability         | Prometheus + Alertmanager + Grafana            | Metrics / dashboards & alerting basics  | `ihp`                | `iap`                  |
+| Metrics Server                  | Observability         | Resource metrics API for kubectl top & HPA     | Testing autoscaling & resource metrics  | `ihms`               | `iams`                 |
 | Kubeview                        | Cluster Visualization | UI to explore resources graphically            | Visualizing relationships               | —                    | `iakv`                 |
 | Kite Kubernetes Dashboard       | Cluster Visualization | Lightweight dashboard for cluster insights     | Quick inspection of workloads and logs  | `ihkite`             | `iakite`               |
 | OpenCost                        | Cost Analysis         | Estimation of per‑resource cost                | Understanding resource cost attribution | —                    | `iaoc`                 |
@@ -136,6 +137,13 @@ This repo can install a curated set of platform + demo components using either H
 
 -   Bundles Prometheus, Alertmanager, Grafana, node exporters, etc.
 -   Local benefit: learn scraping, PromQL, dashboard import, alert rule structures.
+
+**Metrics Server**
+
+-   Provides the Kubernetes Metrics API for resource usage metrics (CPU, memory).
+-   Essential for `kubectl top nodes/pods` commands and Horizontal Pod Autoscalers (HPA).
+-   Locally: test HPA behavior, monitor resource consumption, understand metrics pipelines.
+-   Configured with `--kubelet-insecure-tls` for local development (not for production).
 
 **Kubeview**
 

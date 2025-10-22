@@ -514,6 +514,29 @@ function install_nats_application() {
     echo -e "  https://docs.nats.io/using-nats/nats-tools/nats_cli"
 }
 
+function install_metrics_server_application() {
+    echo -e "$yellow Installing Metrics Server ArgoCD application"
+    (kubectl apply -f $metrics_server_app_yaml|| { 
+        echo -e "$red 🛑 Could not install Metrics Server ArgoCD application into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Metrics Server ArgoCD application"
+
+    echo -e "$yellow\n⏰ Waiting for Metrics Server to be ready"
+    sleep 10
+    (kubectl wait deployment -n kube-system metrics-server --for condition=Available=True --timeout=120s || { 
+        echo -e "$red 🛑 Metrics Server is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo "Metrics Server application installed: yes" >> $cluster_info_file
+
+    echo -e "$yellow Metrics Server is ready to use"
+    echo -e "$yellow Verify metrics are available:$blue kubectl top nodes"
+    echo -e "$yellow Check pod metrics:$blue kubectl top pods -A"
+}
+
 function post_pgadmin_install() {
     echo -e "$yellow\n⏰ Waiting for PgAdmin4 to be running"
     sleep 10

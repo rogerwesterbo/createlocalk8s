@@ -108,8 +108,8 @@ Current date and time in Linux Mon Oct 13 23:29:08 CEST 2025
 -   Post-create helper to install a sample Nyancat app (demo ingress + ArgoCD)
 -   Rich subcommands to list, inspect, delete clusters & fetch kubeconfig
 -   **Registry-based installers**: List and install Helm/ArgoCD components with simple commands
--   19 Helm installers: ArgoCD, Crossplane, Rook Ceph, Falco, Trivy, Vault, MetalLB, MinIO, NFS, MongoDB Operator, CNPG, PgAdmin, Redis Stack, NATS, cert-manager, kube-prometheus-stack, kubeview, nginx-ingress, OpenCost
--   22 ArgoCD Application installers (GitOps style): monitoring (Prometheus), databases, security, storage, cost monitoring, etc.
+-   20 Helm installers: ArgoCD, Crossplane, Rook Ceph, Falco, Trivy, Vault, MetalLB, MinIO, NFS, MongoDB Operator, CNPG, PgAdmin, Redis Stack, NATS, Metrics Server, Prometheus, cert-manager, kubeview, nginx-ingress, OpenCost
+-   23 ArgoCD Application installers (GitOps style): monitoring (Prometheus), metrics (Metrics Server), databases, security, storage, cost monitoring, etc.
 -   **Dry-run mode**: Preview what will be installed with `--dry-run`
 -   Generates per-cluster info + kubeconfig files under `clusters/<cluster-name>/`
 -   Consistent colored output & spinners, with readiness waits for core components
@@ -432,7 +432,7 @@ See full cluster details (cluster info + kind config used):
 ./kl.sh install apps prometheus,mongodb --dry-run
 ```
 
-**Available Helm components** (19):
+**Available Helm components** (20):
 
 -   `argocd` - ArgoCD GitOps controller
 -   `cert-manager` - Certificate management
@@ -443,6 +443,7 @@ See full cluster details (cluster info + kind config used):
 -   `kube-prometheus-stack` - Prometheus monitoring
 -   `kubeview` - Cluster visualizer
 -   `metallb` - Load balancer
+-   `metrics-server` - Metrics Server for resource metrics
 -   `minio` - S3-compatible storage
 -   `mongodb-operator` - MongoDB operator
 -   `nats` - NATS messaging
@@ -450,11 +451,12 @@ See full cluster details (cluster info + kind config used):
 -   `nginx-ingress` - NGINX ingress controller
 -   `opencost` - Cost monitoring
 -   `pgadmin` - PostgreSQL admin UI
+-   `prometheus` - Kube Prometheus Stack (Helm)
 -   `redis-stack` - Redis Stack server
 -   `rook-ceph-operator` - Rook Ceph operator
 -   `trivy` - Security scanner
 
-**Available ArgoCD apps** (22):
+**Available ArgoCD apps** (23):
 
 -   `nyancat` - Sample demo app
 -   `prometheus` - Kube Prometheus Stack
@@ -465,6 +467,7 @@ See full cluster details (cluster info + kind config used):
 -   `hashicorp-vault` - Vault app
 -   `kubeview` - KubeView app
 -   `metallb` - MetalLB app
+-   `metrics-server` - Metrics Server app
 -   `minio` - MinIO app
 -   `mongodb` - MongoDB instance
 -   `mongodb-operator` - MongoDB operator app

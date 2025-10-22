@@ -349,6 +349,62 @@ function install_helm_nats(){
     echo -e "$yellow To subscribe:$blue kubectl -n nats exec -it deploy/nats-box -- nats sub test"
 }
 
+function install_helm_metrics_server(){
+    echo -e "$yellow Installing Metrics Server"
+    helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+    (helm upgrade --install metrics-server metrics-server/metrics-server \
+        --namespace kube-system \
+        --set args[0]="--kubelet-insecure-tls" \
+        --set args[1]="--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname" || { 
+        echo -e "$red 🛑 Could not install Metrics Server into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Metrics Server to be ready"
+    sleep 10
+    (kubectl wait deployment -n kube-system metrics-server --for condition=Available=True --timeout=120s || { 
+        echo -e "$red 🛑 Metrics Server is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Metrics Server"
+    echo -e "$yellow Verify metrics are available:$blue kubectl top nodes"
+    echo -e "$yellow Check pod metrics:$blue kubectl top pods -A"
+}
+
+function install_helm_kube_prometheus_stack(){
+    echo -e "$yellow Installing Kube Prometheus Stack (Prometheus, Grafana, Alertmanager)"
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    (helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
+        --namespace prometheus \
+        --create-namespace \
+        --set prometheusOperator.admissionWebhooks.patch.podAnnotations."sidecar\.istio\.io/inject"="false" || { 
+        echo -e "$red 🛑 Could not install Kube Prometheus Stack into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Prometheus Operator to be ready"
+    sleep 15
+    (kubectl wait deployment -n prometheus prometheus-kube-prometheus-operator --for condition=Available=True --timeout=180s || { 
+        echo -e "$red 🛑 Prometheus Operator is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Grafana to be ready"
+    (kubectl wait deployment -n prometheus prometheus-grafana --for condition=Available=True --timeout=180s || { 
+        echo -e "$red 🛑 Grafana is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Kube Prometheus Stack"
+    echo -e "$yellow\nTo access the Grafana dashboard, type:$blue kubectl port-forward -n prometheus services/prometheus-grafana 30000:80"
+    echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:30000"
+    echo -e "$yellow\nUsername: admin"
+    echo -e "$yellow\nPassword: prom-operator"
+    echo -e "$yellow\nAccess Prometheus UI:$blue kubectl port-forward -n prometheus services/prometheus-kube-prometheus-prometheus 9090:9090"
+    echo -e "$yellow\nAccess Alertmanager UI:$blue kubectl port-forward -n prometheus services/prometheus-kube-prometheus-alertmanager 9093:9093"
+}
+
 function install_helm_cilium(){
     local cluster_name="${1:-}"
     local provider="${2:-}"
