@@ -104,14 +104,6 @@ This repo can install a curated set of platform + demo components using either H
 -   Excellent for prototyping caching, document storage (JSON), pub/sub messaging, search indexing, and time‑series ingestion in one lightweight component.
 -   Port-forward: `kubectl port-forward -n redis svc/redis-stack-server 6379:6379` then `redis-cli -h localhost -p 6379`.
 
-**Valkey**
-
--   Open-source Redis-compatible key-value store (Linux Foundation project).
--   Drop-in replacement for Redis with full protocol compatibility.
--   Great for learning Redis concepts without Redis licensing concerns.
--   Supports master-replica setups with persistence.
--   Port-forward: `kubectl port-forward -n valkey svc/valkey-master 6379:6379` then `valkey-cli -h localhost -p 6379`.
-
 **NATS (Core + JetStream + nats-box)**
 
 -   Ultra-lightweight messaging system providing pub/sub, request/reply, and (with JetStream) persistence, streaming, key-value & object store primitives.
