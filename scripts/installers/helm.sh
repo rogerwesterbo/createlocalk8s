@@ -59,6 +59,45 @@ function install_helm_nfs(){
         ""
 }
 
+function install_helm_local_path_provisioner(){
+    echo -e "$yellow Installing Local Path Provisioner"
+    helm repo add local-path-provisioner https://github.com/rancher/local-path-provisioner
+    
+    # Install using the chart from the GitHub repo
+    (helm upgrade --install local-path-provisioner \
+        https://github.com/rancher/local-path-provisioner/releases/download/v0.0.28/local-path-provisioner-0.0.28.tgz \
+        --namespace local-path-storage \
+        --create-namespace \
+        --set storageClass.defaultClass=true || { 
+        echo -e "$red 🛑 Could not install Local Path Provisioner into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Local Path Provisioner to be ready"
+    sleep 10
+    (kubectl wait deployment -n local-path-storage local-path-provisioner --for condition=Available=True --timeout=120s || { 
+        echo -e "$red 🛑 Local Path Provisioner is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Local Path Provisioner"
+    echo -e "$yellow\nLocal Path Provisioner is ready to use"
+    echo -e "$yellow\nStorageClass 'local-path' is available for PVCs"
+    echo -e "$yellow\nExample PVC:$blue"
+    echo -e "  apiVersion: v1"
+    echo -e "  kind: PersistentVolumeClaim"
+    echo -e "  metadata:"
+    echo -e "    name: local-path-pvc"
+    echo -e "  spec:"
+    echo -e "    accessModes:"
+    echo -e "      - ReadWriteOnce"
+    echo -e "    storageClassName: local-path"
+    echo -e "    resources:"
+    echo -e "      requests:"
+    echo -e "        storage: 1Gi"
+    echo -e "$yellow\nCheck storage class:$blue kubectl get storageclass"
+}
+
 function install_helm_redis_stack(){
     # Add redis-stack helm repo and install redis-stack-server
     helm_install_generic \
@@ -73,6 +112,30 @@ function install_helm_redis_stack(){
 
     echo -e "\nTo access Redis locally (port-forward), run: kubectl port-forward -n redis svc/redis-stack-server 6379:6379"
     echo -e "Connect using redis-cli: redis-cli -h localhost -p 6379"
+}
+
+function install_helm_valkey(){
+    echo -e "$yellow Installing Valkey"
+    helm repo add valkey https://valkey.io/valkey-helm/
+    (helm upgrade --install valkey valkey/valkey \
+        --namespace valkey \
+        --create-namespace || { 
+        echo -e "$red 🛑 Could not install Valkey into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Valkey to be ready"
+    sleep 10
+    (kubectl wait pods --for=condition=Ready --all -n valkey --timeout=180s || { 
+        echo -e "$red 🛑 Valkey is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Valkey"
+    echo -e "$yellow\nValkey is ready to use"
+    echo -e "$yellow\nTo access Valkey CLI: $blue kubectl exec -it -n valkey statefulset/valkey-master -- valkey-cli"
+    echo -e "$yellow\nTo access Valkey locally (port-forward):$blue kubectl port-forward -n valkey svc/valkey-master 6379:6379"
+    echo -e "$yellow\nConnect using valkey-cli:$blue valkey-cli -h localhost -p 6379"
 }
 
 function install_helm_argocd(){
@@ -347,6 +410,62 @@ function install_helm_nats(){
     echo -e "$yellow ✅ Done installing NATS"
     echo -e "$yellow To publish test message:$blue kubectl -n nats exec -it deploy/nats-box -- nats pub test hi"
     echo -e "$yellow To subscribe:$blue kubectl -n nats exec -it deploy/nats-box -- nats sub test"
+}
+
+function install_helm_metrics_server(){
+    echo -e "$yellow Installing Metrics Server"
+    helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+    (helm upgrade --install metrics-server metrics-server/metrics-server \
+        --namespace kube-system \
+        --set args[0]="--kubelet-insecure-tls" \
+        --set args[1]="--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname" || { 
+        echo -e "$red 🛑 Could not install Metrics Server into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Metrics Server to be ready"
+    sleep 10
+    (kubectl wait deployment -n kube-system metrics-server --for condition=Available=True --timeout=120s || { 
+        echo -e "$red 🛑 Metrics Server is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Metrics Server"
+    echo -e "$yellow Verify metrics are available:$blue kubectl top nodes"
+    echo -e "$yellow Check pod metrics:$blue kubectl top pods -A"
+}
+
+function install_helm_kube_prometheus_stack(){
+    echo -e "$yellow Installing Kube Prometheus Stack (Prometheus, Grafana, Alertmanager)"
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    (helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
+        --namespace prometheus \
+        --create-namespace \
+        --set prometheusOperator.admissionWebhooks.patch.podAnnotations."sidecar\.istio\.io/inject"="false" || { 
+        echo -e "$red 🛑 Could not install Kube Prometheus Stack into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Prometheus Operator to be ready"
+    sleep 15
+    (kubectl wait deployment -n prometheus prometheus-kube-prometheus-operator --for condition=Available=True --timeout=180s || { 
+        echo -e "$red 🛑 Prometheus Operator is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Grafana to be ready"
+    (kubectl wait deployment -n prometheus prometheus-grafana --for condition=Available=True --timeout=180s || { 
+        echo -e "$red 🛑 Grafana is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Kube Prometheus Stack"
+    echo -e "$yellow\nTo access the Grafana dashboard, type:$blue kubectl port-forward -n prometheus services/prometheus-grafana 30000:80"
+    echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:30000"
+    echo -e "$yellow\nUsername: admin"
+    echo -e "$yellow\nPassword: prom-operator"
+    echo -e "$yellow\nAccess Prometheus UI:$blue kubectl port-forward -n prometheus services/prometheus-kube-prometheus-prometheus 9090:9090"
+    echo -e "$yellow\nAccess Alertmanager UI:$blue kubectl port-forward -n prometheus services/prometheus-kube-prometheus-alertmanager 9093:9093"
 }
 
 function install_helm_cilium(){

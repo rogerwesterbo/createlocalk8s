@@ -100,6 +100,32 @@ function install_nfs_application() {
     echo "NFS Subdirectory External Provisioner application installed: yes" >> $cluster_info_file
 }
 
+function install_local_path_provisioner_application() {
+    echo -e "$yellow Installing Local Path Provisioner ArgoCD application"
+    (kubectl apply -f $local_path_provisioner_app_yaml|| 
+    { 
+        echo -e "$red 🛑 Could not install Local Path Provisioner ArgoCD application into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Local Path Provisioner ArgoCD application"
+
+    echo -e "$yellow\n⏰ Waiting for Local Path Provisioner to be ready"
+    sleep 10
+    (kubectl wait deployment -n local-path-storage local-path-provisioner --for condition=Available=True --timeout=120s || 
+    { 
+        echo -e "$red 🛑 Local Path Provisioner is not ready ..."
+        die
+    }) & spinner
+
+    echo "Local Path Provisioner application installed: yes" >> $cluster_info_file
+
+    echo -e "$yellow\nLocal Path Provisioner is ready to use"
+    echo -e "$yellow\nStorageClass 'local-path' is available for PersistentVolumeClaims"
+    echo -e "$yellow\nCheck storage classes:$blue kubectl get storageclass"
+    echo -e "$yellow\nCheck provisioner pods:$blue kubectl get pods -n local-path-storage"
+}
+
 function install_mongodb_operator_application() {
     echo -e "$yellow Installing Mongodb Operator ArgoCD application"
     (kubectl apply -f $mongodb_operator_app_yaml|| 
@@ -465,6 +491,32 @@ function install_redis_stack_application() {
     echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:6379"
 }
 
+function install_valkey_application() {
+    echo -e "$yellow Installing Valkey ArgoCD application"
+    (kubectl apply -f $valkey_app_yaml|| 
+    { 
+        echo -e "$red 🛑 Could not install Valkey ArgoCD application into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Valkey ArgoCD application"
+
+    echo -e "$yellow\n⏰ Waiting for Valkey to be ready"
+    sleep 10
+    (kubectl wait pods --for=condition=Ready --all -n valkey --timeout=180s || 
+    { 
+        echo -e "$red 🛑 Valkey is not running, and is not ready to use ..."
+        die
+    }) & spinner
+
+    echo "Valkey application installed: yes" >> $cluster_info_file
+
+    echo -e "$yellow\nValkey is ready to use"
+    echo -e "$yellow\nTo access Valkey CLI:$blue kubectl exec -it -n valkey statefulset/valkey-master -- valkey-cli"
+    echo -e "$yellow\nTo access Valkey locally (port-forward):$blue kubectl port-forward -n valkey svc/valkey-master 6379:6379"
+    echo -e "$yellow\nConnect using valkey-cli:$blue valkey-cli -h localhost -p 6379"
+}
+
 function install_nats_application() {
     echo -e "$yellow Installing NATS ArgoCD application"
     (kubectl apply -f $nats_app_yaml|| { 
@@ -512,6 +564,29 @@ function install_nats_application() {
     echo -e "  https://docs.nats.io/running-a-nats-service/configuration/websocket"
     echo -e "  https://docs.nats.io/running-a-nats-service/configuration/mqtt"
     echo -e "  https://docs.nats.io/using-nats/nats-tools/nats_cli"
+}
+
+function install_metrics_server_application() {
+    echo -e "$yellow Installing Metrics Server ArgoCD application"
+    (kubectl apply -f $metrics_server_app_yaml|| { 
+        echo -e "$red 🛑 Could not install Metrics Server ArgoCD application into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Metrics Server ArgoCD application"
+
+    echo -e "$yellow\n⏰ Waiting for Metrics Server to be ready"
+    sleep 10
+    (kubectl wait deployment -n kube-system metrics-server --for condition=Available=True --timeout=120s || { 
+        echo -e "$red 🛑 Metrics Server is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo "Metrics Server application installed: yes" >> $cluster_info_file
+
+    echo -e "$yellow Metrics Server is ready to use"
+    echo -e "$yellow Verify metrics are available:$blue kubectl top nodes"
+    echo -e "$yellow Check pod metrics:$blue kubectl top pods -A"
 }
 
 function post_pgadmin_install() {

@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: valkey
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://valkey.io/valkey-helm/
+    chart: valkey
+    # Using wildcard to track latest version
+    targetRevision: '*'
+    helm:
+      # Valkey configuration values
+      valuesObject:
+        # Example configuration - adjust as needed
+        master:
+          persistence:
+            enabled: true
+            size: 8Gi
+        replica:
+          replicaCount: 2
+          persistence:
+            enabled: true
+            size: 8Gi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: valkey
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

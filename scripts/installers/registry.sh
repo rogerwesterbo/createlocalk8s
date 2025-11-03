@@ -54,9 +54,13 @@ crossplane|helm|install_helm_crossplane|Crossplane control plane
 nginx|helm|install_helm_nginx_controller|Ingress-Nginx controller
 minio|helm|install_helm_minio|MinIO operator
 nfs|helm|install_helm_nfs|NFS external provisioner
+local-path-provisioner|helm|install_helm_local_path_provisioner|Local Path Provisioner (Rancher)|local-path-storage
 redis-stack|helm|install_helm_redis_stack|Redis Stack server|redis
+valkey|helm|install_helm_valkey|Valkey key-value store|valkey
 nats|helm|install_helm_nats|NATS messaging server
 kite|helm|install_helm_kite|Kite Kubernetes dashboard
+metrics-server|helm|install_helm_metrics_server|Metrics Server for resource metrics|kube-system
+prometheus|helm|install_helm_kube_prometheus_stack|Kube Prometheus Stack (Prometheus/Grafana/Alertmanager)|prometheus
 cilium|helm|install_helm_cilium|Cilium CNI networking and security|kube-system
 calico|helm|install_helm_calico|Calico CNI networking and security|tigera-operator
 EOF
@@ -65,7 +69,7 @@ EOF
 APP_ARGO_REGISTRY_DATA="$(cat <<'EOF'
 nyancat|app|install_nyancat_application|Sample Nyancat demo application
 certmanager|app|install_cert_manager_application|Cert-Manager for certificates
-prometheus|app|install_kube_prometheus_stack_application|Kube Prometheus Stack (Grafana/Prometheus/Alertmanager)|monitoring
+prometheus|app|install_kube_prometheus_stack_application|Kube Prometheus Stack (Grafana/Prometheus/Alertmanager)|prometheus
 kubeview|app|install_kubeview_application|Kubeview UI
 opencost|app|install_opencost_application|OpenCost cost monitoring
 metallb|app|install_metallb_application|MetalLB load balancer
@@ -82,9 +86,12 @@ crossplane|app|install_crossplane_application|Crossplane control plane
 nginx|app|install_nginx_controller_application|Ingress-Nginx controller
 minio|app|install_minio_application|MinIO operator
 nfs|app|install_nfs_application|NFS external provisioner
+local-path-provisioner|app|install_local_path_provisioner_application|Local Path Provisioner (Rancher)|local-path-storage
 redis-stack|app|install_redis_stack_application|Redis Stack server|redis
+valkey|app|install_valkey_application|Valkey key-value store|valkey
 nats|app|install_nats_application|NATS messaging server
 kite|app|install_kite_application|Kite Kubernetes dashboard
+metrics-server|app|install_metrics_server_application|Metrics Server for resource metrics|kube-system
 EOF
 )"
 
@@ -104,7 +111,7 @@ registry_find() { # args: type key
 
 registry_list_pretty() { # arg: type
   local t="$1"
-  registry_filter_type "$t" | awk -F'|' '{printf "%-18s %-10s %s\n", $1, $2, $4}' | sort
+  registry_filter_type "$t" | awk -F'|' '{printf "%-25s %-10s %s\n", $1, $2, $4}' | sort
 }
 
 registry_install_many() { # type, comma/space list
