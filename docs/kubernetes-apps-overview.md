@@ -14,6 +14,7 @@ This repo can install a curated set of platform + demo components using either H
 | Metallb                         | Load Balancer         | Provides LoadBalancer IPs in bare-metal / kind | Simulating cloud LB behavior            | `ihm`                | `iam`                  |
 | Minio Operator                  | Object Storage (S3)   | S3-compatible buckets                          | Practicing apps needing object storage  | `ihmin`              | `iamin`                |
 | NFS Subdir External Provisioner | Storage               | Dynamic ReadWriteMany PVs backed by host NFS   | Shared volume experiments               | `ihnfs`              | `ianfs`                |
+| Local Path Provisioner          | Storage               | Dynamic local path PVs (Rancher)               | Simple local persistent volumes         | `ihlpp`              | `ialpp`                |
 | Rook Ceph (Operator)            | Storage Orchestration | Manages Ceph clusters                          | Exploring distributed storage           | `ihrco`              | `iarco`                |
 | Rook Ceph (Cluster)             | Storage Backend       | Ceph block / object / filesystem               | Stateful workloads resilience trials    | `ihrcc`              | `iarcc`                |
 | MongoDB (Operator)              | Database Operator     | CRDs to declaratively manage MongoDB           | Learning DB operator patterns           | `ihmdb`              | `iamdb`                |
@@ -25,6 +26,7 @@ This repo can install a curated set of platform + demo components using either H
 | Trivy Operator                  | Security / SBOM       | Image & config vulnerability scanning          | Learning security shift-left            | `iht`                | `iat`                  |
 | HashiCorp Vault                 | Secrets Management    | Centralized secrets + encryption               | Practicing secret injection & policies  | `ihv`                | `iav`                  |
 | Redis Stack                     | Cache / Data          | Redis + modules (JSON, Search, etc.)           | Caching patterns, pub/sub, JSON docs    | `ihrs`               | `iars`                 |
+| Valkey                          | Cache / Data          | Redis-compatible key-value store               | Alternative to Redis, OSS caching       | `ihvk`               | `iavk`                 |
 | NATS                            | Messaging / Streaming | Lightweight high-speed pub/sub + JetStream     | Event-driven prototypes, decoupling     | `ihnats`             | `ianats`               |
 | Crossplane                      | Infra Abstraction     | Compose infra APIs / claim external services   | Exploring platform engineering patterns | `ihcr`               | `iacr`                 |
 | Kube-Prometheus-Stack           | Observability         | Prometheus + Alertmanager + Grafana            | Metrics / dashboards & alerting basics  | `ihp`                | `iap`                  |
@@ -70,6 +72,13 @@ This repo can install a curated set of platform + demo components using either H
 -   Simple dynamic provisioning of RWX (ReadWriteMany) volumes—handy for shared state experiments.
 -   Good stepping stone before more complex distributed storage like Ceph.
 
+**Local Path Provisioner (Rancher)**
+
+-   Lightweight local storage provisioner that creates PersistentVolumes using local paths on nodes.
+-   Simplest way to get dynamic provisioning in local clusters without external dependencies.
+-   Uses ReadWriteOnce (RWO) access mode - perfect for single-pod stateful workloads.
+-   Great for learning PV/PVC concepts without the complexity of distributed storage.
+
 **Rook Ceph (Operator + Cluster)**
 
 -   Operator deploys and manages Ceph (distributed storage platform) offering block, object, and filesystem interfaces.
@@ -94,6 +103,14 @@ This repo can install a curated set of platform + demo components using either H
 -   Provides Redis plus enhanced modules (RedisJSON, Search, TimeSeries, Bloom) via the upstream redis-stack-server chart.
 -   Excellent for prototyping caching, document storage (JSON), pub/sub messaging, search indexing, and time‑series ingestion in one lightweight component.
 -   Port-forward: `kubectl port-forward -n redis svc/redis-stack-server 6379:6379` then `redis-cli -h localhost -p 6379`.
+
+**Valkey**
+
+-   Open-source Redis-compatible key-value store (Linux Foundation project).
+-   Drop-in replacement for Redis with full protocol compatibility.
+-   Great for learning Redis concepts without Redis licensing concerns.
+-   Supports master-replica setups with persistence.
+-   Port-forward: `kubectl port-forward -n valkey svc/valkey-master 6379:6379` then `valkey-cli -h localhost -p 6379`.
 
 **NATS (Core + JetStream + nats-box)**
 

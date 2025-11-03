@@ -108,8 +108,8 @@ Current date and time in Linux Mon Oct 13 23:29:08 CEST 2025
 -   Post-create helper to install a sample Nyancat app (demo ingress + ArgoCD)
 -   Rich subcommands to list, inspect, delete clusters & fetch kubeconfig
 -   **Registry-based installers**: List and install Helm/ArgoCD components with simple commands
--   20 Helm installers: ArgoCD, Crossplane, Rook Ceph, Falco, Trivy, Vault, MetalLB, MinIO, NFS, MongoDB Operator, CNPG, PgAdmin, Redis Stack, NATS, Metrics Server, Prometheus, cert-manager, kubeview, nginx-ingress, OpenCost
--   23 ArgoCD Application installers (GitOps style): monitoring (Prometheus), metrics (Metrics Server), databases, security, storage, cost monitoring, etc.
+-   **22 Helm installers**: ArgoCD, Crossplane, Rook Ceph, Falco, Trivy, Vault, MetalLB, MinIO, NFS, Local Path Provisioner, MongoDB Operator, CNPG, PgAdmin, Redis Stack, Valkey, NATS, Kite, Metrics Server, Prometheus, Cilium, Calico, Nginx Ingress
+-   **25 ArgoCD Application installers** (GitOps style): monitoring (Prometheus), metrics (Metrics Server), databases, security, storage, cost monitoring, etc.
 -   **Dry-run mode**: Preview what will be installed with `--dry-run`
 -   Generates per-cluster info + kubeconfig files under `clusters/<cluster-name>/`
 -   Consistent colored output & spinners, with readiness waits for core components
@@ -432,55 +432,60 @@ See full cluster details (cluster info + kind config used):
 ./kl.sh install apps prometheus,mongodb --dry-run
 ```
 
-**Available Helm components** (20):
+**Available Helm components** (22):
 
 -   `argocd` - ArgoCD GitOps controller
--   `cert-manager` - Certificate management
--   `cnpg` - CloudNativePG operator
+-   `calico` - Calico CNI networking and security
+-   `cilium` - Cilium CNI networking and security
 -   `crossplane` - Cloud native control plane
 -   `falco` - Runtime security
--   `hashicorp-vault` - Secrets management
--   `kube-prometheus-stack` - Prometheus monitoring
--   `kubeview` - Cluster visualizer
+-   `kite` - Kite Kubernetes dashboard
+-   `local-path-provisioner` - Local Path Provisioner (Rancher)
 -   `metallb` - Load balancer
 -   `metrics-server` - Metrics Server for resource metrics
 -   `minio` - S3-compatible storage
--   `mongodb-operator` - MongoDB operator
+-   `mongodb-instance` - MongoDB additional instance (Bitnami)
+-   `mongodb-operator` - MongoDB operator (Bitnami)
 -   `nats` - NATS messaging
 -   `nfs` - NFS provisioner
--   `nginx-ingress` - NGINX ingress controller
--   `opencost` - Cost monitoring
+-   `nginx` - NGINX ingress controller
 -   `pgadmin` - PostgreSQL admin UI
--   `prometheus` - Kube Prometheus Stack (Helm)
+-   `postgres` - CloudNativePG operator + cluster
+-   `prometheus` - Kube Prometheus Stack (Prometheus/Grafana/Alertmanager)
 -   `redis-stack` - Redis Stack server
+-   `rook-ceph-cluster` - Rook Ceph cluster
 -   `rook-ceph-operator` - Rook Ceph operator
 -   `trivy` - Security scanner
+-   `valkey` - Valkey key-value store
+-   `vault` - HashiCorp Vault server
 
-**Available ArgoCD apps** (23):
+**Available ArgoCD apps** (25):
 
--   `nyancat` - Sample demo app
--   `prometheus` - Kube Prometheus Stack
--   `cert-manager` - Cert Manager app
--   `cnpg-cluster` - CNPG cluster instance
--   `crossplane` - Crossplane app
--   `falco` - Falco security app
--   `hashicorp-vault` - Vault app
--   `kubeview` - KubeView app
--   `metallb` - MetalLB app
--   `metrics-server` - Metrics Server app
--   `minio` - MinIO app
--   `mongodb` - MongoDB instance
--   `mongodb-operator` - MongoDB operator app
--   `nats` - NATS app
--   `nfs` - NFS provisioner app
--   `opencost` - OpenCost app
--   `pg-ui` - PostgreSQL UI
--   `pgadmin` - PgAdmin app
--   `redis-stack` - Redis Stack app
+-   `certmanager` - Cert Manager for certificates
+-   `crossplane` - Crossplane control plane
+-   `falco` - Falco runtime security
+-   `kite` - Kite Kubernetes dashboard
+-   `kubeview` - Kubeview UI
+-   `local-path-provisioner` - Local Path Provisioner (Rancher)
+-   `metallb` - MetalLB load balancer
+-   `metrics-server` - Metrics Server for resource metrics
+-   `minio` - MinIO operator
+-   `mongodb-instance` - MongoDB Instance CR
+-   `mongodb-operator` - MongoDB Operator (Community)
+-   `nats` - NATS messaging server
+-   `nfs` - NFS external provisioner
+-   `nginx` - Ingress-Nginx controller
+-   `nyancat` - Sample Nyancat demo application
+-   `opencost` - OpenCost cost monitoring
+-   `pgadmin` - PgAdmin4 UI
+-   `postgres` - CloudNativePG operator + cluster
+-   `prometheus` - Kube Prometheus Stack (Grafana/Prometheus/Alertmanager)
+-   `redis-stack` - Redis Stack server
 -   `rook-ceph-cluster` - Rook Ceph cluster
--   `rook-ceph-operator` - Rook Ceph operator app
--   `trivy` - Trivy scanner app
--   `coredns` - CoreDNS app
+-   `rook-ceph-operator` - Rook Ceph operator
+-   `trivy` - Trivy operator
+-   `valkey` - Valkey key-value store
+-   `vault` - HashiCorp Vault server
 
 > Use tab completion to discover available components! Run `./completions/install-completion.sh` to enable it.
 

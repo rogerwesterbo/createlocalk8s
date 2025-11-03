@@ -59,6 +59,45 @@ function install_helm_nfs(){
         ""
 }
 
+function install_helm_local_path_provisioner(){
+    echo -e "$yellow Installing Local Path Provisioner"
+    helm repo add local-path-provisioner https://github.com/rancher/local-path-provisioner
+    
+    # Install using the chart from the GitHub repo
+    (helm upgrade --install local-path-provisioner \
+        https://github.com/rancher/local-path-provisioner/releases/download/v0.0.28/local-path-provisioner-0.0.28.tgz \
+        --namespace local-path-storage \
+        --create-namespace \
+        --set storageClass.defaultClass=true || { 
+        echo -e "$red 🛑 Could not install Local Path Provisioner into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Local Path Provisioner to be ready"
+    sleep 10
+    (kubectl wait deployment -n local-path-storage local-path-provisioner --for condition=Available=True --timeout=120s || { 
+        echo -e "$red 🛑 Local Path Provisioner is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Local Path Provisioner"
+    echo -e "$yellow\nLocal Path Provisioner is ready to use"
+    echo -e "$yellow\nStorageClass 'local-path' is available for PVCs"
+    echo -e "$yellow\nExample PVC:$blue"
+    echo -e "  apiVersion: v1"
+    echo -e "  kind: PersistentVolumeClaim"
+    echo -e "  metadata:"
+    echo -e "    name: local-path-pvc"
+    echo -e "  spec:"
+    echo -e "    accessModes:"
+    echo -e "      - ReadWriteOnce"
+    echo -e "    storageClassName: local-path"
+    echo -e "    resources:"
+    echo -e "      requests:"
+    echo -e "        storage: 1Gi"
+    echo -e "$yellow\nCheck storage class:$blue kubectl get storageclass"
+}
+
 function install_helm_redis_stack(){
     # Add redis-stack helm repo and install redis-stack-server
     helm_install_generic \

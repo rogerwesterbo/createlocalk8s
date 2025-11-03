@@ -100,6 +100,32 @@ function install_nfs_application() {
     echo "NFS Subdirectory External Provisioner application installed: yes" >> $cluster_info_file
 }
 
+function install_local_path_provisioner_application() {
+    echo -e "$yellow Installing Local Path Provisioner ArgoCD application"
+    (kubectl apply -f $local_path_provisioner_app_yaml|| 
+    { 
+        echo -e "$red 🛑 Could not install Local Path Provisioner ArgoCD application into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Local Path Provisioner ArgoCD application"
+
+    echo -e "$yellow\n⏰ Waiting for Local Path Provisioner to be ready"
+    sleep 10
+    (kubectl wait deployment -n local-path-storage local-path-provisioner --for condition=Available=True --timeout=120s || 
+    { 
+        echo -e "$red 🛑 Local Path Provisioner is not ready ..."
+        die
+    }) & spinner
+
+    echo "Local Path Provisioner application installed: yes" >> $cluster_info_file
+
+    echo -e "$yellow\nLocal Path Provisioner is ready to use"
+    echo -e "$yellow\nStorageClass 'local-path' is available for PersistentVolumeClaims"
+    echo -e "$yellow\nCheck storage classes:$blue kubectl get storageclass"
+    echo -e "$yellow\nCheck provisioner pods:$blue kubectl get pods -n local-path-storage"
+}
+
 function install_mongodb_operator_application() {
     echo -e "$yellow Installing Mongodb Operator ArgoCD application"
     (kubectl apply -f $mongodb_operator_app_yaml|| 
