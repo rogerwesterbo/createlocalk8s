@@ -25,6 +25,7 @@ This repo can install a curated set of platform + demo components using either H
 | Trivy Operator                  | Security / SBOM       | Image & config vulnerability scanning          | Learning security shift-left            | `iht`                | `iat`                  |
 | HashiCorp Vault                 | Secrets Management    | Centralized secrets + encryption               | Practicing secret injection & policies  | `ihv`                | `iav`                  |
 | Redis Stack                     | Cache / Data          | Redis + modules (JSON, Search, etc.)           | Caching patterns, pub/sub, JSON docs    | `ihrs`               | `iars`                 |
+| Valkey                          | Cache / Data          | Redis-compatible key-value store               | Drop-in Redis replacement, high perf    | `ihvalkey`           | `iavalkey`             |
 | NATS                            | Messaging / Streaming | Lightweight high-speed pub/sub + JetStream     | Event-driven prototypes, decoupling     | `ihnats`             | `ianats`               |
 | Crossplane                      | Infra Abstraction     | Compose infra APIs / claim external services   | Exploring platform engineering patterns | `ihcr`               | `iacr`                 |
 | Kube-Prometheus-Stack           | Observability         | Prometheus + Alertmanager + Grafana            | Metrics / dashboards & alerting basics  | `ihp`                | `iap`                  |
@@ -94,6 +95,13 @@ This repo can install a curated set of platform + demo components using either H
 -   Provides Redis plus enhanced modules (RedisJSON, Search, TimeSeries, Bloom) via the upstream redis-stack-server chart.
 -   Excellent for prototyping caching, document storage (JSON), pub/sub messaging, search indexing, and time‑series ingestion in one lightweight component.
 -   Port-forward: `kubectl port-forward -n redis svc/redis-stack-server 6379:6379` then `redis-cli -h localhost -p 6379`.
+
+**Valkey**
+
+-   A Redis-compatible key-value store that provides high-performance in-memory data structure storage.
+-   Offers a drop-in replacement for Redis with protocol compatibility, making it easy to migrate or test applications.
+-   Uses wildcard versioning to automatically track the latest stable release from the official Valkey Helm repository.
+-   Port-forward: `kubectl port-forward -n valkey svc/valkey-master 6379:6379` then `valkey-cli -h localhost -p 6379`.
 
 **NATS (Core + JetStream + nats-box)**
 
