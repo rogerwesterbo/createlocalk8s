@@ -75,6 +75,30 @@ function install_helm_redis_stack(){
     echo -e "Connect using redis-cli: redis-cli -h localhost -p 6379"
 }
 
+function install_helm_valkey(){
+    echo -e "$yellow Installing Valkey"
+    helm repo add valkey https://valkey.io/valkey-helm/
+    (helm upgrade --install valkey valkey/valkey \
+        --namespace valkey \
+        --create-namespace || { 
+        echo -e "$red 🛑 Could not install Valkey into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Valkey to be ready"
+    sleep 10
+    (kubectl wait pods --for=condition=Ready --all -n valkey --timeout=180s || { 
+        echo -e "$red 🛑 Valkey is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Valkey"
+    echo -e "$yellow\nValkey is ready to use"
+    echo -e "$yellow\nTo access Valkey CLI: $blue kubectl exec -it -n valkey statefulset/valkey-master -- valkey-cli"
+    echo -e "$yellow\nTo access Valkey locally (port-forward):$blue kubectl port-forward -n valkey svc/valkey-master 6379:6379"
+    echo -e "$yellow\nConnect using valkey-cli:$blue valkey-cli -h localhost -p 6379"
+}
+
 function install_helm_argocd(){
     echo -e "$yellow Installing ArgoCD "
     helm repo add argo https://argoproj.github.io/argo-helm

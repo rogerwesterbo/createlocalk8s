@@ -465,6 +465,32 @@ function install_redis_stack_application() {
     echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:6379"
 }
 
+function install_valkey_application() {
+    echo -e "$yellow Installing Valkey ArgoCD application"
+    (kubectl apply -f $valkey_app_yaml|| 
+    { 
+        echo -e "$red 🛑 Could not install Valkey ArgoCD application into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Valkey ArgoCD application"
+
+    echo -e "$yellow\n⏰ Waiting for Valkey to be ready"
+    sleep 10
+    (kubectl wait pods --for=condition=Ready --all -n valkey --timeout=180s || 
+    { 
+        echo -e "$red 🛑 Valkey is not running, and is not ready to use ..."
+        die
+    }) & spinner
+
+    echo "Valkey application installed: yes" >> $cluster_info_file
+
+    echo -e "$yellow\nValkey is ready to use"
+    echo -e "$yellow\nTo access Valkey CLI:$blue kubectl exec -it -n valkey statefulset/valkey-master -- valkey-cli"
+    echo -e "$yellow\nTo access Valkey locally (port-forward):$blue kubectl port-forward -n valkey svc/valkey-master 6379:6379"
+    echo -e "$yellow\nConnect using valkey-cli:$blue valkey-cli -h localhost -p 6379"
+}
+
 function install_nats_application() {
     echo -e "$yellow Installing NATS ArgoCD application"
     (kubectl apply -f $nats_app_yaml|| { 
