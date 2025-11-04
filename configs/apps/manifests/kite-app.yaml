@@ -17,7 +17,13 @@ spec:
     helm:
       values: |
         ingress:
-          enabled: false
+          enabled: true
+          className: nginx
+          hosts:
+            - host: kite.localtest.me
+              paths:
+                - path: /
+                  pathType: Prefix
   syncPolicy:
     automated:
       prune: true

@@ -110,8 +110,8 @@ function install_helm_redis_stack(){
         "kubectl wait pods --for=condition=Ready --all -n redis --timeout=180s" \
         "\nRedis Stack is ready to use\nTo access Redis CLI: kubectl exec -it -n redis deploy/redis-stack-server -- redis-cli\n"
 
-    echo -e "\nTo access Redis locally (port-forward), run: kubectl port-forward -n redis svc/redis-stack-server 6379:6379"
-    echo -e "Connect using redis-cli: redis-cli -h localhost -p 6379"
+    echo -e "\nTo access Redis locally (port-forward), run: kubectl port-forward -n redis svc/redis-stack-server 6380:6379"
+    echo -e "Connect using redis-cli: redis-cli -h localhost -p 6380"
 }
 
 function install_helm_valkey(){
@@ -134,8 +134,8 @@ function install_helm_valkey(){
     echo -e "$yellow ✅ Done installing Valkey"
     echo -e "$yellow\nValkey is ready to use"
     echo -e "$yellow\nTo access Valkey CLI: $blue kubectl exec -it -n valkey statefulset/valkey-master -- valkey-cli"
-    echo -e "$yellow\nTo access Valkey locally (port-forward):$blue kubectl port-forward -n valkey svc/valkey-master 6379:6379"
-    echo -e "$yellow\nConnect using valkey-cli:$blue valkey-cli -h localhost -p 6379"
+    echo -e "$yellow\nTo access Valkey locally (port-forward):$blue kubectl port-forward -n valkey svc/valkey-master 6381:6379"
+    echo -e "$yellow\nConnect using valkey-cli:$blue valkey-cli -h localhost -p 6381"
 }
 
 function install_helm_argocd(){
@@ -309,6 +309,29 @@ function install_helm_postgres(){
     }) & spinner
 
     echo -e "$yellow ✅ Done installing Postgres Cluster"
+    
+    echo -e "$yellow\n⏰ Waiting for Postgres cluster resource to be created"
+    sleep 15
+    
+    # Wait for the cluster resource to exist
+    local max_wait=60
+    local waited=0
+    while ! kubectl get cluster -n postgres-cluster postgres-cluster &>/dev/null; do
+        if [ $waited -ge $max_wait ]; then
+            echo -e "$red 🛑 Postgres cluster resource not created after ${max_wait}s ..."
+            die
+        fi
+        sleep 2
+        waited=$((waited + 2))
+    done
+    
+    echo -e "$yellow ⏰ Waiting for Postgres cluster to be ready"
+    (kubectl wait --for=condition=Ready cluster/postgres-cluster -n postgres-cluster --timeout=300s || 
+    { 
+        echo -e "$red 🛑 Postgres Cluster is not ready ..."
+        die
+    }) & spinner
+    echo -e "$yellow\nPostgres Cluster is ready to use"
 
     post_postgres_installation
 }
@@ -379,17 +402,54 @@ function install_helm_nginx_controller(){
 }
 
 function install_helm_kite(){
-    local post_msg="\nPort forward: kubectl -n kite port-forward svc/kite 8080:8080\nOpen: http://localhost:8080\n"
+    local post_msg="\nPort forward: kubectl -n kite port-forward svc/kite 15001:8080\nOpen: http://localhost:15001\n"
 
-    helm_install_generic \
-        "kite" \
-        "kite" \
-        "https://zxh326.github.io/kite" \
-        "kite" \
-        "kite" \
-        "" \
-        "kubectl wait pods --for=condition=Ready --all -n kite --timeout=180s" \
-        "$post_msg"
+    echo -e "$yellow Installing Kite"
+    helm repo add kite https://zxh326.github.io/kite
+    (helm upgrade --install kite kite/kite \
+        --namespace kite \
+        --create-namespace \
+        --set ingress.enabled=true \
+        --set ingress.className=nginx \
+        --set ingress.hosts[0].host=kite.localtest.me \
+        --set ingress.hosts[0].paths[0].path=/ \
+        --set ingress.hosts[0].paths[0].pathType=Prefix || { 
+        echo -e "$red 🛑 Could not install Kite into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Kite to be ready"
+    sleep 10
+    (kubectl wait pods --for=condition=Ready --all -n kite --timeout=180s || { 
+        echo -e "$red 🛑 Kite is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Kite"
+    
+    # Show access information
+    local http_port
+    http_port=$(get_current_cluster_http_port)
+    
+    echo -e "$yellow\nTo access Kite UI:"
+    echo -e "$yellow Via port-forward:$blue kubectl -n kite port-forward svc/kite 15001:8080"
+    echo -e "$yellow Then open: http://localhost:15001"
+    
+    echo -e "$yellow\nVia ingress:"
+    if [[ $(is_running_more_than_one_cluster) == "yes" ]]; then
+        echo -e "$yellow Open:$blue http://kite.localtest.me:$http_port"
+    elif [ "$http_port" != "80" ]; then
+        echo -e "$yellow Open:$blue http://kite.localtest.me:$http_port"
+    else
+        echo -e "$yellow Open:$blue http://kite.localtest.me"
+    fi
+    
+    echo -e "$yellow\nℹ️  First-time setup:"
+    echo -e "$yellow 1. Register a new account in the Kite UI"
+    echo -e "$yellow 2. Log in with your credentials"
+    echo -e "$yellow 3. Click 'Add Cluster' and select 'In-Cluster' mode"
+    echo -e "$yellow 4. Name your cluster (e.g., 'local') and save"
+    echo -e "$yellow\nKite will then auto-discover and display your cluster resources!"
 }
 
 function install_helm_nats(){
@@ -460,8 +520,8 @@ function install_helm_kube_prometheus_stack(){
     }) & spinner
 
     echo -e "$yellow ✅ Done installing Kube Prometheus Stack"
-    echo -e "$yellow\nTo access the Grafana dashboard, type:$blue kubectl port-forward -n prometheus services/prometheus-grafana 30000:80"
-    echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:30000"
+    echo -e "$yellow\nTo access the Grafana dashboard, type:$blue kubectl port-forward -n prometheus services/prometheus-grafana 3000:80"
+    echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:3000"
     echo -e "$yellow\nUsername: admin"
     echo -e "$yellow\nPassword: prom-operator"
     echo -e "$yellow\nAccess Prometheus UI:$blue kubectl port-forward -n prometheus services/prometheus-kube-prometheus-prometheus 9090:9090"
@@ -590,6 +650,157 @@ function install_helm_calico(){
     echo -e "$yellow ✅ Done installing Calico"
     echo -e "$yellow Check Calico status:$blue kubectl get pods -n calico-system"
     echo -e "$yellow Check Calico nodes:$blue kubectl get nodes -o wide"
+}
+
+function install_helm_keycloak(){
+    echo -e "$yellow Installing Keycloak"
+    
+    # Check for StorageClass (required for PostgreSQL)
+    # Try to get provider from context
+    local context cluster_name provider
+    context=$(kubectl config current-context 2>/dev/null || true)
+    if [[ "$context" == kind-* ]]; then
+        cluster_name="${context#kind-}"
+    elif [[ "$context" == admin@* ]]; then
+        cluster_name="${context#admin@}"
+    fi
+    
+    # Get provider from clusterinfo.txt if available
+    if [ -n "$cluster_name" ] && [ -n "${clustersDir:-}" ]; then
+        local provider_file="$clustersDir/$cluster_name/provider.txt"
+        if [ -f "$provider_file" ]; then
+            provider=$(cat "$provider_file")
+        fi
+    fi
+    
+    if [[ "$provider" == "talos" ]]; then
+        local default_sc
+        default_sc=$(kubectl get storageclass -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}')
+        if [ -z "$default_sc" ]; then
+            echo -e "$red\n🛑 ERROR: No default StorageClass found!"
+            echo -e "$yellow\nKeycloak requires PostgreSQL, which needs persistent storage."
+            echo -e "$yellow\nFor Talos clusters, you can install storage providers:"
+            echo -e "$yellow\n  OpenEBS (local-path):$blue ./kl.sh install helm localpathprovisioner"
+            echo -e "$yellow  Rook Ceph (distributed):$blue ./kl.sh install helm rookcephoperator && ./kl.sh install helm rookcephcluster"
+            echo -e "$yellow  NFS (network):$blue ./kl.sh install helm nfs"
+            echo -e "$yellow\nAfter installing, set it as default:$blue kubectl patch storageclass <name> -p '{\"metadata\": {\"annotations\":{\"storageclass.kubernetes.io/is-default-class\":\"true\"}}}'"
+            die
+        fi
+        echo -e "$yellow ✓ StorageClass found: $default_sc"
+    fi
+    
+    # Check if PostgreSQL is installed
+    if ! kubectl get namespace postgres-cluster &>/dev/null || ! kubectl get service -n postgres-cluster postgres-cluster-rw &>/dev/null; then
+        echo -e "$yellow\n📊 PostgreSQL is required for Keycloak but not found."
+        echo -e "$yellow Installing PostgreSQL (Cloud Native PG)..."
+        install_helm_postgres
+    else
+        echo -e "$yellow ✓ PostgreSQL cluster found"
+    fi
+    
+    # Create Keycloak database and user
+    echo -e "$yellow\n🔧 Setting up Keycloak database in PostgreSQL"
+    
+    # Get postgres superuser password
+    local postgres_password
+    postgres_password=$(kubectl get secrets -n postgres-cluster postgres-cluster-superuser -o jsonpath='{.data.password}' | base64 -d)
+    
+    # Create keycloak database and user
+    echo -e "$yellow Creating keycloak database and user..."
+    local keycloak_password
+    keycloak_password=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+    
+    kubectl run -n postgres-cluster postgres-client --rm -i --restart=Never --image=postgres:16 -- \
+        psql "postgresql://postgres:${postgres_password}@postgres-cluster-rw:5432/postgres" <<EOF 2>/dev/null || true
+-- Create keycloak database if it doesn't exist
+SELECT 'CREATE DATABASE keycloak' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keycloak')\gexec
+
+-- Create keycloak user if it doesn't exist, or update password if it does
+DO \$\$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_user WHERE usename = 'keycloak') THEN
+        CREATE USER keycloak WITH PASSWORD '${keycloak_password}';
+    ELSE
+        ALTER USER keycloak WITH PASSWORD '${keycloak_password}';
+    END IF;
+END
+\$\$;
+
+-- Grant privileges
+GRANT ALL PRIVILEGES ON DATABASE keycloak TO keycloak;
+\\c keycloak
+GRANT ALL ON SCHEMA public TO keycloak;
+EOF
+    
+    # Create secret for Keycloak database password
+    kubectl create secret generic keycloak-db-secret \
+        --from-literal=password="${keycloak_password}" \
+        -n keycloak \
+        --dry-run=client -o yaml | kubectl apply -f - &>/dev/null
+    
+    echo -e "$yellow ✓ Database setup complete"
+    
+    # Install Keycloak
+    helm repo add codecentric https://codecentric.github.io/helm-charts
+    (helm upgrade --install keycloak codecentric/keycloakx \
+        --namespace keycloak \
+        --create-namespace \
+        --set command[0]="/opt/keycloak/bin/kc.sh" \
+        --set args[0]="start-dev" \
+        --set replicas=1 \
+        --set http.relativePath="/" \
+        --set database.vendor="postgres" \
+        --set database.hostname="postgres-cluster-rw.postgres-cluster.svc.cluster.local" \
+        --set database.port=5432 \
+        --set database.database="keycloak" \
+        --set database.username="keycloak" \
+        --set database.existingSecret="keycloak-db-secret" \
+        --set database.existingSecretKey="password" \
+        --set cache.stack="custom" \
+        --set extraEnv="- name: KEYCLOAK_ADMIN\n  value: admin\n- name: KEYCLOAK_ADMIN_PASSWORD\n  value: admin" \
+        --set ingress.enabled=true \
+        --set ingress.ingressClassName=nginx \
+        --set ingress.rules[0].host=keycloak.localtest.me \
+        --set ingress.rules[0].paths[0].path=/ \
+        --set ingress.rules[0].paths[0].pathType=Prefix \
+        --set ingress.annotations."nginx\.ingress\.kubernetes\.io/backend-protocol"=HTTP \
+        --set-json='tls=[]' || { 
+        echo -e "$red 🛑 Could not install Keycloak into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for Keycloak to be ready"
+    sleep 15
+    (kubectl wait pods -n keycloak -l app.kubernetes.io/name=keycloakx --for=condition=Ready --timeout=300s || { 
+        echo -e "$red 🛑 Keycloak is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Keycloak"
+    
+    # Show access information
+    local http_port
+    http_port=$(get_current_cluster_http_port)
+    
+    echo -e "$yellow\nTo access Keycloak UI:"
+    echo -e "$yellow Via port-forward:$blue kubectl port-forward -n keycloak svc/keycloak-http 15003:80"
+    echo -e "$yellow Then open: http://localhost:15003"
+    
+    echo -e "$yellow\nVia ingress:"
+    if [[ $(is_running_more_than_one_cluster) == "yes" ]]; then
+        echo -e "$yellow Open:$blue http://keycloak.localtest.me:$http_port"
+    elif [ "$http_port" != "80" ]; then
+        echo -e "$yellow Open:$blue http://keycloak.localtest.me:$http_port"
+    else
+        echo -e "$yellow Open:$blue http://keycloak.localtest.me"
+    fi
+    
+    echo -e "$yellow\nDefault admin credentials:"
+    echo -e "$yellow   Username: admin"
+    echo -e "$yellow   Password: admin"
+    echo -e "$yellow\nDatabase: PostgreSQL (postgres-cluster)"
+    echo -e "$yellow   Database: keycloak"
+    echo -e "$yellow   User: keycloak"
 }
 
 function install_multus_cni(){

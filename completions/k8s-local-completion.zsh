@@ -48,9 +48,10 @@ _k8s_local_zsh() {
     # --- Get cluster names from directories ---
     local -a clusters
     if [[ -d clusters ]]; then
-        clusters=(${(f)"$(find clusters -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | grep -v '^\.')"})
-        for i in {1..${#clusters[@]}}; do
-            clusters[$i]="${clusters[$i]}:Cluster"
+        local cluster_list
+        cluster_list=($(find clusters -mindepth 1 -maxdepth 1 -type d -exec basename {} \; 2>/dev/null | grep -v '^\\.'))
+        for cluster in "${cluster_list[@]}"; do
+            clusters+=("${cluster}:Cluster")
         done
     fi
 
@@ -60,37 +61,52 @@ _k8s_local_zsh() {
     helm_out="$($script helm list 2>/dev/null)"
     if [[ -n "$helm_out" ]]; then
         # Remove header lines commonly containing NAME or similar
-        helm_components=(${(f)"$(echo "$helm_out" | awk 'NR==1 && tolower($0) ~ /name/ {next} {print $1}' | sed -E '/^$/d')"})
-        helm_components=(${helm_components:#(NAME|NAME:)*})
+        local helm_list
+        helm_list=($(echo "$helm_out" | awk 'NR==1 && tolower($0) ~ /name/ {next} {print $1}' | sed -E '/^$/d'))
+        helm_list=(${helm_list:#(NAME|NAME:)*})
         # Map to "name:Helm component"
-        for i in {1..${#helm_components[@]}}; do
-            helm_components[$i]="${helm_components[$i]}:Helm component"
+        for component in "${helm_list[@]}"; do
+            helm_components+=("${component}:Helm component")
         done
     fi
     # Fallback static list
     if (( ${#helm_components} == 0 )); then
         helm_components=(
             'argocd:ArgoCD'
+            'calico:Calico CNI networking'
             'cert-manager:cert-manager'
+            'cilium:Cilium CNI networking'
             'cnpg:CloudNativePG operator'
             'crossplane:Crossplane'
             'falco:Falco'
             'hashicorp-vault:Vault'
+            'keycloak:Keycloak identity and access management'
+            'kite:Kite Kubernetes dashboard'
             'kube-prometheus-stack:Prometheus stack'
             'kubeview:KubeView'
+            'local-path-provisioner:Local Path Provisioner'
+            'localpathprovisioner:Local Path Provisioner'
             'metallb:MetalLB'
             'metrics-server:Metrics Server'
             'minio:MinIO'
+            'mongodb-instance:MongoDB instance'
             'mongodb-operator:MongoDB operator'
             'nats:NATS'
             'nfs:NFS provisioner'
+            'nginx:NGINX ingress'
             'nginx-ingress:NGINX ingress'
             'opencost:OpenCost'
             'pgadmin:PgAdmin'
+            'postgres:CloudNativePG operator + cluster'
             'prometheus:Kube Prometheus Stack'
             'redis-stack:Redis Stack'
+            'rook-ceph-cluster:Rook Ceph cluster'
             'rook-ceph-operator:Rook Ceph operator'
+            'rookcephcluster:Rook Ceph cluster'
+            'rookcephoperator:Rook Ceph operator'
             'trivy:Trivy'
+            'valkey:Valkey key-value store'
+            'vault:HashiCorp Vault server'
         )
     fi
 
@@ -98,9 +114,10 @@ _k8s_local_zsh() {
     local apps_out
     apps_out="$($script apps list 2>/dev/null)"
     if [[ -n "$apps_out" ]]; then
-        argo_apps=(${(f)"$(echo "$apps_out" | awk '{print $1}' | sed -E '/^(NAME|Name|#|$)/d')"})
-        for i in {1..${#argo_apps[@]}}; do
-            argo_apps[$i]="${argo_apps[$i]}:ArgoCD app"
+        local apps_list
+        apps_list=($(echo "$apps_out" | awk '{print $1}' | sed -E '/^(NAME|Name|#|$)/d'))
+        for app in "${apps_list[@]}"; do
+            argo_apps+=("${app}:ArgoCD app")
         done
     fi
     # Fallback static list
@@ -109,26 +126,35 @@ _k8s_local_zsh() {
             'nyancat:Nyancat demo'
             'prometheus:Kube Prometheus Stack'
             'cert-manager:Cert Manager app'
+            'certmanager:Cert Manager app'
             'cnpg-cluster:CNPG cluster'
             'crossplane:Crossplane app'
             'falco:Falco'
             'hashicorp-vault:Vault'
+            'vault:HashiCorp Vault server'
+            'keycloak:Keycloak identity and access management'
+            'kite:Kite Kubernetes dashboard'
             'kubeview:KubeView'
             'metallb:MetalLB'
             'metrics-server:Metrics Server'
             'minio:MinIO'
             'mongodb:MongoDB instance'
+            'mongodb-instance:MongoDB instance'
             'mongodb-operator:MongoDB operator app'
             'nats:NATS'
             'nfs:NFS provisioner'
+            'nginx:Ingress-Nginx controller'
             'opencost:OpenCost'
             'pg-ui:PostgreSQL UI'
             'pgadmin:PgAdmin'
+            'postgres:CloudNativePG operator + cluster'
             'redis-stack:Redis Stack'
             'rook-ceph-cluster:Rook Ceph cluster'
             'rook-ceph-operator:Rook Ceph operator'
             'trivy:Trivy scanner'
+            'valkey:Valkey key-value store'
             'coredns:CoreDNS'
+            'local-path-provisioner:Local Path Provisioner'
         )
     fi
 

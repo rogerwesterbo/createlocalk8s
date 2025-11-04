@@ -1,0 +1,58 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  destination:
+    namespace: keycloak
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: keycloakx
+    repoURL: https://codecentric.github.io/helm-charts
+    targetRevision: '*'
+    helm:
+      values: |
+        command:
+          - "/opt/keycloak/bin/kc.sh"
+        args:
+          - "start-dev"
+        replicas: 1
+        http:
+          relativePath: "/"
+        database:
+          vendor: postgres
+          hostname: postgres-cluster-rw.postgres-cluster.svc.cluster.local
+          port: 5432
+          database: keycloak
+          username: keycloak
+          existingSecret: keycloak-db-secret
+          existingSecretKey: password
+        cache:
+          stack: "custom"
+        extraEnv: |
+          - name: KEYCLOAK_ADMIN
+            value: admin
+          - name: KEYCLOAK_ADMIN_PASSWORD
+            value: admin
+        ingress:
+          enabled: true
+          ingressClassName: nginx
+          annotations:
+            nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+          rules:
+            - host: keycloak.localtest.me
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls: []
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

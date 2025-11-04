@@ -63,6 +63,7 @@ metrics-server|helm|install_helm_metrics_server|Metrics Server for resource metr
 prometheus|helm|install_helm_kube_prometheus_stack|Kube Prometheus Stack (Prometheus/Grafana/Alertmanager)|prometheus
 cilium|helm|install_helm_cilium|Cilium CNI networking and security|kube-system
 calico|helm|install_helm_calico|Calico CNI networking and security|tigera-operator
+keycloak|helm|install_helm_keycloak|Keycloak identity and access management|keycloak
 EOF
 )"
 
@@ -92,6 +93,7 @@ valkey|app|install_valkey_application|Valkey key-value store|valkey
 nats|app|install_nats_application|NATS messaging server
 kite|app|install_kite_application|Kite Kubernetes dashboard
 metrics-server|app|install_metrics_server_application|Metrics Server for resource metrics|kube-system
+keycloak|app|install_keycloak_application|Keycloak identity and access management|keycloak
 EOF
 )"
 
