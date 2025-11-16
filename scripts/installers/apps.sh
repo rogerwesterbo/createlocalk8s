@@ -1274,3 +1274,52 @@ function post_calico_installation() {
     # Restart ArgoCD if it exists
     restart_argocd_after_cni
 }
+
+# Uninstall/Delete functions
+
+function delete_kubevirt() {
+    echo -e "$yellow\n🗑️  Deleting KubeVirt..."
+    
+    if ! kubectl get namespace kubevirt >/dev/null 2>&1; then
+        echo -e "$yellow KubeVirt is not installed"
+        return 0
+    fi
+    
+    # Get the version
+    local VERSION
+    VERSION=$(kubectl get kubevirt.kubevirt.io/kubevirt -n kubevirt -o=jsonpath="{.status.observedKubeVirtVersion}" 2>/dev/null || echo "")
+    
+    if [ -z "$VERSION" ]; then
+        # Try to get from stable.txt
+        VERSION=$(curl -s https://storage.googleapis.com/kubevirt-prow/release/kubevirt/kubevirt/stable.txt)
+    fi
+    
+    # Delete the KubeVirt CR (this will trigger cleanup of VMs and resources)
+    echo -e "$yellow Deleting KubeVirt CR..."
+    kubectl delete kubevirt kubevirt -n kubevirt 2>/dev/null || true
+    
+    # Wait for resources to be deleted
+    echo -e "$yellow Waiting for KubeVirt resources to be cleaned up..."
+    kubectl wait kubevirt kubevirt -n kubevirt --for=delete --timeout=180s 2>/dev/null || true
+    
+    # Delete the operator
+    if [ -n "$VERSION" ]; then
+        echo -e "$yellow Deleting KubeVirt operator (version ${VERSION})..."
+        kubectl delete -f "https://github.com/kubevirt/kubevirt/releases/download/${VERSION}/kubevirt-operator.yaml" 2>/dev/null || true
+    else
+        echo -e "$yellow Deleting KubeVirt operator deployments..."
+        kubectl delete deployment -n kubevirt virt-operator 2>/dev/null || true
+    fi
+    
+    # Delete ConfigMap
+    kubectl delete configmap -n kubevirt kubevirt-installation-info 2>/dev/null || true
+    
+    # Delete namespace
+    echo -e "$yellow Deleting namespace..."
+    kubectl delete namespace kubevirt 2>/dev/null || true
+    
+    echo -e "$green ✅ KubeVirt deleted successfully${clear}"
+    echo -e "$yellow\nNote: VMs and their associated PVCs may still exist."
+    echo -e "$yellow Check with:$blue kubectl get vms -A"
+    echo -e "$yellow           $blue kubectl get pvc -A"
+}

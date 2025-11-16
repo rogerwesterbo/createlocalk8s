@@ -45,6 +45,7 @@ function print_help() {
     printf "  %-40s %s\n" "apps list" "List available ArgoCD app components"
     printf "  %-40s %s\n" "install apps nyancat,prometheus" "Install one or more ArgoCD apps"
     printf "  %-40s %s\n" "install apps nats,redis-stack --dry-run" "Dry run for ArgoCD apps"
+    printf "  %-40s %s\n" "uninstall apps kubevirt" "Delete installed apps"
     echo ""
     echo "Notes:"
     echo "  - Parameters in [brackets] are optional"
@@ -139,6 +140,36 @@ perform_action() {
             exit 0
           fi;;
         *) echo -e "${red}Unknown install target type: $target_type${clear}"; exit 1;;
+      esac;;
+    uninstall|remove)
+      local target_type items
+      target_type="$1"; shift || true
+      items="$1"; shift || true
+      if [[ -z $target_type || -z $items ]]; then
+         echo -e "${red}Usage: ./create-cluster.sh uninstall <apps> <name1,name2>${clear}"; exit 1
+      fi
+      
+      case "$target_type" in
+        apps)
+          # Split comma-separated items
+          IFS=',' read -r -a arr <<< "$items"
+          for item in "${arr[@]}"; do
+            [ -z "$item" ] && continue
+            case "$item" in
+              kubevirt)
+                echo -e "${yellow}==> Deleting app item: $item${clear}"
+                delete_kubevirt || exit 1
+                ;;
+              *)
+                echo -e "${red}Delete not implemented for: $item${clear}"
+                echo -e "${yellow}You can manually delete with:${clear}"
+                echo -e "${blue}  kubectl delete namespace <namespace>${clear}"
+                exit 1;;
+            esac
+          done
+          exit 0
+          ;;
+        *) echo -e "${red}Unknown uninstall target type: $target_type (only 'apps' supported)${clear}"; exit 1;;
       esac;;
     *)
       print_logo
