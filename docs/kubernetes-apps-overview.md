@@ -36,6 +36,7 @@ This repo can install a curated set of platform + demo components using either H
 | Kubeview                        | Cluster Visualization  | UI to explore resources graphically            | Visualizing relationships                   | —                    | `iakv`                 |
 | Kite Kubernetes Dashboard       | Cluster Visualization  | Lightweight dashboard for cluster insights     | Quick inspection of workloads and logs      | `ihkite`             | `iakite`               |
 | OpenCost                        | Cost Analysis          | Estimation of per‑resource cost                | Understanding resource cost attribution     | —                    | `iaoc`                 |
+| KubeVirt                        | Virtualization         | VM management on Kubernetes                    | Running VMs alongside containers            | —                    | `iakv` (kubevirt)      |
 | Nyancat App                     | Demo                   | Simple sample workload via ingress             | Smoke testing ingress + ArgoCD              | —                    | `iac`                  |
 | Vault (Unseal Automation)       | Bootstrap              | Auto init/unseal & output keys                 | Rapid experimentation                       | (within `ihv`)       | (within `iav`)         |
 | NFS + Minio Together            | Pattern                | RWX + Object storage                           | Testing hybrid storage patterns             | (combine above)      | (combine above)        |
@@ -187,7 +188,22 @@ This repo can install a curated set of platform + demo components using either H
 -   Allocates resource cost across namespaces, pods, workloads.
 -   Locally: understand the inputs needed for real cost reporting; pairs with metrics stack.
 
-### 7. Sample / Demo
+### 7. Virtualization
+
+**KubeVirt**
+
+-   Technology preview: extends Kubernetes to manage virtual machines (VMs) alongside containers.
+-   Adds custom resources (VirtualMachine, VirtualMachineInstance) that run KVM-based VMs using standard Kubernetes APIs.
+-   Locally: experiment with hybrid workloads (VMs + containers), test live migration, explore VM networking/storage patterns.
+-   Requirements:
+    -   **Kind clusters**: Works with software emulation (automatically enabled).
+    -   **Talos clusters**: Requires a storage provider (local-path-provisioner, Rook Ceph, or NFS) for VM disk persistence.
+-   Install virtctl CLI for VM management: `kubectl krew install virt` or download from releases.
+-   Common operations: `virtctl start/stop/restart <vm>`, `virtctl console <vm>`, `virtctl ssh <user>@<vm>`.
+-   Great for learning VM lifecycle, comparing with container workflows, or running legacy workloads that can't easily containerize.
+-   See [KubeVirt documentation](../docs/kubevirt.md) for detailed setup and usage.
+
+### 8. Sample / Demo
 
 **Nyancat Application**
 
@@ -222,6 +238,7 @@ This repo can install a curated set of platform + demo components using either H
 | Observability              | Kube-Prometheus-Stack    | Layer in OpenCost                     |
 | Infra abstraction          | Crossplane               | Compose your own XRDs                 |
 | Secrets management         | Vault                    | Integrate apps using Vault secrets    |
+| Virtualization basics      | KubeVirt                 | Create VMs, explore live migration    |
 
 ---
 

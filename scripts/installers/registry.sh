@@ -96,6 +96,7 @@ nats|app|install_nats_application|NATS messaging server
 kite|app|install_kite_application|Kite Kubernetes dashboard
 metrics-server|app|install_metrics_server_application|Metrics Server for resource metrics|kube-system
 keycloak|app|install_keycloak_application|Keycloak identity and access management|keycloak
+kubevirt|app|install_kubevirt_application|KubeVirt virtual machine management|kubevirt
 EOF
 )"
 

@@ -1,0 +1,23 @@
+# KubeVirt is installed via direct kubectl apply of release manifests
+# This is a placeholder ArgoCD Application for tracking purposes
+# The actual installation is handled by the install_kubevirt_application function
+# which applies:
+# 1. kubevirt-operator.yaml
+# 2. kubevirt-cr.yaml
+#
+# Note: KubeVirt doesn't provide a Helm chart or Git-based manifests suitable for ArgoCD
+# The recommended installation is via their release artifacts
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubevirt-installation-info
+  namespace: kubevirt
+  labels:
+    app: kubevirt
+data:
+  installation-method: 'direct-kubectl'
+  version: 'stable'
+  notes: |
+    KubeVirt is installed via direct kubectl apply.
+    Operator: https://github.com/kubevirt/kubevirt/releases/download/${VERSION}/kubevirt-operator.yaml
+    CR: https://github.com/kubevirt/kubevirt/releases/download/${VERSION}/kubevirt-cr.yaml

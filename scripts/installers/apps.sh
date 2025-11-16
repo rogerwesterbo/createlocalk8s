@@ -1074,6 +1074,147 @@ function unseal_vault() {
     done
 }
 
+function install_kubevirt_application() {
+    echo -e "$yellow Installing KubeVirt"
+    
+    # Detect provider from context
+    local context cluster_name provider
+    context=$(kubectl config current-context 2>/dev/null || true)
+    if [[ "$context" == kind-* ]]; then
+        cluster_name="${context#kind-}"
+        provider="kind"
+    elif [[ "$context" == admin@* ]]; then
+        cluster_name="${context#admin@}"
+        provider="talos"
+    fi
+    
+    # Get provider from clusterinfo.txt if available
+    if [ -n "$cluster_name" ] && [ -n "${clustersDir:-}" ]; then
+        local provider_file="$clustersDir/$cluster_name/provider.txt"
+        if [ -f "$provider_file" ]; then
+            provider=$(cat "$provider_file")
+        fi
+    fi
+    
+    # For Talos clusters, check for storage
+    if [[ "$provider" == "talos" ]]; then
+        echo -e "$yellow\n⚠️  KubeVirt on Talos requires a storage provider for persistent volumes"
+        local default_sc=$(kubectl get storageclass -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}' 2>/dev/null)
+        if [ -z "$default_sc" ]; then
+            echo -e "$red\n🛑 ERROR: No default StorageClass found!"
+            echo -e "$yellow\nKubeVirt requires persistent storage for VM disks."
+            echo -e "$yellow\nFor Talos clusters, install a storage provider first:"
+            echo -e "$yellow\n  OpenEBS (local-path):$blue ./kl.sh install helm localpathprovisioner"
+            echo -e "$yellow  Rook Ceph (distributed):$blue ./kl.sh install apps rookcephoperator,rookcephcluster"
+            echo -e "$yellow\nAfter installing, set it as default:$blue kubectl patch storageclass <name> -p '{\"metadata\": {\"annotations\":{\"storageclass.kubernetes.io/is-default-class\":\"true\"}}}'"
+            die
+        fi
+        echo -e "$yellow ✓ StorageClass found: $default_sc"
+    fi
+    
+    # Get the latest stable version
+    echo -e "$yellow\n📦 Fetching latest stable KubeVirt version..."
+    local VERSION
+    VERSION=$(curl -s https://storage.googleapis.com/kubevirt-prow/release/kubevirt/kubevirt/stable.txt)
+    if [ -z "$VERSION" ]; then
+        echo -e "$red 🛑 Could not fetch KubeVirt version"
+        die
+    fi
+    echo -e "$yellow Latest stable version: $VERSION"
+    
+    # Create namespace
+    echo -e "$yellow\n🔧 Creating kubevirt namespace..."
+    kubectl create namespace kubevirt --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
+    
+    # Install KubeVirt operator
+    echo -e "$yellow\n📥 Installing KubeVirt operator..."
+    (kubectl apply -f "https://github.com/kubevirt/kubevirt/releases/download/${VERSION}/kubevirt-operator.yaml" || {
+        echo -e "$red 🛑 Could not install KubeVirt operator"
+        die
+    }) & spinner
+    
+    echo -e "$yellow ✅ KubeVirt operator installed"
+    
+    # Wait for operator to be ready
+    echo -e "$yellow\n⏰ Waiting for KubeVirt operator to be ready..."
+    sleep 10
+    (kubectl wait deployment -n kubevirt virt-operator --for condition=Available=True --timeout=180s || {
+        echo -e "$red 🛑 KubeVirt operator is not ready"
+        die
+    }) & spinner
+    
+    # Install KubeVirt CR
+    echo -e "$yellow\n📥 Installing KubeVirt CR..."
+    (kubectl apply -f "https://github.com/kubevirt/kubevirt/releases/download/${VERSION}/kubevirt-cr.yaml" || {
+        echo -e "$red 🛑 Could not install KubeVirt CR"
+        die
+    }) & spinner
+    
+    echo -e "$yellow ✅ KubeVirt CR installed"
+    
+    # For kind clusters, enable emulation mode if needed
+    if [[ "$provider" == "kind" ]]; then
+        echo -e "$yellow\n🔧 Enabling emulation mode for kind cluster..."
+        (kubectl -n kubevirt patch kubevirt kubevirt --type=merge --patch '{"spec":{"configuration":{"developerConfiguration":{"useEmulation":true}}}}' || {
+            echo -e "$yellow ⚠️  Could not enable emulation mode (may not be needed)"
+        }) & spinner
+    fi
+    
+    # Wait for KubeVirt to be ready
+    echo -e "$yellow\n⏰ Waiting for KubeVirt to be ready (this may take a few minutes)..."
+    local max_wait=300
+    local waited=0
+    while [ "$(kubectl get kubevirt.kubevirt.io/kubevirt -n kubevirt -o=jsonpath="{.status.phase}" 2>/dev/null)" != "Deployed" ]; do
+        if [ $waited -ge $max_wait ]; then
+            echo -e "$red\n🛑 KubeVirt did not become ready after ${max_wait}s"
+            echo -e "$yellow Check status with:$blue kubectl get kubevirt.kubevirt.io/kubevirt -n kubevirt -o yaml"
+            die
+        fi
+        sleep 5
+        waited=$((waited + 5))
+        if [ $((waited % 30)) -eq 0 ]; then
+            echo -e "$yellow   Still waiting... (${waited}s/${max_wait}s)"
+        fi
+    done
+    
+    # Apply the info ConfigMap
+    (kubectl apply -f $kubevirt_app_yaml || true) & spinner
+    
+    # Record installation in cluster info file if it exists
+    if [ -n "${cluster_info_file:-}" ] && [ -f "$cluster_info_file" ]; then
+        echo "KubeVirt application installed: yes" >> "$cluster_info_file"
+        echo "KubeVirt version: $VERSION" >> "$cluster_info_file"
+    fi
+    
+    echo -e "$yellow\n✅ KubeVirt is ready to use!"
+    echo -e "$yellow\nVerify installation:"
+    echo -e "$yellow   Check phase:$blue kubectl get kubevirt.kubevirt.io/kubevirt -n kubevirt -o=jsonpath=\"{.status.phase}\""
+    echo -e "$yellow   Check components:$blue kubectl get all -n kubevirt"
+    
+    echo -e "$yellow\n📚 Next steps:"
+    echo -e "$yellow   Install virtctl CLI:"
+    echo -e "$blue     VERSION=\$(kubectl get kubevirt.kubevirt.io/kubevirt -n kubevirt -o=jsonpath=\"{.status.observedKubeVirtVersion}\")"
+    echo -e "$blue     ARCH=\$(uname -s | tr A-Z a-z)-\$(uname -m | sed 's/x86_64/amd64/')"
+    echo -e "$blue     curl -L -o virtctl https://github.com/kubevirt/kubevirt/releases/download/\${VERSION}/virtctl-\${VERSION}-\${ARCH}"
+    echo -e "$blue     chmod +x virtctl"
+    echo -e "$blue     sudo mv virtctl /usr/local/bin/"
+    
+    echo -e "$yellow\n   Or install as kubectl plugin:"
+    echo -e "$blue     kubectl krew install virt"
+    
+    echo -e "$yellow\n   Create a test VM:"
+    echo -e "$blue     kubectl apply -f https://kubevirt.io/labs/manifests/vm.yaml"
+    echo -e "$blue     virtctl start testvm"
+    
+    echo -e "$yellow\n📖 Documentation:"
+    echo -e "$yellow   KubeVirt docs:$blue https://kubevirt.io/user-guide/"
+    echo -e "$yellow   Labs:$blue https://kubevirt.io/labs/"
+    if [[ "$provider" == "kind" ]]; then
+        echo -e "$yellow   Kind quickstart:$blue https://kubevirt.io/quickstart_kind/"
+    fi
+    echo -e "$clear"
+}
+
 function restart_argocd_after_cni() {
     # Check if ArgoCD is installed
     if kubectl get namespace argocd >/dev/null 2>&1; then
