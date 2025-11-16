@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ -z "${openbao_app_yaml:-}" ]; then
+    apps_script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    openbao_app_yaml="$apps_script_root/configs/apps/manifests/openbao-app.yaml"
+fi
+
 function is_running_more_than_one_cluster() {
     local total_clusters=0
     local talos_count=0
@@ -418,6 +423,33 @@ function install_vault_application() {
     show_vault_after_installation
 }
 
+function install_openbao_application() {
+    echo -e "$yellow Installing OpenBao ArgoCD application"
+    (kubectl apply -f $openbao_app_yaml|| 
+    { 
+        echo -e "$red 🛑 Could not install OpenBao ArgoCD application into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing OpenBao ArgoCD application"
+
+    echo -e "$yellow\n⏰ Waiting for ArgoCD to sync and create OpenBao"
+    sleep 20
+
+    (kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=openbao -n openbao --timeout=300s || {
+        echo -e "$red 🛑 OpenBao is not ready ...";
+        die
+    }) & spinner
+
+    echo "OpenBao application installed: yes" >> $cluster_info_file
+
+    echo -e "$yellow ✅ OpenBao is ready to use"
+    echo -e "$yellow\nRoot token:$blue openbao-root"
+    echo -e "$yellow Port-forward:$blue kubectl port-forward -n openbao svc/openbao 8200:8200"
+    echo -e "$yellow Ingress:$blue http://openbao.localtest.me"
+    echo -e "$yellow\nRun:$blue kubectl logs -n openbao statefulset/openbao --tail=20$yellow to see dev-mode startup output"
+}
+
 function install_postgres_application() {
     echo -e "$yellow Installing Postgres ArgoCD application"
     (kubectl apply -f $cnpg_app_yaml|| 
@@ -648,6 +680,154 @@ function install_metrics_server_application() {
     echo -e "$yellow Metrics Server is ready to use"
     echo -e "$yellow Verify metrics are available:$blue kubectl top nodes"
     echo -e "$yellow Check pod metrics:$blue kubectl top pods -A"
+}
+
+function install_keycloak_application() {
+    echo -e "$yellow Installing Keycloak ArgoCD application"
+    
+    # Check for StorageClass (required for PostgreSQL)
+    # Try to get provider from context
+    local context cluster_name provider
+    context=$(kubectl config current-context 2>/dev/null || true)
+    if [[ "$context" == kind-* ]]; then
+        cluster_name="${context#kind-}"
+    elif [[ "$context" == admin@* ]]; then
+        cluster_name="${context#admin@}"
+    fi
+    
+    # Get provider from clusterinfo.txt if available
+    if [ -n "$cluster_name" ] && [ -n "${clustersDir:-}" ]; then
+        local provider_file="$clustersDir/$cluster_name/provider.txt"
+        if [ -f "$provider_file" ]; then
+            provider=$(cat "$provider_file")
+        fi
+    fi
+    
+    if [[ "$provider" == "talos" ]]; then
+        local default_sc=$(kubectl get storageclass -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}')
+        if [ -z "$default_sc" ]; then
+            echo -e "$red\n🛑 ERROR: No default StorageClass found!"
+            echo -e "$yellow\nKeycloak requires PostgreSQL, which needs persistent storage."
+            echo -e "$yellow\nFor Talos clusters, you can install storage providers:"
+            echo -e "$yellow\n  OpenEBS (local-path):$blue ./kl.sh install helm localpathprovisioner"
+            echo -e "$yellow  Rook Ceph (distributed):$blue ./kl.sh install apps rookcephoperator,rookcephcluster"
+            echo -e "$yellow\n  NFS (network):$blue ./kl.sh install apps nfs"
+            echo -e "$yellow\nAfter installing, set it as default:$blue kubectl patch storageclass <name> -p '{\"metadata\": {\"annotations\":{\"storageclass.kubernetes.io/is-default-class\":\"true\"}}}'"
+            die
+        fi
+        echo -e "$yellow ✓ StorageClass found: $default_sc"
+    fi
+    
+    # Check if PostgreSQL is installed
+    if ! kubectl get namespace postgres-cluster &>/dev/null || ! kubectl get cluster -n postgres-cluster postgres-cluster &>/dev/null; then
+        echo -e "$yellow\n📊 PostgreSQL is required for Keycloak but not found."
+        echo -e "$yellow Installing PostgreSQL (Cloud Native PG)..."
+        install_postgres_application
+    else
+        echo -e "$yellow ✓ PostgreSQL cluster found"
+    fi
+    
+    # Create Keycloak database and user
+    echo -e "$yellow\n🔧 Setting up Keycloak database in PostgreSQL"
+    
+    # Wait for postgres cluster to be ready
+    echo -e "$yellow Waiting for PostgreSQL cluster to be ready..."
+    kubectl wait --for=condition=Ready cluster/postgres-cluster -n postgres-cluster --timeout=300s &>/dev/null || {
+        echo -e "$red 🛑 PostgreSQL cluster not ready"
+        die
+    }
+    
+    # Get postgres superuser password
+    local postgres_password=$(kubectl get secrets -n postgres-cluster postgres-cluster-superuser -o jsonpath='{.data.password}' | base64 -d)
+    
+    # Create keycloak database and user
+    echo -e "$yellow Creating keycloak database and user..."
+    local keycloak_password=$(openssl rand -base64 32 | tr -d "=+/" | cut -c1-25)
+    
+    kubectl run -n postgres-cluster postgres-client --rm -i --restart=Never --image=postgres:16 -- \
+        psql "postgresql://postgres:${postgres_password}@postgres-cluster-rw:5432/postgres" <<EOF 2>/dev/null || true
+-- Create keycloak database if it doesn't exist
+SELECT 'CREATE DATABASE keycloak' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'keycloak')\gexec
+
+-- Create keycloak user if it doesn't exist, or update password if it does
+DO \$\$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_user WHERE usename = 'keycloak') THEN
+        CREATE USER keycloak WITH PASSWORD '${keycloak_password}';
+    ELSE
+        ALTER USER keycloak WITH PASSWORD '${keycloak_password}';
+    END IF;
+END
+\$\$;
+
+-- Grant privileges
+GRANT ALL PRIVILEGES ON DATABASE keycloak TO keycloak;
+\\c keycloak
+GRANT ALL ON SCHEMA public TO keycloak;
+EOF
+    
+    # Create secret for Keycloak database password
+    kubectl create secret generic keycloak-db-secret \
+        --from-literal=password="${keycloak_password}" \
+        -n keycloak \
+        --dry-run=client -o yaml | kubectl apply -f - &>/dev/null
+    
+    echo -e "$yellow ✓ Database setup complete"
+    
+    # Install Keycloak
+    (kubectl apply -f $keycloak_app_yaml|| { 
+        echo -e "$red 🛑 Could not install Keycloak ArgoCD application into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Keycloak ArgoCD application"
+
+    echo -e "$yellow\n⏰ Waiting for ArgoCD to sync and create Keycloak resources"
+    sleep 20
+    
+    # Wait for statefulset to be created by ArgoCD (Keycloak uses StatefulSet, not Deployment)
+    local max_wait=60
+    local waited=0
+    while ! kubectl get statefulset -n keycloak keycloak-keycloakx &>/dev/null; do
+        if [ $waited -ge $max_wait ]; then
+            echo -e "$red 🛑 Keycloak statefulset not created by ArgoCD after ${max_wait}s ..."
+            die
+        fi
+        sleep 2
+        waited=$((waited + 2))
+    done
+    
+    echo -e "$yellow ⏰ Waiting for Keycloak to be ready"
+    (kubectl wait pods -n keycloak -l app.kubernetes.io/name=keycloakx --for=condition=Ready --timeout=300s || { 
+        echo -e "$red 🛑 Keycloak is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo "Keycloak application installed: yes" >> $cluster_info_file
+
+    echo -e "$yellow ✅ Keycloak is ready to use"
+    
+    echo -e "$yellow\nTo access Keycloak UI:"
+    echo -e "$yellow Via port-forward:$blue kubectl port-forward -n keycloak svc/keycloak-http 15003:80"
+    echo -e "$yellow Then open: http://localhost:15003"
+    
+    echo -e "$yellow\nVia ingress:"
+    local http_port
+    http_port=$(get_current_cluster_http_port)
+    if [[ $(is_running_more_than_one_cluster) == "yes" ]]; then
+        echo -e "$yellow Open:$blue http://keycloak.localtest.me:$http_port"
+    elif [ "$http_port" != "80" ]; then
+        echo -e "$yellow Open:$blue http://keycloak.localtest.me:$http_port"
+    else
+        echo -e "$yellow Open:$blue http://keycloak.localtest.me"
+    fi
+    
+    echo -e "$yellow\nDefault admin credentials:"
+    echo -e "$yellow   Username: admin"
+    echo -e "$yellow   Password: admin"
+    echo -e "$yellow\nDatabase: PostgreSQL (postgres-cluster)"
+    echo -e "$yellow   Database: keycloak"
+    echo -e "$yellow   User: keycloak"
 }
 
 function install_keycloak_application() {

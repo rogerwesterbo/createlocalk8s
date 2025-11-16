@@ -6,38 +6,39 @@ This repo can install a curated set of platform + demo components using either H
 
 ## Quick Reference Table
 
-| App / Stack                     | Category               | What It Gives You                              | Nice Locally For                           | Install (Helm Alias) | Install (ArgoCD Alias) |
-| ------------------------------- | ---------------------- | ---------------------------------------------- | ------------------------------------------ | -------------------- | ---------------------- |
-| Nginx Ingress Controller        | Networking / Ingress   | HTTP(S) routing + host/path rules              | Testing real ingress + TLS flows           | `ihn`                | `ian`                  |
-| ArgoCD                          | GitOps                 | Declarative sync from Git to cluster           | Practicing GitOps workflows                | `iha`                | (core bootstrap)       |
-| Cert-Manager                    | PKI / TLS              | Auto-issue & renew certs (self-signed / ACME)  | Learning TLS cert issuance pipelines       | —                    | `iacm`                 |
-| Metallb                         | Load Balancer          | Provides LoadBalancer IPs in bare-metal / kind | Simulating cloud LB behavior               | `ihm`                | `iam`                  |
-| Minio Operator                  | Object Storage (S3)    | S3-compatible buckets                          | Practicing apps needing object storage     | `ihmin`              | `iamin`                |
-| NFS Subdir External Provisioner | Storage                | Dynamic ReadWriteMany PVs backed by host NFS   | Shared volume experiments                  | `ihnfs`              | `ianfs`                |
-| Local Path Provisioner          | Storage                | Dynamic local path PVs (Rancher)               | Simple local persistent volumes            | `ihlpp`              | `ialpp`                |
-| Rook Ceph (Operator)            | Storage Orchestration  | Manages Ceph clusters                          | Exploring distributed storage              | `ihrco`              | `iarco`                |
-| Rook Ceph (Cluster)             | Storage Backend        | Ceph block / object / filesystem               | Stateful workloads resilience trials       | `ihrcc`              | `iarcc`                |
-| MongoDB (Operator)              | Database Operator      | CRDs to declaratively manage MongoDB           | Learning DB operator patterns              | `ihmdb`              | `iamdb`                |
-| MongoDB (Instance)              | Database               | Actual MongoDB deployment                      | Testing apps needing Mongo                 | `ihmdbi`             | `iamdbi`               |
-| CloudNativePG (Operator)        | Database Operator      | Postgres cluster management CRDs               | Studying HA Postgres automation            | `ihpg`               | `iapg` (operator)      |
-| CloudNativePG Cluster           | Database               | Multi-instance Postgres cluster                | SQL dev + HA failover demo                 | (part of `ihpg`)     | `iapg` (cluster)       |
-| PgAdmin4                        | DB GUI                 | Web UI for Postgres                            | Inspect schema, run queries                | `ihpa`               | `iapga`                |
-| Falco                           | Runtime Security       | Syscall-based threat detection                 | Observing security events                  | `ihf`                | `iaf`                  |
-| Trivy Operator                  | Security / SBOM        | Image & config vulnerability scanning          | Learning security shift-left               | `iht`                | `iat`                  |
-| HashiCorp Vault                 | Secrets Management     | Centralized secrets + encryption               | Practicing secret injection & policies     | `ihv`                | `iav`                  |
-| Keycloak                        | Identity & Access Mgmt | SSO, OIDC/SAML provider, user federation       | Testing authentication/authorization flows | `ihkc`               | `iakc`                 |
-| Redis Stack                     | Cache / Data           | Redis + modules (JSON, Search, etc.)           | Caching patterns, pub/sub, JSON docs       | `ihrs`               | `iars`                 |
-| Valkey                          | Cache / Data           | Redis-compatible key-value store               | Alternative to Redis, OSS caching          | `ihvk`               | `iavk`                 |
-| NATS                            | Messaging / Streaming  | Lightweight high-speed pub/sub + JetStream     | Event-driven prototypes, decoupling        | `ihnats`             | `ianats`               |
-| Crossplane                      | Infra Abstraction      | Compose infra APIs / claim external services   | Exploring platform engineering patterns    | `ihcr`               | `iacr`                 |
-| Kube-Prometheus-Stack           | Observability          | Prometheus + Alertmanager + Grafana            | Metrics / dashboards & alerting basics     | `ihp`                | `iap`                  |
-| Metrics Server                  | Observability          | Resource metrics API for kubectl top & HPA     | Testing autoscaling & resource metrics     | `ihms`               | `iams`                 |
-| Kubeview                        | Cluster Visualization  | UI to explore resources graphically            | Visualizing relationships                  | —                    | `iakv`                 |
-| Kite Kubernetes Dashboard       | Cluster Visualization  | Lightweight dashboard for cluster insights     | Quick inspection of workloads and logs     | `ihkite`             | `iakite`               |
-| OpenCost                        | Cost Analysis          | Estimation of per‑resource cost                | Understanding resource cost attribution    | —                    | `iaoc`                 |
-| Nyancat App                     | Demo                   | Simple sample workload via ingress             | Smoke testing ingress + ArgoCD             | —                    | `iac`                  |
-| Vault (Unseal Automation)       | Bootstrap              | Auto init/unseal & output keys                 | Rapid experimentation                      | (within `ihv`)       | (within `iav`)         |
-| NFS + Minio Together            | Pattern                | RWX + Object storage                           | Testing hybrid storage patterns            | (combine above)      | (combine above)        |
+| App / Stack                     | Category               | What It Gives You                              | Nice Locally For                            | Install (Helm Alias) | Install (ArgoCD Alias) |
+| ------------------------------- | ---------------------- | ---------------------------------------------- | ------------------------------------------- | -------------------- | ---------------------- |
+| Nginx Ingress Controller        | Networking / Ingress   | HTTP(S) routing + host/path rules              | Testing real ingress + TLS flows            | `ihn`                | `ian`                  |
+| ArgoCD                          | GitOps                 | Declarative sync from Git to cluster           | Practicing GitOps workflows                 | `iha`                | (core bootstrap)       |
+| Cert-Manager                    | PKI / TLS              | Auto-issue & renew certs (self-signed / ACME)  | Learning TLS cert issuance pipelines        | —                    | `iacm`                 |
+| Metallb                         | Load Balancer          | Provides LoadBalancer IPs in bare-metal / kind | Simulating cloud LB behavior                | `ihm`                | `iam`                  |
+| Minio Operator                  | Object Storage (S3)    | S3-compatible buckets                          | Practicing apps needing object storage      | `ihmin`              | `iamin`                |
+| NFS Subdir External Provisioner | Storage                | Dynamic ReadWriteMany PVs backed by host NFS   | Shared volume experiments                   | `ihnfs`              | `ianfs`                |
+| Local Path Provisioner          | Storage                | Dynamic local path PVs (Rancher)               | Simple local persistent volumes             | `ihlpp`              | `ialpp`                |
+| Rook Ceph (Operator)            | Storage Orchestration  | Manages Ceph clusters                          | Exploring distributed storage               | `ihrco`              | `iarco`                |
+| Rook Ceph (Cluster)             | Storage Backend        | Ceph block / object / filesystem               | Stateful workloads resilience trials        | `ihrcc`              | `iarcc`                |
+| MongoDB (Operator)              | Database Operator      | CRDs to declaratively manage MongoDB           | Learning DB operator patterns               | `ihmdb`              | `iamdb`                |
+| MongoDB (Instance)              | Database               | Actual MongoDB deployment                      | Testing apps needing Mongo                  | `ihmdbi`             | `iamdbi`               |
+| CloudNativePG (Operator)        | Database Operator      | Postgres cluster management CRDs               | Studying HA Postgres automation             | `ihpg`               | `iapg` (operator)      |
+| CloudNativePG Cluster           | Database               | Multi-instance Postgres cluster                | SQL dev + HA failover demo                  | (part of `ihpg`)     | `iapg` (cluster)       |
+| PgAdmin4                        | DB GUI                 | Web UI for Postgres                            | Inspect schema, run queries                 | `ihpa`               | `iapga`                |
+| Falco                           | Runtime Security       | Syscall-based threat detection                 | Observing security events                   | `ihf`                | `iaf`                  |
+| Trivy Operator                  | Security / SBOM        | Image & config vulnerability scanning          | Learning security shift-left                | `iht`                | `iat`                  |
+| HashiCorp Vault                 | Secrets Management     | Centralized secrets + encryption               | Practicing secret injection & policies      | `ihv`                | `iav`                  |
+| OpenBao (Dev)                   | Secrets Management     | Vault-compatible dev server (community fork)   | Evaluating workflows with MPL-licensed fork | `iho`                | `iao`                  |
+| Keycloak                        | Identity & Access Mgmt | SSO, OIDC/SAML provider, user federation       | Testing authentication/authorization flows  | `ihkc`               | `iakc`                 |
+| Redis Stack                     | Cache / Data           | Redis + modules (JSON, Search, etc.)           | Caching patterns, pub/sub, JSON docs        | `ihrs`               | `iars`                 |
+| Valkey                          | Cache / Data           | Redis-compatible key-value store               | Alternative to Redis, OSS caching           | `ihvk`               | `iavk`                 |
+| NATS                            | Messaging / Streaming  | Lightweight high-speed pub/sub + JetStream     | Event-driven prototypes, decoupling         | `ihnats`             | `ianats`               |
+| Crossplane                      | Infra Abstraction      | Compose infra APIs / claim external services   | Exploring platform engineering patterns     | `ihcr`               | `iacr`                 |
+| Kube-Prometheus-Stack           | Observability          | Prometheus + Alertmanager + Grafana            | Metrics / dashboards & alerting basics      | `ihp`                | `iap`                  |
+| Metrics Server                  | Observability          | Resource metrics API for kubectl top & HPA     | Testing autoscaling & resource metrics      | `ihms`               | `iams`                 |
+| Kubeview                        | Cluster Visualization  | UI to explore resources graphically            | Visualizing relationships                   | —                    | `iakv`                 |
+| Kite Kubernetes Dashboard       | Cluster Visualization  | Lightweight dashboard for cluster insights     | Quick inspection of workloads and logs      | `ihkite`             | `iakite`               |
+| OpenCost                        | Cost Analysis          | Estimation of per‑resource cost                | Understanding resource cost attribution     | —                    | `iaoc`                 |
+| Nyancat App                     | Demo                   | Simple sample workload via ingress             | Smoke testing ingress + ArgoCD              | —                    | `iac`                  |
+| Vault (Unseal Automation)       | Bootstrap              | Auto init/unseal & output keys                 | Rapid experimentation                       | (within `ihv`)       | (within `iav`)         |
+| NFS + Minio Together            | Pattern                | RWX + Object storage                           | Testing hybrid storage patterns             | (combine above)      | (combine above)        |
 
 ---
 
@@ -134,6 +135,12 @@ This repo can install a curated set of platform + demo components using either H
 -   Central secret storage, dynamic credentials, encryption as a service.
 -   Auto-init/unseal flow here accelerates experimentation with auth backends & policies.
 
+**OpenBao (Dev Mode)**
+
+-   Community fork of Vault under the MPL, aligned with upstream APIs and CLI.
+-   Ships in single-pod dev mode (no unseal ceremony) with ingress at `http://openbao.localtest.me` and root token `openbao-root`.
+-   Ideal when you want Vault-compatible workflows without the proprietary licensing constraints or unseal automation scripts.
+
 **Keycloak**
 
 -   Open-source Identity and Access Management (IAM) solution providing Single Sign-On (SSO), identity brokering, and user federation.
@@ -193,6 +200,7 @@ This repo can install a curated set of platform + demo components using either H
 
 -   Script captures unseal keys/root token to `vault-init.json` to skip manual ceremony.
 -   In production you'd use auto-unseal (KMS/HSM); here we prioritize speed of learning.
+-   OpenBao dev installs skip unseal entirely—grab the `openbao-root` token and experiment immediately.
 
 **Combined Storage (NFS + Minio + Ceph)**
 

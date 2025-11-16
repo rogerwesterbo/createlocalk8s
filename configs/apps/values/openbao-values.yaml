@@ -1,0 +1,46 @@
+# Default OpenBao settings for local development clusters.
+# Deploys OpenBao in single-node dev mode and exposes UI via ingress.
+
+global:
+  tlsDisable: true
+
+server:
+  dev:
+    enabled: true
+    devRootToken: openbao-root
+    devListenAddress: '[::]:8200'
+  ha:
+    enabled: false
+  standalone:
+    enabled: false
+  dataStorage:
+    enabled: false
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    activeService: true
+    hosts:
+      - host: openbao.localtest.me
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: 'HTTP'
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  extraEnvironmentVars:
+    OPENBAO_DEV_ROOT_TOKEN_ID: openbao-root
+
+ui:
+  enabled: true
+
+ingress:
+  enabled: false
+
+csi:
+  enabled: false
+
+injector:
+  enabled: false

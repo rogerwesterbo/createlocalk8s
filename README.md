@@ -108,8 +108,8 @@ Current date and time in Linux Mon Oct 13 23:29:08 CEST 2025
 -   Post-create helper to install a sample Nyancat app (demo ingress + ArgoCD)
 -   Rich subcommands to list, inspect, delete clusters & fetch kubeconfig
 -   **Registry-based installers**: List and install Helm/ArgoCD components with simple commands
--   **23 Helm installers**: ArgoCD, Crossplane, Rook Ceph, Falco, Trivy, Vault, MetalLB, MinIO, NFS, Local Path Provisioner, MongoDB Operator, CNPG, PgAdmin, Redis Stack, Valkey, NATS, Kite, Keycloak, Metrics Server, Prometheus, Cilium, Calico, Nginx Ingress
--   **26 ArgoCD Application installers** (GitOps style): monitoring (Prometheus), metrics (Metrics Server), databases, security, storage, cost monitoring, identity management, etc.
+-   **24 Helm installers**: ArgoCD, Crossplane, Rook Ceph, Falco, Trivy, Vault, OpenBao, MetalLB, MinIO, NFS, Local Path Provisioner, MongoDB Operator, CNPG, PgAdmin, Redis Stack, Valkey, NATS, Kite, Keycloak, Metrics Server, Prometheus, Cilium, Calico, Nginx Ingress
+-   **27 ArgoCD Application installers** (GitOps style): monitoring (Prometheus), metrics (Metrics Server), databases, security, storage, cost monitoring, identity management, etc.
 -   **Dry-run mode**: Preview what will be installed with `--dry-run`
 -   Generates per-cluster info + kubeconfig files under `clusters/<cluster-name>/`
 -   Consistent colored output & spinners, with readiness waits for core components
@@ -432,7 +432,7 @@ See full cluster details (cluster info + kind config used):
 ./kl.sh install apps prometheus,mongodb --dry-run
 ```
 
-**Available Helm components** (23):
+**Available Helm components** (24):
 
 -   `argocd` - ArgoCD GitOps controller
 -   `calico` - Calico CNI networking and security
@@ -450,6 +450,7 @@ See full cluster details (cluster info + kind config used):
 -   `nats` - NATS messaging
 -   `nfs` - NFS provisioner
 -   `nginx` - NGINX ingress controller
+-   `openbao` - OpenBao secrets manager (dev mode)
 -   `pgadmin` - PostgreSQL admin UI
 -   `postgres` - CloudNativePG operator + cluster
 -   `prometheus` - Kube Prometheus Stack (Prometheus/Grafana/Alertmanager)
@@ -460,7 +461,7 @@ See full cluster details (cluster info + kind config used):
 -   `valkey` - Valkey key-value store
 -   `vault` - HashiCorp Vault server
 
-**Available ArgoCD apps** (26):
+**Available ArgoCD apps** (27):
 
 -   `certmanager` - Cert Manager for certificates
 -   `crossplane` - Crossplane control plane
@@ -478,6 +479,7 @@ See full cluster details (cluster info + kind config used):
 -   `nfs` - NFS external provisioner
 -   `nginx` - Ingress-Nginx controller
 -   `nyancat` - Sample Nyancat demo application
+-   `openbao` - OpenBao secrets manager (dev mode)
 -   `opencost` - OpenCost cost monitoring
 -   `pgadmin` - PgAdmin4 UI
 -   `postgres` - CloudNativePG operator + cluster

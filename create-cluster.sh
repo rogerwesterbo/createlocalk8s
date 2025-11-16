@@ -16,6 +16,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 scriptDir=$(dirname -- "$(readlink -f -- "$BASH_SOURCE")")
 manifestDir=$(get_abs_filename "$scriptDir/configs/apps/manifests")
 clustersDir=$(get_abs_filename "$scriptDir/clusters")
+configsDir=$(get_abs_filename "$scriptDir/configs")
+
 kind_config_path=$(get_abs_filename "$manifestDir/kindconfig.yaml")
 kind_config_template_path=$(get_abs_filename "$manifestDir/kindconfig-template.yaml")
 nyancat_argo_app_yaml=$(get_abs_filename "$manifestDir/nyancat-argo-app.yaml")
@@ -48,8 +50,10 @@ nats_app_yaml=$(get_abs_filename "$manifestDir/nats-app.yaml")
 kite_app_yaml=$(get_abs_filename "$manifestDir/kite-app.yaml")
 metrics_server_app_yaml=$(get_abs_filename "$manifestDir/metrics-server-app.yaml")
 keycloak_app_yaml=$(get_abs_filename "$manifestDir/keycloak-app.yaml")
-nats_ingress_yaml=$(get_abs_filename "$configs_dir/nats-ingress.yaml")
-nats_gateway_yaml=$(get_abs_filename "$configs_dir/nats-gateway.yaml")
+openbao_app_yaml=$(get_abs_filename "$manifestDir/openbao-app.yaml")
+openbao_values_yaml=$(get_abs_filename "$scriptDir/configs/apps/values/openbao-values.yaml")
+nats_ingress_yaml=$(get_abs_filename "$configsDir/nats-ingress.yaml")
+nats_gateway_yaml=$(get_abs_filename "$configsDir/nats-gateway.yaml")
 
 
 if [ "$#" -eq 0 ]; then

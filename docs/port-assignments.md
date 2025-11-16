@@ -13,20 +13,22 @@ All `kubectl port-forward` commands use unique local ports to avoid conflicts wh
 
 ## Web UIs & Dashboards
 
-| Service  | Port Forward Command                                                               | Local Port | Service Port | Local URL                                                     |
-| -------- | ---------------------------------------------------------------------------------- | ---------- | ------------ | ------------------------------------------------------------- |
-| Grafana  | `kubectl port-forward -n prometheus services/prometheus-grafana 3000:80`           | 3000       | 80           | http://localhost:3000                                         |
-| Kubeview | `kubectl port-forward -n kubeview pods/<pod-name> 15004:8000`                      | 15004      | 8000         | http://localhost:15004                                        |
-| Kite     | `kubectl -n kite port-forward svc/kite 15001:8080`                                 | 15001      | 8080         | http://localhost:15001 or http://kite.localtest.me[:port]     |
-| Keycloak | `kubectl port-forward -n keycloak svc/keycloak-http 15003:80`                      | 15003      | 80           | http://localhost:15003 or http://keycloak.localtest.me[:port] |
-| PgAdmin  | `kubectl port-forward -n pgadmin services/pgadmin-pgadmin4 5050:80`                | 5050       | 80           | http://localhost:5050                                         |
-| Vault    | `kubectl port-forward --namespace vault service/vault 8200:8200`                   | 8200       | 8200         | http://localhost:8200                                         |
-| Falco UI | `kubectl port-forward --namespace falco services/falco-falcosidekick-ui 2802:2802` | 2802       | 2802         | http://localhost:2802                                         |
+| Service       | Port Forward Command                                                               | Local Port | Service Port | Local URL                                                     |
+| ------------- | ---------------------------------------------------------------------------------- | ---------- | ------------ | ------------------------------------------------------------- |
+| Grafana       | `kubectl port-forward -n prometheus services/prometheus-grafana 3000:80`           | 3000       | 80           | http://localhost:3000                                         |
+| Kubeview      | `kubectl port-forward -n kubeview pods/<pod-name> 15004:8000`                      | 15004      | 8000         | http://localhost:15004                                        |
+| Kite          | `kubectl -n kite port-forward svc/kite 15001:8080`                                 | 15001      | 8080         | http://localhost:15001 or http://kite.localtest.me[:port]     |
+| Keycloak      | `kubectl port-forward -n keycloak svc/keycloak-http 15003:80`                      | 15003      | 80           | http://localhost:15003 or http://keycloak.localtest.me[:port] |
+| OpenBao (Dev) | `kubectl port-forward -n openbao svc/openbao 8201:8200`                            | 8201       | 8200         | http://localhost:8201 or http://openbao.localtest.me[:port]   |
+| PgAdmin       | `kubectl port-forward -n pgadmin services/pgadmin-pgadmin4 5050:80`                | 5050       | 80           | http://localhost:5050                                         |
+| Vault         | `kubectl port-forward --namespace vault service/vault 8200:8200`                   | 8200       | 8200         | http://localhost:8200                                         |
+| Falco UI      | `kubectl port-forward --namespace falco services/falco-falcosidekick-ui 2802:2802` | 2802       | 2802         | http://localhost:2802                                         |
 
 **Note:**
 
 -   Kite is accessible via ingress at `http://kite.localtest.me` (or with cluster-specific port if multiple clusters are running).
 -   Keycloak is accessible via ingress at `http://keycloak.localtest.me` (or with cluster-specific port if multiple clusters are running).
+-   OpenBao runs in dev mode with ingress at `http://openbao.localtest.me` (or with cluster-specific port if multiple clusters are running).
 
 ## Monitoring & Metrics
 
@@ -51,7 +53,7 @@ All `kubectl port-forward` commands use unique local ports to avoid conflicts wh
 -   **4000-4999**: NATS Core (4222)
 -   **5000-5999**: PostgreSQL (5432), PgAdmin (5050)
 -   **6000-6999**: Redis Stack (6380), Valkey (6381)
--   **8000-8999**: Vault (8200)
+-   **8000-8999**: Vault (8200), OpenBao (8201)
 -   **9000-9999**: OpenCost (9003), Prometheus (9090), Alertmanager (9093)
 -   **15000+**: Kite (15001), NATS WebSocket (15002), Keycloak (15003), Kubeview (15004)
 -   **27000+**: MongoDB (27017)
@@ -86,3 +88,7 @@ All `kubectl port-forward` commands use unique local ports to avoid conflicts wh
 ### Vault
 
 -   Token: Found in `vault-init.json` after installation
+
+### OpenBao (Dev Mode)
+
+-   Token: `openbao-root`

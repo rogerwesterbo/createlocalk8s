@@ -45,6 +45,7 @@ mongodb-operator|helm|install_helm_mongodb_operator|MongoDB (Bitnami) single dep
 mongodb-instance|helm|install_helm_mongodb_instance|MongoDB additional instance (Bitnami)|mongodb
 trivy|helm|install_helm_trivy|Trivy security operator
 vault|helm|install_helm_vault|HashiCorp Vault server
+openbao|helm|install_helm_openbao|OpenBao secrets manager (dev mode)|openbao
 falco|helm|install_helm_falco|Falco runtime security
 postgres|helm|install_helm_postgres|CloudNativePG operator + cluster|postgres
 pgadmin|helm|install_helm_pgadmin|PgAdmin4 UI
@@ -79,6 +80,7 @@ mongodb-instance|app|install_mongodb_instance|MongoDB Instance CR|mongodb
 falco|app|install_falco_application|Falco runtime security
 trivy|app|install_trivy_application|Trivy operator
 vault|app|install_vault_application|HashiCorp Vault server
+openbao|app|install_openbao_application|OpenBao secrets manager (dev mode)|openbao
 postgres|app|install_postgres_application|CloudNativePG operator + cluster|postgres
 pgadmin|app|install_pgadmin_application|PgAdmin4 UI
 rook-ceph-operator|app|install_rook_ceph_operator_application|Rook Ceph operator

@@ -35,6 +35,12 @@ function helm_install_generic() {
     fi
 }
 
+# Determine OpenBao values file location if not injected by the caller
+if [ -z "${openbao_values_yaml:-}" ]; then
+    helm_script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+    openbao_values_yaml="$helm_script_root/configs/apps/values/openbao-values.yaml"
+fi
+
 function install_helm_minio(){
     helm_install_generic \
         "minio-operator" \
@@ -233,6 +239,32 @@ function install_helm_vault(){
     unseal_vault
 
     show_vault_after_installation
+}
+
+function install_helm_openbao(){
+    echo -e "$yellow Installing OpenBao"
+
+    helm repo add openbao https://openbao.github.io/openbao-helm
+    (helm upgrade --install openbao openbao/openbao \
+        --namespace openbao \
+        --create-namespace \
+        --values "$openbao_values_yaml" || {
+        echo -e "$red 🛑 Could not install OpenBao into cluster ...";
+        die
+    }) & spinner
+
+    echo -e "$yellow\n⏰ Waiting for OpenBao to be ready"
+    sleep 10
+    (kubectl rollout status statefulset/openbao -n openbao --timeout=300s || {
+        echo -e "$red 🛑 OpenBao is not ready ...";
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing OpenBao"
+    echo -e "$yellow\nOpenBao runs in dev mode for quick local experiments"
+    echo -e "$yellow Root token:$blue openbao-root"
+    echo -e "$yellow Port-forward:$blue kubectl port-forward -n openbao svc/openbao 8200:8200"
+    echo -e "$yellow Ingress:$blue http://openbao.localtest.me"
 }
 
 function install_helm_mongodb_operator(){

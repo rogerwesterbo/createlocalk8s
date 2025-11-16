@@ -1,0 +1,65 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openbao
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  destination:
+    namespace: openbao
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: openbao
+    repoURL: https://openbao.github.io/openbao-helm
+    targetRevision: '0.19.*'
+    helm:
+      values: |
+        global:
+          tlsDisable: true
+
+        server:
+          dev:
+            enabled: true
+            devRootToken: openbao-root
+            devListenAddress: "[::]:8200"
+          ha:
+            enabled: false
+          standalone:
+            enabled: false
+          dataStorage:
+            enabled: false
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            activeService: true
+            hosts:
+              - host: openbao.localtest.me
+            annotations:
+              nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          extraEnvironmentVars:
+            OPENBAO_DEV_ROOT_TOKEN_ID: openbao-root
+
+        ui:
+          enabled: true
+
+        csi:
+          enabled: false
+
+        injector:
+          enabled: false
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
