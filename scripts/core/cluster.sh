@@ -311,21 +311,18 @@ function get_cluster_parameter() {
     local provider=""  # Will be set interactively or via flag
     local provider_from_flag=false
     local cluster_name_arg=""
-    local skip_next=false
+    local args=("$@")
+    local i=0
 
-    for arg in "$@"; do
-        if [ "$skip_next" = true ]; then
-            skip_next=false
-            continue
-        fi
-
+    while [ $i -lt ${#args[@]} ]; do
+        arg="${args[$i]}"
         case "$arg" in
             --provider)
-                skip_next=true
-                shift
-                provider="$1"
-                provider_from_flag=true
-                shift
+                i=$((i + 1))
+                if [ $i -lt ${#args[@]} ]; then
+                    provider="${args[$i]}"
+                    provider_from_flag=true
+                fi
                 ;;
             --provider=*)
                 provider="${arg#*=}"
@@ -337,6 +334,7 @@ function get_cluster_parameter() {
                 fi
                 ;;
         esac
+        i=$((i + 1))
     done
 
     # If provider not specified via flag, ask interactively
