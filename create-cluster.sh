@@ -55,6 +55,9 @@ openbao_app_yaml=$(get_abs_filename "$manifestDir/openbao-app.yaml")
 openbao_values_yaml=$(get_abs_filename "$scriptDir/configs/apps/values/openbao-values.yaml")
 nats_ingress_yaml=$(get_abs_filename "$configsDir/nats-ingress.yaml")
 nats_gateway_yaml=$(get_abs_filename "$configsDir/nats-gateway.yaml")
+arangodb_operator_app_yaml=$(get_abs_filename "$manifestDir/arangodb-operator-app.yaml")
+arangodb_single_instance_yaml=$(get_abs_filename "$manifestDir/arangodb-single-instance.yaml")
+arangodb_cluster_instance_yaml=$(get_abs_filename "$manifestDir/arangodb-cluster-instance.yaml")
 
 
 if [ "$#" -eq 0 ]; then

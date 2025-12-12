@@ -1323,3 +1323,187 @@ function delete_kubevirt() {
     echo -e "$yellow Check with:$blue kubectl get vms -A"
     echo -e "$yellow           $blue kubectl get pvc -A"
 }
+
+function install_arangodb_operator_application() {
+    echo -e "$yellow Installing ArangoDB Operator ArgoCD application"
+    (kubectl apply -f $arangodb_operator_app_yaml|| 
+    { 
+        echo -e "$red 🛑 Could not install ArangoDB Operator ArgoCD application into cluster ..."
+        die
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing ArangoDB Operator ArgoCD application"
+
+    echo -e "$yellow\n⏰ Waiting for ArgoCD to sync and create ArangoDB Operator"
+    sleep 20
+    
+    # Wait for operator deployment to be created by ArgoCD
+    # The actual deployment name from helm chart is: arango-arangodb-operator-operator
+    local max_wait=120
+    local waited=0
+    while ! kubectl get deployment -n arangodb -l app.kubernetes.io/name=kube-arangodb &>/dev/null; do
+        if [ $waited -ge $max_wait ]; then
+            echo -e "$red 🛑 ArangoDB Operator deployment not created by ArgoCD after ${max_wait}s ..."
+            echo -e "$yellow Check ArgoCD app status:$blue kubectl get application -n argocd arangodb-operator"
+            die
+        fi
+        sleep 2
+        waited=$((waited + 2))
+    done
+    
+    echo -e "$yellow ⏰ Waiting for ArangoDB Operator to be ready"
+    (kubectl wait deployment -n arangodb -l app.kubernetes.io/name=kube-arangodb --for condition=Available=True --timeout=300s || { 
+        echo -e "$red 🛑 ArangoDB Operator is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo "ArangoDB Operator application installed: yes" >> $cluster_info_file
+
+    echo -e "$yellow\n✅ ArangoDB Operator is ready to use"
+    echo -e "$yellow\n📚 Next steps:"
+    echo -e "$yellow   Install a single instance:$blue ./kl.sh install apps arangodb-single"
+    echo -e "$yellow   Install a cluster:$blue ./kl.sh install apps arangodb-cluster"
+    echo -e "$yellow\n📖 Documentation:$blue https://arangodb.github.io/kube-arangodb/"
+}
+
+function install_arangodb_single_application() {
+    echo -e "$yellow Installing ArangoDB Single Instance"
+    
+    # Check if operator is installed
+    if ! kubectl get deployment -n arangodb -l app.kubernetes.io/name=kube-arangodb &>/dev/null; then
+        echo -e "$yellow\n📊 ArangoDB Operator is required but not found."
+        echo -e "$yellow Installing ArangoDB Operator..."
+        install_arangodb_operator_application
+    else
+        echo -e "$yellow ✓ ArangoDB Operator found"
+    fi
+    
+    # Create JWT secret for authentication
+    echo -e "$yellow\n🔧 Creating JWT secret for authentication"
+    kubectl create secret generic arangodb-jwt-secret \
+        --from-literal=token="$(openssl rand -base64 32)" \
+        -n arangodb \
+        --dry-run=client -o yaml | kubectl apply -f - &>/dev/null
+    
+    echo -e "$yellow ✓ JWT secret created"
+    
+    # Apply single instance
+    (kubectl apply -f $arangodb_single_instance_yaml || { 
+        echo -e "$red 🛑 Could not install ArangoDB Single Instance into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing ArangoDB Single Instance"
+
+    echo -e "$yellow\n⏰ Waiting for ArangoDB Single Instance to be ready"
+    sleep 15
+    (kubectl wait pods -n arangodb -l arango_deployment=arangodb-single --for=condition=Ready --timeout=300s || { 
+        echo -e "$red 🛑 ArangoDB Single Instance is not ready ..."; 
+        die 
+    }) & spinner
+
+    echo "ArangoDB Single Instance installed: yes" >> $cluster_info_file
+
+    show_arangodb_after_installation "single"
+}
+
+function install_arangodb_cluster_application() {
+    echo -e "$yellow Installing ArangoDB Cluster"
+    
+    # Check if operator is installed
+    if ! kubectl get deployment -n arangodb -l app.kubernetes.io/name=kube-arangodb &>/dev/null; then
+        echo -e "$yellow\n📊 ArangoDB Operator is required but not found."
+        echo -e "$yellow Installing ArangoDB Operator..."
+        install_arangodb_operator_application
+    else
+        echo -e "$yellow ✓ ArangoDB Operator found"
+    fi
+    
+    # Check for StorageClass
+    local default_sc
+    default_sc=$(kubectl get storageclass -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}')
+    if [ -z "$default_sc" ]; then
+        echo -e "$red\n🛑 ERROR: No default StorageClass found!"
+        echo -e "$yellow\nArangoDB Cluster requires persistent storage."
+        echo -e "$yellow\nPlease install a storage provider first:"
+        echo -e "$yellow   OpenEBS (local-path):$blue ./kl.sh install helm local-path-provisioner"
+        echo -e "$yellow   Rook Ceph (distributed):$blue ./kl.sh install helm rook-ceph-operator && ./kl.sh install helm rook-ceph-cluster"
+        echo -e "$yellow   NFS (network):$blue ./kl.sh install helm nfs"
+        die
+    fi
+    echo -e "$yellow ✓ StorageClass found: $default_sc"
+    
+    # Create JWT secret for authentication
+    echo -e "$yellow\n🔧 Creating JWT secret for authentication"
+    kubectl create secret generic arangodb-jwt-secret \
+        --from-literal=token="$(openssl rand -base64 32)" \
+        -n arangodb \
+        --dry-run=client -o yaml | kubectl apply -f - &>/dev/null
+    
+    echo -e "$yellow ✓ JWT secret created"
+    
+    # Apply cluster instance
+    (kubectl apply -f $arangodb_cluster_instance_yaml || { 
+        echo -e "$red 🛑 Could not install ArangoDB Cluster into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing ArangoDB Cluster"
+
+    echo -e "$yellow\n⏰ Waiting for ArangoDB Cluster to be ready (this may take a few minutes)"
+    sleep 20
+    (kubectl wait pods -n arangodb -l arango_deployment=arangodb-cluster --for=condition=Ready --timeout=600s || { 
+        echo -e "$red 🛑 ArangoDB Cluster is not ready ..."; 
+        echo -e "$yellow Check status:$blue kubectl get pods -n arangodb"; 
+        die 
+    }) & spinner
+
+    echo "ArangoDB Cluster installed: yes" >> $cluster_info_file
+
+    show_arangodb_after_installation "cluster"
+}
+
+function show_arangodb_after_installation(){
+    local mode="$1"
+    local deployment_name="arangodb-$mode"
+    
+    echo -e "$yellow\n✅ ArangoDB $mode is ready to use!"
+    
+    # Get root password
+    local root_password=""
+    if kubectl get secret -n arangodb "$deployment_name-jwt" &>/dev/null 2>&1; then
+        root_password=$(kubectl get secret -n arangodb "$deployment_name-jwt" -o jsonpath='{.data.token}' | base64 -d 2>/dev/null || echo "")
+    fi
+    
+    echo -e "$yellow\n🔑 Default credentials:"
+    echo -e "$yellow   Username: root"
+    if [ -n "$root_password" ]; then
+        echo -e "$yellow   Password: (empty - uses JWT token)"
+    else
+        echo -e "$yellow   Password: (empty)"
+    fi
+    
+    echo -e "$yellow\n🌐 To access the ArangoDB Web UI:"
+    echo -e "$yellow   Port-forward:$blue kubectl port-forward -n arangodb svc/$deployment_name 8529:8529"
+    echo -e "$yellow   Then open:$blue https://localhost:8529"
+    
+    echo -e "$yellow\n📝 Connection string:"
+    echo -e "$blue   http://$deployment_name.arangodb.svc.cluster.local:8529"
+    
+    if [ "$mode" == "cluster" ]; then
+        echo -e "$yellow\n📊 Cluster components:"
+        echo -e "$yellow   • 3 Agents (consensus)"
+        echo -e "$yellow   • 3 DBServers (data)"
+        echo -e "$yellow   • 3 Coordinators (query routing)"
+    fi
+    
+    echo -e "$yellow\n🔍 Check status:"
+    echo -e "$blue   kubectl get arangodeployment -n arangodb"
+    echo -e "$blue   kubectl get pods -n arangodb"
+    
+    echo -e "$yellow\n📖 Documentation:"
+    echo -e "$blue   https://arangodb.github.io/kube-arangodb/"
+    echo -e "$blue   https://docs.arangodb.com/"
+    echo -e "$clear"
+}
+

@@ -1,0 +1,15 @@
+apiVersion: database.arangodb.com/v1
+kind: ArangoDeployment
+metadata:
+  name: arangodb-single
+  namespace: arangodb
+spec:
+  mode: Single
+  image: arangodb/arangodb:3.12
+  tls:
+    caSecretName: None
+  auth:
+    jwtSecretName: arangodb-jwt-secret
+  single:
+    tolerations:
+      - operator: Exists

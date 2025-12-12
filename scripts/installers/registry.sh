@@ -65,6 +65,9 @@ prometheus|helm|install_helm_kube_prometheus_stack|Kube Prometheus Stack (Promet
 cilium|helm|install_helm_cilium|Cilium CNI networking and security|kube-system
 calico|helm|install_helm_calico|Calico CNI networking and security|tigera-operator
 keycloak|helm|install_helm_keycloak|Keycloak identity and access management|keycloak
+arangodb-operator|helm|install_helm_arangodb_operator|ArangoDB Operator for Kubernetes|arangodb
+arangodb-single|helm|install_helm_arangodb_single|ArangoDB Single Server instance|arangodb
+arangodb-cluster|helm|install_helm_arangodb_cluster|ArangoDB Cluster (3 agents, 3 dbservers, 3 coordinators)|arangodb
 EOF
 )"
 
@@ -97,6 +100,9 @@ kite|app|install_kite_application|Kite Kubernetes dashboard
 metrics-server|app|install_metrics_server_application|Metrics Server for resource metrics|kube-system
 keycloak|app|install_keycloak_application|Keycloak identity and access management|keycloak
 kubevirt|app|install_kubevirt_application|KubeVirt virtual machine management|kubevirt
+arangodb-operator|app|install_arangodb_operator_application|ArangoDB Operator for Kubernetes|arangodb
+arangodb-single|app|install_arangodb_single_application|ArangoDB Single Server instance|arangodb
+arangodb-cluster|app|install_arangodb_cluster_application|ArangoDB Cluster (3 agents, 3 dbservers, 3 coordinators)|arangodb
 EOF
 )"
 

@@ -1,0 +1,33 @@
+apiVersion: database.arangodb.com/v1
+kind: ArangoDeployment
+metadata:
+  name: arangodb-cluster
+  namespace: arangodb
+spec:
+  mode: Cluster
+  image: arangodb/arangodb:3.12
+  tls:
+    caSecretName: None
+  auth:
+    jwtSecretName: arangodb-jwt-secret
+  id:
+    tolerations:
+      - operator: Exists
+  agents:
+    count: 3
+    tolerations:
+      - operator: Exists
+    resources:
+      requests:
+        storage: 1Gi
+  dbservers:
+    count: 3
+    tolerations:
+      - operator: Exists
+    resources:
+      requests:
+        storage: 2Gi
+  coordinators:
+    count: 3
+    tolerations:
+      - operator: Exists

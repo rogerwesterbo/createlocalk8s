@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: arangodb-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '2'
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  destination:
+    namespace: arangodb
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    chart: kube-arangodb
+    repoURL: https://arangodb.github.io/kube-arangodb
+    targetRevision: '1.2.*'
+    helm:
+      values: |
+        operator:
+          architectures:
+            - amd64
+            - arm64
+          tolerations:
+            - operator: Exists
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
