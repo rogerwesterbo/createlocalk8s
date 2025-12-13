@@ -42,6 +42,7 @@ talos_create_cluster() {
     local http_port="$6"
     local https_port="$7"
     local custom_cni="${8:-default}"
+    local memory="${9:-4096}"
 
     local cluster_dir="$clustersDir/$cluster_name"
     local talos_dir="$cluster_dir/talos"
@@ -83,8 +84,8 @@ talos_create_cluster() {
     create_cmd="$create_cmd --controlplanes $controlplane_count"
     create_cmd="$create_cmd --workers $worker_count"
     create_cmd="$create_cmd --kubernetes-version $k8s_version"
-    create_cmd="$create_cmd --memory 4096"
-    create_cmd="$create_cmd --memory-workers 4096"
+    create_cmd="$create_cmd --memory $memory"
+    create_cmd="$create_cmd --memory-workers $memory"
 
     # For single control plane: expose ports directly for hostNetwork mode
     # For multi control plane: we'll use HAProxy proxy container to route to MetalLB

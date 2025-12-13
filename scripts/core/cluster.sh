@@ -479,6 +479,18 @@ function get_cluster_parameter() {
             echo -e "$yellow ✅ Using default Kubernetes version: $blue$kindk8sversion"
             echo -e "$clear"
         fi
+
+        # Ask for memory size (Talos only)
+        talos_memory=4096
+        read -p "Enter memory size for Talos nodes in MB (default: 4096): " talos_memory_new
+        if [ -n "$talos_memory_new" ]; then
+            talos_memory=$talos_memory_new
+            echo -e "$yellow ✅ Memory per node set to: $blue${talos_memory}MB"
+            echo -e "$clear"
+        else
+            echo -e "$yellow ✅ Using default memory per node: $blue${talos_memory}MB"
+            echo -e "$clear"
+        fi
     fi
 
     install_nginx_controller="yes"
@@ -596,6 +608,11 @@ function get_cluster_parameter() {
     echo -en "$yellow\nKubernetes version:"
     echo -en "$blue $kindk8sversion"
 
+    if [ "$provider" == "talos" ]; then
+        echo -en "$yellow\nMemory per node:"
+        echo -en "$blue ${talos_memory}MB"
+    fi
+
     echo -en "$yellow\nInstall Nginx ingress controller?:"
     echo -en "$blue $install_nginx_controller"
 
@@ -650,7 +667,7 @@ function create_cluster() {
     call_provider_function "$provider" "create_cluster" \
         "$cluster_name" "$config_file" "$kindk8sversion" \
         "$controlplane_number" "$worker_number" \
-        "$first_controlplane_port_http" "$first_controlplane_port_https" "$custom_cni" || {
+        "$first_controlplane_port_http" "$first_controlplane_port_https" "$custom_cni" "${talos_memory:-4096}" || {
         echo -e "${red} 🛑 Cluster creation failed${clear}"
         die
     }
