@@ -67,11 +67,12 @@ function install_helm_nfs(){
 
 function install_helm_local_path_provisioner(){
     echo -e "$yellow Installing Local Path Provisioner"
-    helm repo add local-path-provisioner https://github.com/rancher/local-path-provisioner
     
-    # Install using the chart from the GitHub repo
+    # Install using OCI helm chart from GitHub Container Registry
+    # Alternative (raw manifest): kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.32/deploy/local-path-storage.yaml
     (helm upgrade --install local-path-provisioner \
-        https://github.com/rancher/local-path-provisioner/releases/download/v0.0.28/local-path-provisioner-0.0.28.tgz \
+        oci://ghcr.io/rancher/local-path-provisioner/charts/local-path-provisioner \
+        --version 0.0.32 \
         --namespace local-path-storage \
         --create-namespace \
         --set storageClass.defaultClass=true || { 
