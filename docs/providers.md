@@ -70,7 +70,7 @@ These features work identically on **all providers**:
 ```bash
 # Works on kind or talos clusters
 ./kl.sh install helm argocd
-./kl.sh install helm redis-stack,nats
+./kl.sh install helm valkey,nats
 ./kl.sh install helm prometheus --dry-run
 ```
 

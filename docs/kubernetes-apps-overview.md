@@ -27,7 +27,6 @@ This repo can install a curated set of platform + demo components using either H
 | HashiCorp Vault                 | Secrets Management     | Centralized secrets + encryption               | Practicing secret injection & policies      | `ihv`                | `iav`                  |
 | OpenBao (Dev)                   | Secrets Management     | Vault-compatible dev server (community fork)   | Evaluating workflows with MPL-licensed fork | `iho`                | `iao`                  |
 | Keycloak                        | Identity & Access Mgmt | SSO, OIDC/SAML provider, user federation       | Testing authentication/authorization flows  | `ihkc`               | `iakc`                 |
-| Redis Stack                     | Cache / Data           | Redis + modules (JSON, Search, etc.)           | Caching patterns, pub/sub, JSON docs        | `ihrs`               | `iars`                 |
 | Valkey                          | Cache / Data           | Redis-compatible key-value store               | Alternative to Redis, OSS caching           | `ihvk`               | `iavk`                 |
 | NATS                            | Messaging / Streaming  | Lightweight high-speed pub/sub + JetStream     | Event-driven prototypes, decoupling         | `ihnats`             | `ianats`               |
 | Crossplane                      | Infra Abstraction      | Compose infra APIs / claim external services   | Exploring platform engineering patterns     | `ihcr`               | `iacr`                 |
@@ -101,11 +100,11 @@ This repo can install a curated set of platform + demo components using either H
 -   Teaches reconciliation loops: update spec → operator adjusts actual state.
 
 **PgAdmin4**
-**Redis Stack (Server + Modules)**
+**Valkey**
 
--   Provides Redis plus enhanced modules (RedisJSON, Search, TimeSeries, Bloom) via the upstream redis-stack-server chart.
--   Excellent for prototyping caching, document storage (JSON), pub/sub messaging, search indexing, and time‑series ingestion in one lightweight component.
--   Port-forward: `kubectl port-forward -n redis svc/redis-stack-server 6379:6379` then `redis-cli -h localhost -p 6379`.
+-   High-performance key-value store, open source fork of Redis.
+-   Drop-in replacement for Redis, compatible with Redis clients.
+-   Port-forward: `kubectl port-forward -n valkey svc/valkey-master 6381:6379` then `valkey-cli -h localhost -p 6381`.
 
 **NATS (Core + JetStream + nats-box)**
 
@@ -232,8 +231,8 @@ This repo can install a curated set of platform + demo components using either H
 | Basic routing + GitOps     | Nginx + ArgoCD + Nyancat | Add Cert-Manager, Metallb             |
 | Storage fundamentals       | NFS or Minio             | Progress to Rook Ceph                 |
 | Database operator patterns | CloudNativePG Operator   | Add PgAdmin, then MongoDB Operator    |
-| Caching / polyglot storage | Redis Stack              | Add MongoDB / Postgres for comparison |
-| Event-driven basics        | NATS                     | Add Redis pub/sub & then JetStream    |
+| Caching / polyglot storage | Valkey                   | Add MongoDB / Postgres for comparison |
+| Event-driven basics        | NATS                     | Add Valkey pub/sub & then JetStream   |
 | Security basics            | Trivy Operator           | Add Falco for runtime events          |
 | Observability              | Kube-Prometheus-Stack    | Layer in OpenCost                     |
 | Infra abstraction          | Crossplane               | Compose your own XRDs                 |
@@ -259,7 +258,7 @@ kubectl get pvc -A
 kubectl logs -n falco -l app.kubernetes.io/name=falco -f
 
 # List CRDs added by operators
-kubectl get crds | grep -E 'argoproj|vault|postgres|mongodb|crossplane|trivy|falco|redis|jetstream'
+kubectl get crds | grep -E 'argoproj|vault|postgres|mongodb|crossplane|trivy|falco|valkey|jetstream'
 ```
 
 ---

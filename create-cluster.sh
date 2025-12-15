@@ -44,7 +44,6 @@ nginx_controller_app_yaml=$(get_abs_filename "$manifestDir/nginx-controller-app.
 minio_app_yaml=$(get_abs_filename "$manifestDir/minio-app.yaml")
 nfs_app_yaml=$(get_abs_filename "$manifestDir/nfs-app.yaml")
 local_path_provisioner_app_yaml=$(get_abs_filename "$manifestDir/local-path-provisioner-app.yaml")
-redis_stack_app_yaml=$(get_abs_filename "$manifestDir/redis-stack-app.yaml")
 valkey_app_yaml=$(get_abs_filename "$manifestDir/valkey-app.yaml")
 nats_app_yaml=$(get_abs_filename "$manifestDir/nats-app.yaml")
 kite_app_yaml=$(get_abs_filename "$manifestDir/kite-app.yaml")

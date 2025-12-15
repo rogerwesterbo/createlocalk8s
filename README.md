@@ -73,18 +73,18 @@ Examples:
 
 Helm installations:
   helm list                                List available Helm components
-  install helm redis-stack,nats            Install one or more Helm components
-  install helm redis-stack --dry-run       Dry run (show what would be installed)
+  install helm valkey,nats            Install one or more Helm components
+  install helm valkey --dry-run       Dry run (show what would be installed)
 
 ArgoCD application installations:
   apps list                                List available ArgoCD app components
   install apps nyancat,prometheus          Install one or more ArgoCD apps
-  install apps nats,redis-stack --dry-run  Dry run for ArgoCD apps
+  install apps nats,valkey --dry-run  Dry run for ArgoCD apps
 
 Notes:
   - Parameters in [brackets] are optional
   - Parameters in <brackets> are required
-  - Use comma-separated lists (no spaces): redis-stack,nats
+  - Use comma-separated lists (no spaces): valkey,nats
   - Components are installed in the order specified
   - Use --dry-run to preview changes before applying
 
@@ -108,7 +108,7 @@ Current date and time in Linux Mon Oct 13 23:29:08 CEST 2025
 -   Post-create helper to install a sample Nyancat app (demo ingress + ArgoCD)
 -   Rich subcommands to list, inspect, delete clusters & fetch kubeconfig
 -   **Registry-based installers**: List and install Helm/ArgoCD components with simple commands
--   **24 Helm installers**: ArgoCD, Crossplane, Rook Ceph, Falco, Trivy, Vault, OpenBao, MetalLB, MinIO, NFS, Local Path Provisioner, MongoDB Operator, CNPG, PgAdmin, Redis Stack, Valkey, NATS, Kite, Keycloak, Metrics Server, Prometheus, Cilium, Calico, Nginx Ingress
+-   **24 Helm installers**: ArgoCD, Crossplane, Rook Ceph, Falco, Trivy, Vault, OpenBao, MetalLB, MinIO, NFS, Local Path Provisioner, MongoDB Operator, CNPG, PgAdmin, Valkey, NATS, Kite, Keycloak, Metrics Server, Prometheus, Cilium, Calico, Nginx Ingress
 -   **27 ArgoCD Application installers** (GitOps style): monitoring (Prometheus), metrics (Metrics Server), databases, security, storage, cost monitoring, identity management, etc.
 -   **Dry-run mode**: Preview what will be installed with `--dry-run`
 -   Generates per-cluster info + kubeconfig files under `clusters/<cluster-name>/`
@@ -416,10 +416,10 @@ See full cluster details (cluster info + kind config used):
 
 ```bash
 # Install single Helm component
-./kl.sh install helm redis-stack
+./kl.sh install helm valkey
 
 # Install multiple Helm components (comma-separated)
-./kl.sh install helm redis-stack,nats,metallb
+./kl.sh install helm valkey,nats,metallb
 
 # Install ArgoCD application
 ./kl.sh install apps prometheus
@@ -428,7 +428,7 @@ See full cluster details (cluster info + kind config used):
 ./kl.sh install apps nyancat,prometheus,mongodb
 
 # Dry-run mode (preview what will be installed)
-./kl.sh install helm redis-stack --dry-run
+./kl.sh install helm valkey --dry-run
 ./kl.sh install apps prometheus,mongodb --dry-run
 ```
 
@@ -454,7 +454,6 @@ See full cluster details (cluster info + kind config used):
 -   `pgadmin` - PostgreSQL admin UI
 -   `postgres` - CloudNativePG operator + cluster
 -   `prometheus` - Kube Prometheus Stack (Prometheus/Grafana/Alertmanager)
--   `redis-stack` - Redis Stack server
 -   `rook-ceph-cluster` - Rook Ceph cluster
 -   `rook-ceph-operator` - Rook Ceph operator
 -   `trivy` - Security scanner
@@ -484,7 +483,6 @@ See full cluster details (cluster info + kind config used):
 -   `pgadmin` - PgAdmin4 UI
 -   `postgres` - CloudNativePG operator + cluster
 -   `prometheus` - Kube Prometheus Stack (Grafana/Prometheus/Alertmanager)
--   `redis-stack` - Redis Stack server
 -   `rook-ceph-cluster` - Rook Ceph cluster
 -   `rook-ceph-operator` - Rook Ceph operator
 -   `trivy` - Trivy operator

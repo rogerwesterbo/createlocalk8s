@@ -8,7 +8,6 @@ All `kubectl port-forward` commands use unique local ports to avoid conflicts wh
 | ----------- | ----------------------------------------------------------------------------------- | ---------- | ------------ |
 | MongoDB     | `kubectl port-forward --namespace mongodb service/mongodb-instance-svc 27017:27017` | 27017      | 27017        |
 | PostgreSQL  | `kubectl port-forward -n postgres-cluster services/postgres-cluster-rw 5432:5432`   | 5432       | 5432         |
-| Redis Stack | `kubectl port-forward -n redis svc/redis-stack-server 6380:6379`                    | 6380       | 6379         |
 | Valkey      | `kubectl port-forward -n valkey svc/valkey-master 6381:6379`                        | 6381       | 6379         |
 
 ## Web UIs & Dashboards
@@ -52,7 +51,7 @@ All `kubectl port-forward` commands use unique local ports to avoid conflicts wh
 -   **3000-3999**: Grafana (3000)
 -   **4000-4999**: NATS Core (4222)
 -   **5000-5999**: PostgreSQL (5432), PgAdmin (5050)
--   **6000-6999**: Redis Stack (6380), Valkey (6381)
+-   **6000-6999**: Valkey (6381)
 -   **8000-8999**: Vault (8200), OpenBao (8201)
 -   **9000-9999**: OpenCost (9003), Prometheus (9090), Alertmanager (9093)
 -   **15000+**: Kite (15001), NATS WebSocket (15002), Keycloak (15003), Kubeview (15004)

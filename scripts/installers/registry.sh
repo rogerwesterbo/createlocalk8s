@@ -56,7 +56,6 @@ nginx|helm|install_helm_nginx_controller|Ingress-Nginx controller
 minio|helm|install_helm_minio|MinIO operator
 nfs|helm|install_helm_nfs|NFS external provisioner
 local-path-provisioner|helm|install_helm_local_path_provisioner|Local Path Provisioner (Rancher)|local-path-storage
-redis-stack|helm|install_helm_redis_stack|Redis Stack server|redis
 valkey|helm|install_helm_valkey|Valkey key-value store|valkey
 nats|helm|install_helm_nats|NATS messaging server
 kite|helm|install_helm_kite|Kite Kubernetes dashboard
@@ -90,7 +89,6 @@ nginx|app|install_nginx_controller_application|Ingress-Nginx controller
 minio|app|install_minio_application|MinIO operator
 nfs|app|install_nfs_application|NFS external provisioner
 local-path-provisioner|app|install_local_path_provisioner_application|Local Path Provisioner (Rancher)|local-path-storage
-redis-stack|app|install_redis_stack_application|Redis Stack server|redis
 valkey|app|install_valkey_application|Valkey key-value store|valkey
 nats|app|install_nats_application|NATS messaging server
 kite|app|install_kite_application|Kite Kubernetes dashboard
