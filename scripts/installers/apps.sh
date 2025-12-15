@@ -407,21 +407,6 @@ function install_falco_application() {
     post_falco_installation
 }
 
-function install_vault_application() {
-    echo -e "$yellow Installing Hashicorp Vault ArgoCD application"
-    (kubectl apply -f $vault_app_yaml|| 
-    { 
-        echo -e "$red 🛑 Could not install Vault ArgoCD application into cluster ..."
-        die
-    }) & spinner
-
-    echo -e "$yellow ✅ Done installing Vault ArgoCD application "
-
-    unseal_vault
-
-    show_vault_after_installation
-}
-
 function install_openbao_application() {
     echo -e "$yellow Installing OpenBao ArgoCD application"
     (kubectl apply -f $openbao_app_yaml|| 
@@ -979,14 +964,6 @@ function post_pgadmin_install() {
     "
 }
 
-function show_vault_after_installation() {
-    echo -e "$yellow\nVault is ready to use"
-    echo -e "$yellow\nTo access the Vault dashboard, type:$blue kubectl port-forward --namespace vault service/vault 8200:8200"
-    echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:8200"
-    echo -e "$yellow\nToken to use: $(jq -cr '.root_token' vault-init.json)"
-    echo -e ""
-}
-
 function post_postgres_installation() {    
     echo -e "$yellow\n Port forward to access the database:$blue kubectl port-forward -n postgres-cluster services/postgres-cluster-rw 5432:5432"
     echo -e "$yellow\n Use your favorite database client to connect to the database"
@@ -1014,38 +991,6 @@ function post_falco_installation() {
     echo -e "$yellow\nTrigger an event to test Falco by executing: $blue kubectl exec -it -n falco pods/<a pod name> -- /bin/bash"
     echo -e "$yellow\nCheck the logs by executing:$blue kubectl logs -n falco -l app.kubernetes.io/name=falco"
     echo -e "$yellow\nOr check the dashboard at: http://localhost:2803"
-}
-
-function unseal_vault() {
-    echo -e "$yellow\n⏰ Waiting for vault to be running"
-    sleep 10
-    (kubectl wait --namespace vault --for=condition=PodReadyToStartContainers pod/vault-0 --timeout=90s || 
-    { 
-        echo -e "$red 🛑 Could not install Nginx ingress controller into cluster ..."
-        die
-    }) & spinner
-
-    echo -e "$yellow\nUnsealing the vault"
-    (kubectl exec -i -n vault vault-0 -- vault operator init -format=json > vault-init.json || 
-    { 
-        echo -e "$red 🛑 Could not unseal the vault ..."
-        die
-    }) & spinner
-    echo -e "$clear"
-
-    echo -e "$yellow\nKeys to unseal the vault"
-    jq -cr '.unseal_keys_b64[]' vault-init.json
-
-    echo -e "$yellow\nRoot token"
-    jq -cr '.root_token' vault-init.json
-
-    echo -e "$yellow\n Unseal progress"
-    keys=$(jq -cr '.unseal_keys_b64[]' vault-init.json)
-    for i in $keys; do
-        echo "\nUnsealing vault with key: $i"
-        echo "kubectl exec -i -n vault vault-0 -- vault operator unseal $i"
-        kubectl exec -i -n vault vault-0 -- vault operator unseal "$i"
-    done
 }
 
 function install_kubevirt_application() {

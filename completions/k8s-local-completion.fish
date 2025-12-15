@@ -44,7 +44,7 @@ function __k8s_local_helm_components
             test -n "$f"; and echo $f
         end
     else
-        printf "%s\n" argocd cert-manager cnpg crossplane falco hashicorp-vault kube-prometheus-stack kubeview metallb metrics-server minio mongodb-operator nats nfs nginx-ingress opencost pgadmin prometheus rook-ceph-operator trivy valkey
+        printf "%s\n" argocd cert-manager cnpg crossplane falco kube-prometheus-stack kubeview metallb metrics-server minio mongodb-operator nats nfs nginx-ingress openbao opencost pgadmin prometheus rook-ceph-operator trivy valkey
     end
 end
 
@@ -58,7 +58,7 @@ function __k8s_local_argo_apps
             test -n "$f"; and echo $f
         end
     else
-        printf "%s\n" nyancat prometheus cert-manager cnpg-cluster crossplane falco hashicorp-vault kubeview metallb metrics-server minio mongodb mongodb-operator nats nfs opencost pg-ui pgadmin rook-ceph-cluster rook-ceph-operator trivy coredns valkey
+        printf "%s\n" nyancat prometheus cert-manager cnpg-cluster crossplane falco kubeview metallb metrics-server minio mongodb mongodb-operator nats nfs openbao opencost pg-ui pgadmin rook-ceph-cluster rook-ceph-operator trivy coredns valkey
     end
 end
 

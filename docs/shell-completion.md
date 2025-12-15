@@ -104,7 +104,7 @@ All shells support the same completion features:
 
 # Tab to see available Helm components (with descriptions!)
 ./kl.sh install helm <TAB>
-# Shows: argocd cert-manager cnpg crossplane falco hashicorp-vault ...
+# Shows: argocd cert-manager cnpg crossplane falco openbao ...
 # Zsh/Fish also show descriptions like "ArgoCD GitOps controller"
 
 # Tab to see available ArgoCD apps

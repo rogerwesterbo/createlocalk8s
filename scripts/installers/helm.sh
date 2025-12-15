@@ -209,23 +209,6 @@ function install_helm_falco(){
     post_falco_installation
 }
 
-function install_helm_vault(){
-    echo -e "$yellow Installing Hashicorp Vault with helm"
-    
-    helm repo add hashicorp https://helm.releases.hashicorp.com
-    (helm install vault hashicorp/vault --namespace vault --create-namespace || 
-    { 
-        echo -e "$red 🛑 Could not install Hashicorp Vault into cluster ..."
-        die
-    }) & spinner
-
-    echo -e "$yellow ✅ Done installing Hashicorp Vault"
-
-    unseal_vault
-
-    show_vault_after_installation
-}
-
 function install_helm_openbao(){
     echo -e "$yellow Installing OpenBao"
 

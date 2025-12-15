@@ -24,7 +24,7 @@ With this repo you create a local cluster using **kind** (Kubernetes in Docker).
 | Ingress                        | HTTP/HTTPS routing into Services                         | Reverse proxy + virtual host mapping |
 | Namespace                      | Logical grouping / scoping                               | Folder / environment                 |
 | ConfigMap                      | Non-secret configuration data                            | Plain config file                    |
-| Secret                         | Base64-encoded sensitive values                          | Password vault entry                 |
+| Secret                         | Base64-encoded sensitive values                          | Password manager entry               |
 | CRD (CustomResourceDefinition) | Extends the API with new kinds                           | Plugin system                        |
 | Operator / Controller          | Automates higher-level logic around CRDs                 | Robot admin                          |
 
@@ -138,7 +138,7 @@ kubectl describe application <app-name> -n argocd
 | CloudNativePG | Cluster                     | Postgres HA cluster |
 | Crossplane    | XRDs / Composites           | Infra abstractions  |
 | Rook Ceph     | CephCluster, CephBlockPool  | Storage backend     |
-| Vault         | (Helm-managed statefulset)  | Secrets management  |
+| OpenBao       | (Helm-managed statefulset)  | Secrets management  |
 
 List CRDs:
 

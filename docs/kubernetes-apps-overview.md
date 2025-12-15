@@ -24,7 +24,6 @@ This repo can install a curated set of platform + demo components using either H
 | PgAdmin4                        | DB GUI                 | Web UI for Postgres                            | Inspect schema, run queries                 | `ihpa`               | `iapga`                |
 | Falco                           | Runtime Security       | Syscall-based threat detection                 | Observing security events                   | `ihf`                | `iaf`                  |
 | Trivy Operator                  | Security / SBOM        | Image & config vulnerability scanning          | Learning security shift-left                | `iht`                | `iat`                  |
-| HashiCorp Vault                 | Secrets Management     | Centralized secrets + encryption               | Practicing secret injection & policies      | `ihv`                | `iav`                  |
 | OpenBao (Dev)                   | Secrets Management     | Vault-compatible dev server (community fork)   | Evaluating workflows with MPL-licensed fork | `iho`                | `iao`                  |
 | Keycloak                        | Identity & Access Mgmt | SSO, OIDC/SAML provider, user federation       | Testing authentication/authorization flows  | `ihkc`               | `iakc`                 |
 | Valkey                          | Cache / Data           | Redis-compatible key-value store               | Alternative to Redis, OSS caching           | `ihvk`               | `iavk`                 |
@@ -37,7 +36,6 @@ This repo can install a curated set of platform + demo components using either H
 | OpenCost                        | Cost Analysis          | Estimation of per‑resource cost                | Understanding resource cost attribution     | —                    | `iaoc`                 |
 | KubeVirt                        | Virtualization         | VM management on Kubernetes                    | Running VMs alongside containers            | —                    | `iakv` (kubevirt)      |
 | Nyancat App                     | Demo                   | Simple sample workload via ingress             | Smoke testing ingress + ArgoCD              | —                    | `iac`                  |
-| Vault (Unseal Automation)       | Bootstrap              | Auto init/unseal & output keys                 | Rapid experimentation                       | (within `ihv`)       | (within `iav`)         |
 | NFS + Minio Together            | Pattern                | RWX + Object storage                           | Testing hybrid storage patterns             | (combine above)      | (combine above)        |
 
 ---
@@ -130,11 +128,6 @@ This repo can install a curated set of platform + demo components using either H
 -   Continuous Kubernetes-native scanning (images, misconfigs, SBOM generation).
 -   Builds security posture awareness habits during development.
 
-**HashiCorp Vault**
-
--   Central secret storage, dynamic credentials, encryption as a service.
--   Auto-init/unseal flow here accelerates experimentation with auth backends & policies.
-
 **OpenBao (Dev Mode)**
 
 -   Community fork of Vault under the MPL, aligned with upstream APIs and CLI.
@@ -211,12 +204,6 @@ This repo can install a curated set of platform + demo components using either H
 
 ### 8. Supporting Patterns
 
-**Vault Unseal Automation**
-
--   Script captures unseal keys/root token to `vault-init.json` to skip manual ceremony.
--   In production you'd use auto-unseal (KMS/HSM); here we prioritize speed of learning.
--   OpenBao dev installs skip unseal entirely—grab the `openbao-root` token and experiment immediately.
-
 **Combined Storage (NFS + Minio + Ceph)**
 
 -   Showcases different storage paradigms: shared POSIX (NFS), object (Minio), distributed robust (Ceph).
@@ -236,13 +223,13 @@ This repo can install a curated set of platform + demo components using either H
 | Security basics            | Trivy Operator           | Add Falco for runtime events          |
 | Observability              | Kube-Prometheus-Stack    | Layer in OpenCost                     |
 | Infra abstraction          | Crossplane               | Compose your own XRDs                 |
-| Secrets management         | Vault                    | Integrate apps using Vault secrets    |
+| Secrets management         | OpenBao                  | Integrate apps using OpenBao secrets  |
 | Virtualization basics      | KubeVirt                 | Create VMs, explore live migration    |
 
 ---
 
 ## Common Commands Cheat Sheet
-
+OpenBao                  | Integrate apps using OpenBao secrets
 ```bash
 # List ArgoCD applications
 a kubectl get applications -n argocd
@@ -258,7 +245,7 @@ kubectl get pvc -A
 kubectl logs -n falco -l app.kubernetes.io/name=falco -f
 
 # List CRDs added by operators
-kubectl get crds | grep -E 'argoproj|vault|postgres|mongodb|crossplane|trivy|falco|valkey|jetstream'
+kubectl get crds | grep -E 'argoproj|openbao|postgres|mongodb|crossplane|trivy|falco|valkey|jetstream'
 ```
 
 ---
@@ -277,7 +264,7 @@ kubectl get crds | grep -E 'argoproj|vault|postgres|mongodb|crossplane|trivy|fal
 | LoadBalancer | Metallb IP pool                          | Cloud LB (ELB / GCLB / etc.)                   |
 | Storage      | HostPath / NFS / Ceph-in-Docker          | Cloud block (EBS / PD) + managed object stores |
 | TLS          | Often self-signed                        | Public ACME / enterprise PKI                   |
-| Secrets      | Plain Kubernetes Secret / Vault dev keys | Encrypted at rest + Vault auto-unseal          |
+| Secrets      | Plain Kubernetes Secret / OpenBao dev keys | Encrypted at rest + OpenBao auto-unseal |
 | Persistence  | Ephemeral (container Fs)                 | Durable volumes, backups                       |
 
 ---

@@ -73,13 +73,10 @@ _k8s_local_zsh() {
     if (( ${#helm_components} == 0 )); then
         helm_components=(
             'argocd:ArgoCD'
-            'calico:Calico CNI networking'
             'cert-manager:cert-manager'
-            'cilium:Cilium CNI networking'
             'cnpg:CloudNativePG operator'
             'crossplane:Crossplane'
             'falco:Falco'
-            'hashicorp-vault:Vault'
             'keycloak:Keycloak identity and access management'
             'kite:Kite Kubernetes dashboard'
             'kube-prometheus-stack:Prometheus stack'
@@ -95,6 +92,7 @@ _k8s_local_zsh() {
             'nfs:NFS provisioner'
             'nginx:NGINX ingress'
             'nginx-ingress:NGINX ingress'
+            'openbao:OpenBao'
             'opencost:OpenCost'
             'pgadmin:PgAdmin'
             'postgres:CloudNativePG operator + cluster'
@@ -105,7 +103,6 @@ _k8s_local_zsh() {
             'rookcephoperator:Rook Ceph operator'
             'trivy:Trivy'
             'valkey:Valkey key-value store'
-            'vault:HashiCorp Vault server'
         )
     fi
 
@@ -129,8 +126,6 @@ _k8s_local_zsh() {
             'cnpg-cluster:CNPG cluster'
             'crossplane:Crossplane app'
             'falco:Falco'
-            'hashicorp-vault:Vault'
-            'vault:HashiCorp Vault server'
             'keycloak:Keycloak identity and access management'
             'kite:Kite Kubernetes dashboard'
             'kubeview:KubeView'
