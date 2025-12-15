@@ -132,23 +132,22 @@ function install_local_path_provisioner_application() {
 }
 
 function install_mongodb_operator_application() {
-    echo -e "$yellow Installing Mongodb Operator ArgoCD application"
+    echo -e "$yellow Installing MongoDB Kubernetes Operator (MCK) ArgoCD application"
     (kubectl apply -f $mongodb_operator_app_yaml|| 
     { 
-        echo -e "$red 🛑 Could not install Mongodb ArgoCD application into cluster ..."
+        echo -e "$red 🛑 Could not install MongoDB Operator ArgoCD application into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow ✅ Done installing Mongodb ArgoCD application"
+    echo -e "$yellow ✅ Done installing MongoDB Operator ArgoCD application"
 
-    echo -e "$yellow ⏲ Installing Mongodb instance
-    "
+    echo -e "$yellow ⏲ Waiting for MongoDB Operator to be ready"
 
-    echo -e "$yellow\n⏰ Waiting for Mongodb to be running"
-    sleep 10
-    (kubectl wait pods --for=condition=Ready --all -n mongodb --timeout=120s || 
+    echo -e "$yellow\n⏰ Waiting for MongoDB Operator deployment"
+    sleep 15
+    (kubectl wait deployment -n mongodb mongodb-kubernetes-operator --for condition=Available=True --timeout=180s || 
     { 
-        echo -e "$red 🛑 Mongodb is not running, and is not ready to use ..."
+        echo -e "$red 🛑 MongoDB Operator is not running ..."
         die
     }) & spinner
 
@@ -209,7 +208,7 @@ function show_mongodb_after_installation() {
 
 function show_mongodb_operator_after_installation() {
     echo -e "$yellow\nMongodb is ready to use"
-    echo -e "$yellow\nTo install a instance of mongodb type:$blue ./create-cluster.sh iamdbi "
+    echo -e "$yellow\nTo install a instance of mongodb type:$blue ./kl.sh install apps mongodb-instance"
     echo -e "$clear"
 }
 

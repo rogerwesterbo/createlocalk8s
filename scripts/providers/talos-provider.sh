@@ -57,12 +57,27 @@ talos_create_cluster() {
     local endpoint_host
     endpoint_host=$(echo "$cluster_name" | tr '[:upper:]' '[:lower:]')-controlplane-1
     
+    # Create CNI patch file if custom CNI is requested (used by both gen config and cluster create)
+    local cni_patch_file=""
+    if [ "$custom_cni" != "default" ]; then
+        cni_patch_file="$talos_dir/cni-patch.yaml"
+        cat > "$cni_patch_file" <<EOF
+cluster:
+  network:
+    cni:
+      name: none
+  proxy:
+    disabled: true
+EOF
+    fi
+    
     # Build talosctl gen config command with optional CNI flags
-    local gen_config_cmd="talosctl gen config \"$cluster_name\" \"https://$endpoint_host:6443\" --kubernetes-version \"$k8s_version\" --additional-sans \"127.0.0.1\""
+    # Use --force to overwrite existing config files from previous attempts
+    local gen_config_cmd="talosctl gen config \"$cluster_name\" \"https://$endpoint_host:6443\" --kubernetes-version \"$k8s_version\" --additional-sans \"127.0.0.1\" --force"
     
     # Add CNI flags if custom CNI is requested
     if [ "$custom_cni" != "default" ]; then
-        gen_config_cmd="$gen_config_cmd --config-patch '[{\"op\":\"add\",\"path\":\"/cluster/network/cni\",\"value\":{\"name\":\"none\"}},{\"op\":\"add\",\"path\":\"/cluster/proxy\",\"value\":{\"disabled\":true}}]'"
+        gen_config_cmd="$gen_config_cmd --config-patch @$cni_patch_file"
     fi
     
     (cd "$talos_dir" && eval $gen_config_cmd >/dev/null ||
@@ -91,6 +106,11 @@ talos_create_cluster() {
     # For multi control plane: we'll use HAProxy proxy container to route to MetalLB
     if [ "$controlplane_count" -eq 1 ]; then
         create_cmd="$create_cmd --exposed-ports $http_port:80/tcp,$https_port:443/tcp"
+    fi
+
+    # Add CNI patch file if custom CNI is requested (file was created earlier)
+    if [ "$custom_cni" != "default" ] && [ -n "$cni_patch_file" ]; then
+        create_cmd="$create_cmd --config-patch @$cni_patch_file"
     fi
 
     # Wait for cluster to be ready

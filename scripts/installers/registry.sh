@@ -41,8 +41,8 @@ label_namespace_for_talos() {
 APP_HELM_REGISTRY_DATA="$(cat <<'EOF'
 argocd|helm|install_helm_argocd|ArgoCD GitOps controller
 metallb|helm|install_helm_metallb|MetalLB load balancer
-mongodb-operator|helm|install_helm_mongodb_operator|MongoDB (Bitnami) single deployment|mongodb
-mongodb-instance|helm|install_helm_mongodb_instance|MongoDB additional instance (Bitnami)|mongodb
+mongodb-operator|helm|install_helm_mongodb_operator|MongoDB Kubernetes Operator (MCK)|mongodb
+mongodb-instance|helm|install_helm_mongodb_instance|MongoDB Instance (MongoDBCommunity CR)|mongodb
 trivy|helm|install_helm_trivy|Trivy security operator
 vault|helm|install_helm_vault|HashiCorp Vault server
 openbao|helm|install_helm_openbao|OpenBao secrets manager (dev mode)|openbao
@@ -75,8 +75,8 @@ prometheus|app|install_kube_prometheus_stack_application|Kube Prometheus Stack (
 kubeview|app|install_kubeview_application|Kubeview UI
 opencost|app|install_opencost_application|OpenCost cost monitoring
 metallb|app|install_metallb_application|MetalLB load balancer
-mongodb-operator|app|install_mongodb_operator_application|MongoDB Operator (Community)|mongodb
-mongodb-instance|app|install_mongodb_instance|MongoDB Instance CR|mongodb
+mongodb-operator|app|install_mongodb_operator_application|MongoDB Kubernetes Operator (MCK)|mongodb
+mongodb-instance|app|install_mongodb_instance|MongoDB Instance CR (Mongodb Operator must be installed)|mongodb
 falco|app|install_falco_application|Falco runtime security
 trivy|app|install_trivy_application|Trivy operator
 vault|app|install_vault_application|HashiCorp Vault server
