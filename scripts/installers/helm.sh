@@ -918,3 +918,38 @@ function install_multus_cni(){
     echo -e "$blue    kubectl get pods -n kube-system -l app=multus"
     echo -e "$clear"
 }
+
+# Gateway API installer (kubectl apply - no helm chart available)
+# Installs the standard channel CRDs from the official Kubernetes SIG release
+function install_helm_gateway_api() {
+    local GATEWAY_API_VERSION="v1.4.1"
+    
+    echo -e "$yellow Installing Gateway API CRDs (Standard Channel)"
+    echo -e "$yellow Version: $GATEWAY_API_VERSION"
+    
+    # Install Gateway API CRDs using server-side apply (recommended by upstream)
+    echo -e "$yellow\n📥 Applying Gateway API CRDs..."
+    (kubectl apply --server-side -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/standard-install.yaml" || {
+        echo -e "$red 🛑 Could not install Gateway API CRDs"
+        die
+    }) & spinner
+    
+    echo -e "$yellow ✅ Done installing Gateway API CRDs"
+    echo -e "$yellow"
+    echo -e "$yellow 📦 Installed resources:"
+    echo -e "$yellow    - GatewayClass"
+    echo -e "$yellow    - Gateway"
+    echo -e "$yellow    - HTTPRoute"
+    echo -e "$yellow    - GRPCRoute"
+    echo -e "$yellow    - ReferenceGrant"
+    echo -e "$yellow"
+    echo -e "$yellow 📖 Next steps:"
+    echo -e "$yellow    Install a Gateway controller that supports Gateway API:"
+    echo -e "$yellow    - Nginx Gateway Fabric: https://github.com/nginxinc/nginx-gateway-fabric"
+    echo -e "$yellow    - Envoy Gateway: https://gateway.envoyproxy.io"
+    echo -e "$yellow    - Cilium: already supports Gateway API if installed"
+    echo -e "$yellow    - Kong: https://docs.konghq.com/gateway/"
+    echo -e "$yellow"
+    echo -e "$yellow 🔍 Check installed CRDs:$blue kubectl get crds | grep gateway"
+    echo -e "$clear"
+}

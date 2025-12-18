@@ -650,6 +650,55 @@ function install_metrics_server_application() {
     echo -e "$yellow Check pod metrics:$blue kubectl top pods -A"
 }
 
+function install_gateway_api_application() {
+    echo -e "$yellow Installing Gateway API ArgoCD application"
+    (kubectl apply -f $gateway_api_app_yaml || { 
+        echo -e "$red 🛑 Could not install Gateway API ArgoCD application into cluster ..."; 
+        die 
+    }) & spinner
+
+    echo -e "$yellow ✅ Done installing Gateway API ArgoCD application"
+
+    echo -e "$yellow\n⏰ Waiting for Gateway API CRDs to be synced"
+    sleep 5
+    
+    # Wait for the CRDs to be established
+    local max_wait=60
+    local waited=0
+    while ! kubectl get crd gateways.gateway.networking.k8s.io &>/dev/null; do
+        if [ $waited -ge $max_wait ]; then
+            echo -e "$yellow ⚠️  Gateway CRDs not yet available, ArgoCD may still be syncing"
+            break
+        fi
+        sleep 2
+        waited=$((waited + 2))
+    done
+    
+    if kubectl get crd gateways.gateway.networking.k8s.io &>/dev/null; then
+        echo -e "$yellow ✅ Gateway API CRDs are ready"
+    fi
+
+    append_to_cluster_info "Gateway API application installed: yes"
+
+    echo -e "$yellow"
+    echo -e "$yellow 📦 Installed resources:"
+    echo -e "$yellow    - GatewayClass"
+    echo -e "$yellow    - Gateway"
+    echo -e "$yellow    - HTTPRoute"
+    echo -e "$yellow    - GRPCRoute"
+    echo -e "$yellow    - ReferenceGrant"
+    echo -e "$yellow"
+    echo -e "$yellow 📖 Next steps:"
+    echo -e "$yellow    Install a Gateway controller that supports Gateway API:"
+    echo -e "$yellow    - Nginx Gateway Fabric: https://github.com/nginxinc/nginx-gateway-fabric"
+    echo -e "$yellow    - Envoy Gateway: https://gateway.envoyproxy.io"
+    echo -e "$yellow    - Cilium: already supports Gateway API if installed"
+    echo -e "$yellow    - Kong: https://docs.konghq.com/gateway/"
+    echo -e "$yellow"
+    echo -e "$yellow 🔍 Check installed CRDs:$blue kubectl get crds | grep gateway"
+    echo -e "$clear"
+}
+
 function install_keycloak_application() {
     echo -e "$yellow Installing Keycloak ArgoCD application"
     

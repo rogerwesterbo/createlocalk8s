@@ -61,6 +61,7 @@ kite|helm|install_helm_kite|Kite Kubernetes dashboard
 metrics-server|helm|install_helm_metrics_server|Metrics Server for resource metrics|kube-system
 prometheus|helm|install_helm_kube_prometheus_stack|Kube Prometheus Stack (Prometheus/Grafana/Alertmanager)|prometheus
 keycloak|helm|install_helm_keycloak|Keycloak identity and access management|keycloak
+gateway-api|helm|install_helm_gateway_api|Gateway API CRDs (Standard Channel)
 EOF
 )"
 
@@ -91,6 +92,7 @@ kite|app|install_kite_application|Kite Kubernetes dashboard
 metrics-server|app|install_metrics_server_application|Metrics Server for resource metrics|kube-system
 keycloak|app|install_keycloak_application|Keycloak identity and access management|keycloak
 kubevirt|app|install_kubevirt_application|KubeVirt virtual machine management|kubevirt
+gateway-api|app|install_gateway_api_application|Gateway API CRDs (Standard Channel)
 EOF
 )"
 

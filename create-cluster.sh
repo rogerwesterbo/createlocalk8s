@@ -49,6 +49,7 @@ kite_app_yaml=$(get_abs_filename "$manifestDir/kite-app.yaml")
 metrics_server_app_yaml=$(get_abs_filename "$manifestDir/metrics-server-app.yaml")
 keycloak_app_yaml=$(get_abs_filename "$manifestDir/keycloak-app.yaml")
 kubevirt_app_yaml="${script_dir}/configs/apps/manifests/kubevirt-app.yaml"
+gateway_api_app_yaml=$(get_abs_filename "$manifestDir/gateway-api-app.yaml")
 openbao_app_yaml=$(get_abs_filename "$manifestDir/openbao-app.yaml")
 openbao_values_yaml=$(get_abs_filename "$scriptDir/configs/apps/values/openbao-values.yaml")
 nats_ingress_yaml=$(get_abs_filename "$configsDir/nats-ingress.yaml")
