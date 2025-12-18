@@ -47,7 +47,7 @@ cp k8s-local-completion.fish ~/.config/fish/completions/
 Tab completion for:
 
 -   ✅ Main commands: `create`, `delete`, `list`, `info`, `config`, `start`, `stop`, `help`, `helm`, `apps`, `install`
--   ✅ Helm components: `argocd`, `redis-stack`, `nats`, `metallb`, `mongodb-operator`, etc.
+-   ✅ Helm components: `argocd`, `valkey`, `nats`, `metallb`, `mongodb-operator`, etc.
 -   ✅ ArgoCD apps: `nyancat`, `prometheus`, `mongodb`, `cnpg-cluster`, etc.
 -   ✅ Flags: `--dry-run`
 -   ✅ Works with all script names: `./kl.sh`, `./k8s-local.sh`, `./create-cluster.sh`

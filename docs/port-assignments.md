@@ -8,7 +8,6 @@ All `kubectl port-forward` commands use unique local ports to avoid conflicts wh
 | ----------- | ----------------------------------------------------------------------------------- | ---------- | ------------ |
 | MongoDB     | `kubectl port-forward --namespace mongodb service/mongodb-instance-svc 27017:27017` | 27017      | 27017        |
 | PostgreSQL  | `kubectl port-forward -n postgres-cluster services/postgres-cluster-rw 5432:5432`   | 5432       | 5432         |
-| Redis Stack | `kubectl port-forward -n redis svc/redis-stack-server 6380:6379`                    | 6380       | 6379         |
 | Valkey      | `kubectl port-forward -n valkey svc/valkey-master 6381:6379`                        | 6381       | 6379         |
 
 ## Web UIs & Dashboards
@@ -21,7 +20,6 @@ All `kubectl port-forward` commands use unique local ports to avoid conflicts wh
 | Keycloak      | `kubectl port-forward -n keycloak svc/keycloak-http 15003:80`                      | 15003      | 80           | http://localhost:15003 or http://keycloak.localtest.me[:port] |
 | OpenBao (Dev) | `kubectl port-forward -n openbao svc/openbao 8201:8200`                            | 8201       | 8200         | http://localhost:8201 or http://openbao.localtest.me[:port]   |
 | PgAdmin       | `kubectl port-forward -n pgadmin services/pgadmin-pgadmin4 5050:80`                | 5050       | 80           | http://localhost:5050                                         |
-| Vault         | `kubectl port-forward --namespace vault service/vault 8200:8200`                   | 8200       | 8200         | http://localhost:8200                                         |
 | Falco UI      | `kubectl port-forward --namespace falco services/falco-falcosidekick-ui 2802:2802` | 2802       | 2802         | http://localhost:2802                                         |
 
 **Note:**
@@ -52,8 +50,8 @@ All `kubectl port-forward` commands use unique local ports to avoid conflicts wh
 -   **3000-3999**: Grafana (3000)
 -   **4000-4999**: NATS Core (4222)
 -   **5000-5999**: PostgreSQL (5432), PgAdmin (5050)
--   **6000-6999**: Redis Stack (6380), Valkey (6381)
--   **8000-8999**: Vault (8200), OpenBao (8201)
+-   **6000-6999**: Valkey (6381)
+-   **8000-8999**: OpenBao (8201)
 -   **9000-9999**: OpenCost (9003), Prometheus (9090), Alertmanager (9093)
 -   **15000+**: Kite (15001), NATS WebSocket (15002), Keycloak (15003), Kubeview (15004)
 -   **27000+**: MongoDB (27017)
@@ -84,10 +82,6 @@ All `kubectl port-forward` commands use unique local ports to avoid conflicts wh
 
 -   Username: `appuser`
 -   Password: `SuperSecret`
-
-### Vault
-
--   Token: Found in `vault-init.json` after installation
 
 ### OpenBao (Dev Mode)
 

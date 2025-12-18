@@ -41,10 +41,9 @@ label_namespace_for_talos() {
 APP_HELM_REGISTRY_DATA="$(cat <<'EOF'
 argocd|helm|install_helm_argocd|ArgoCD GitOps controller
 metallb|helm|install_helm_metallb|MetalLB load balancer
-mongodb-operator|helm|install_helm_mongodb_operator|MongoDB (Bitnami) single deployment|mongodb
-mongodb-instance|helm|install_helm_mongodb_instance|MongoDB additional instance (Bitnami)|mongodb
+mongodb-operator|helm|install_helm_mongodb_operator|MongoDB Kubernetes Operator (MCK)|mongodb
+mongodb-instance|helm|install_helm_mongodb_instance|MongoDB Instance (MongoDBCommunity CR)|mongodb
 trivy|helm|install_helm_trivy|Trivy security operator
-vault|helm|install_helm_vault|HashiCorp Vault server
 openbao|helm|install_helm_openbao|OpenBao secrets manager (dev mode)|openbao
 falco|helm|install_helm_falco|Falco runtime security
 postgres|helm|install_helm_postgres|CloudNativePG operator + cluster|postgres
@@ -56,14 +55,11 @@ nginx|helm|install_helm_nginx_controller|Ingress-Nginx controller
 minio|helm|install_helm_minio|MinIO operator
 nfs|helm|install_helm_nfs|NFS external provisioner
 local-path-provisioner|helm|install_helm_local_path_provisioner|Local Path Provisioner (Rancher)|local-path-storage
-redis-stack|helm|install_helm_redis_stack|Redis Stack server|redis
 valkey|helm|install_helm_valkey|Valkey key-value store|valkey
 nats|helm|install_helm_nats|NATS messaging server
 kite|helm|install_helm_kite|Kite Kubernetes dashboard
 metrics-server|helm|install_helm_metrics_server|Metrics Server for resource metrics|kube-system
 prometheus|helm|install_helm_kube_prometheus_stack|Kube Prometheus Stack (Prometheus/Grafana/Alertmanager)|prometheus
-cilium|helm|install_helm_cilium|Cilium CNI networking and security|kube-system
-calico|helm|install_helm_calico|Calico CNI networking and security|tigera-operator
 keycloak|helm|install_helm_keycloak|Keycloak identity and access management|keycloak
 EOF
 )"
@@ -75,11 +71,10 @@ prometheus|app|install_kube_prometheus_stack_application|Kube Prometheus Stack (
 kubeview|app|install_kubeview_application|Kubeview UI
 opencost|app|install_opencost_application|OpenCost cost monitoring
 metallb|app|install_metallb_application|MetalLB load balancer
-mongodb-operator|app|install_mongodb_operator_application|MongoDB Operator (Community)|mongodb
-mongodb-instance|app|install_mongodb_instance|MongoDB Instance CR|mongodb
+mongodb-operator|app|install_mongodb_operator_application|MongoDB Kubernetes Operator (MCK)|mongodb
+mongodb-instance|app|install_mongodb_instance|MongoDB Instance CR (Mongodb Operator must be installed)|mongodb
 falco|app|install_falco_application|Falco runtime security
 trivy|app|install_trivy_application|Trivy operator
-vault|app|install_vault_application|HashiCorp Vault server
 openbao|app|install_openbao_application|OpenBao secrets manager (dev mode)|openbao
 postgres|app|install_postgres_application|CloudNativePG operator + cluster|postgres
 pgadmin|app|install_pgadmin_application|PgAdmin4 UI
@@ -90,7 +85,6 @@ nginx|app|install_nginx_controller_application|Ingress-Nginx controller
 minio|app|install_minio_application|MinIO operator
 nfs|app|install_nfs_application|NFS external provisioner
 local-path-provisioner|app|install_local_path_provisioner_application|Local Path Provisioner (Rancher)|local-path-storage
-redis-stack|app|install_redis_stack_application|Redis Stack server|redis
 valkey|app|install_valkey_application|Valkey key-value store|valkey
 nats|app|install_nats_application|NATS messaging server
 kite|app|install_kite_application|Kite Kubernetes dashboard

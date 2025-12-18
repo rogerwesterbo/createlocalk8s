@@ -11,9 +11,14 @@ spec:
     server: https://kubernetes.default.svc
   project: default
   source:
-    chart: community-operator
+    chart: mongodb-kubernetes
     repoURL: https://mongodb.github.io/helm-charts
     targetRevision: '*'
+    helm:
+      valuesObject:
+        operator:
+          watchedResources:
+            - mongodbcommunity
   syncPolicy:
     automated:
       prune: true

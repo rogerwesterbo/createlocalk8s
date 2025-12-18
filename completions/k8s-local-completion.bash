@@ -42,7 +42,7 @@ _k8s_local_completion() {
             if [[ -n "$out" ]]; then
                 _K8S_LOCAL_HELM="$(echo "$out" | awk 'NR==1 && tolower($0) ~ /name/ {next} {print $1}' | sed -E '/^$/d' | tr '\n' ' ')"
             fi
-            [[ -z "$_K8S_LOCAL_HELM" ]] && _K8S_LOCAL_HELM="argocd cert-manager cnpg crossplane falco hashicorp-vault kube-prometheus-stack kubeview metallb metrics-server minio mongodb-operator nats nfs nginx-ingress opencost pgadmin prometheus redis-stack rook-ceph-operator trivy"
+            [[ -z "$_K8S_LOCAL_HELM" ]] && _K8S_LOCAL_HELM="argocd cert-manager cnpg crossplane falco kube-prometheus-stack kubeview metallb metrics-server minio mongodb-operator nats nfs nginx-ingress openbao opencost pgadmin prometheus rook-ceph-operator trivy valkey"
         fi
         printf '%s' "$_K8S_LOCAL_HELM"
     }
@@ -55,7 +55,7 @@ _k8s_local_completion() {
             if [[ -n "$out" ]]; then
                 _K8S_LOCAL_APPS="$(echo "$out" | awk '{print $1}' | sed -E '/^(NAME|Name|#|$)/d' | tr '\n' ' ')"
             fi
-            [[ -z "$_K8S_LOCAL_APPS" ]] && _K8S_LOCAL_APPS="nyancat prometheus cert-manager cnpg-cluster crossplane falco hashicorp-vault kubeview metallb metrics-server minio mongodb mongodb-operator nats nfs opencost pg-ui pgadmin redis-stack rook-ceph-cluster rook-ceph-operator trivy coredns"
+            [[ -z "$_K8S_LOCAL_APPS" ]] && _K8S_LOCAL_APPS="nyancat prometheus cert-manager cnpg-cluster crossplane falco kubeview metallb metrics-server minio mongodb mongodb-operator nats nfs openbao opencost pg-ui pgadmin rook-ceph-cluster rook-ceph-operator trivy coredns valkey"
         fi
         printf '%s' "$_K8S_LOCAL_APPS"
     }

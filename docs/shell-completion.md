@@ -84,7 +84,7 @@ source ~/.config/fish/completions/k8s-local-completion.fish
 The completion script provides tab completion for:
 
 -   **Main commands**: `create`, `delete`, `list`, `info`, `config`, `start`, `stop`, `help`, `helm`, `apps`, `install`
--   **Helm components**: All available Helm packages (argocd, redis-stack, nats, metallb, etc.)
+-   **Helm components**: All available Helm packages (argocd, valkey, nats, metallb, etc.)
 -   **ArgoCD apps**: All available ArgoCD applications (nyancat, prometheus, mongodb, etc.)
 -   **Flags**: `--dry-run`
 
@@ -104,7 +104,7 @@ All shells support the same completion features:
 
 # Tab to see available Helm components (with descriptions!)
 ./kl.sh install helm <TAB>
-# Shows: argocd cert-manager cnpg crossplane falco hashicorp-vault ...
+# Shows: argocd cert-manager cnpg crossplane falco openbao ...
 # Zsh/Fish also show descriptions like "ArgoCD GitOps controller"
 
 # Tab to see available ArgoCD apps
@@ -112,7 +112,7 @@ All shells support the same completion features:
 # Shows: nyancat prometheus cert-manager cnpg-cluster crossplane ...
 
 # Tab to add --dry-run flag
-./kl.sh install helm redis-stack <TAB>  # Shows: --dry-run
+./kl.sh install helm valkey <TAB>  # Shows: --dry-run
 ```
 
 ## Features by Shell

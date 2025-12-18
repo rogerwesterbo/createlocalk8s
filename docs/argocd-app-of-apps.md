@@ -116,7 +116,7 @@ platform/
     kube-prometheus-stack-app.yaml
     falco-app.yaml
     trivy-app.yaml
-    vault-app.yaml
+    openbao-app.yaml
     # ... more Application YAMLs
   root/
     platform-root-app.yaml   # The parent Application (points to ../apps)
@@ -180,7 +180,7 @@ Common ordering guideline:
 1. Ingress / Cert-manager / CRDs
 2. Storage operators (Ceph, NFS provisioner)
 3. Databases (Postgres Operator, Mongo Operator)
-4. Security (Vault, Falco, Trivy)
+4. Security (OpenBao, Falco, Trivy)
 5. Observability (Prometheus stack, OpenCost)
 6. Apps / Demos (Nyancat, custom services)
 
@@ -194,7 +194,7 @@ Options:
 | Plain Kubernetes Secrets | (none) | Simple | Unencrypted in Git |
 | Sealed Secrets | SealedSecrets CRD | Encrypted at rest in Git | Key recovery considerations |
 | SOPS + KMS + ArgoCD plugin | SOPS, age/GPG/KMS | Strong encryption & portability | Plugin config needed |
-| Vault + External Secrets Operator | ESO, Vault | Dynamic credentials | More moving parts |
+| OpenBao + External Secrets Operator | ESO, OpenBao | Dynamic credentials | More moving parts |
 
 For quick local learning, plain Secrets are fine (non-production). To graduate, experiment with SOPS or Sealed Secrets.
 

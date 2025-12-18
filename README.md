@@ -73,18 +73,18 @@ Examples:
 
 Helm installations:
   helm list                                List available Helm components
-  install helm redis-stack,nats            Install one or more Helm components
-  install helm redis-stack --dry-run       Dry run (show what would be installed)
+  install helm valkey,nats            Install one or more Helm components
+  install helm valkey --dry-run       Dry run (show what would be installed)
 
 ArgoCD application installations:
   apps list                                List available ArgoCD app components
   install apps nyancat,prometheus          Install one or more ArgoCD apps
-  install apps nats,redis-stack --dry-run  Dry run for ArgoCD apps
+  install apps nats,valkey --dry-run  Dry run for ArgoCD apps
 
 Notes:
   - Parameters in [brackets] are optional
   - Parameters in <brackets> are required
-  - Use comma-separated lists (no spaces): redis-stack,nats
+  - Use comma-separated lists (no spaces): valkey,nats
   - Components are installed in the order specified
   - Use --dry-run to preview changes before applying
 
@@ -108,7 +108,7 @@ Current date and time in Linux Mon Oct 13 23:29:08 CEST 2025
 -   Post-create helper to install a sample Nyancat app (demo ingress + ArgoCD)
 -   Rich subcommands to list, inspect, delete clusters & fetch kubeconfig
 -   **Registry-based installers**: List and install Helm/ArgoCD components with simple commands
--   **24 Helm installers**: ArgoCD, Crossplane, Rook Ceph, Falco, Trivy, Vault, OpenBao, MetalLB, MinIO, NFS, Local Path Provisioner, MongoDB Operator, CNPG, PgAdmin, Redis Stack, Valkey, NATS, Kite, Keycloak, Metrics Server, Prometheus, Cilium, Calico, Nginx Ingress
+-   **22 Helm installers**: ArgoCD, Crossplane, Rook Ceph, Falco, Trivy, OpenBao, MetalLB, MinIO, NFS, Local Path Provisioner, MongoDB Operator, CNPG, PgAdmin, Valkey, NATS, Kite, Keycloak, Metrics Server, Prometheus, Nginx Ingress
 -   **27 ArgoCD Application installers** (GitOps style): monitoring (Prometheus), metrics (Metrics Server), databases, security, storage, cost monitoring, identity management, etc.
 -   **Dry-run mode**: Preview what will be installed with `--dry-run`
 -   Generates per-cluster info + kubeconfig files under `clusters/<cluster-name>/`
@@ -225,7 +225,7 @@ The script checks and will exit if any of these are missing. Install them first:
 | kind     | kind     | Run Kubernetes in Docker   | https://kind.sigs.k8s.io/docs/user/quick-start/            |
 | talos    | talosctl | Talos Linux management CLI | https://www.talos.dev/latest/introduction/getting-started/ |
 
-Optional (used later): `mongosh`, `pgcli`, `vault` CLI, etc.
+Optional (used later): `mongosh`, `pgcli`, `bao` CLI, etc.
 
 Homebrew (macOS/Linux) quick installs:
 
@@ -416,10 +416,10 @@ See full cluster details (cluster info + kind config used):
 
 ```bash
 # Install single Helm component
-./kl.sh install helm redis-stack
+./kl.sh install helm valkey
 
 # Install multiple Helm components (comma-separated)
-./kl.sh install helm redis-stack,nats,metallb
+./kl.sh install helm valkey,nats,metallb
 
 # Install ArgoCD application
 ./kl.sh install apps prometheus
@@ -428,15 +428,13 @@ See full cluster details (cluster info + kind config used):
 ./kl.sh install apps nyancat,prometheus,mongodb
 
 # Dry-run mode (preview what will be installed)
-./kl.sh install helm redis-stack --dry-run
+./kl.sh install helm valkey --dry-run
 ./kl.sh install apps prometheus,mongodb --dry-run
 ```
 
-**Available Helm components** (24):
+**Available Helm components** (21):
 
 -   `argocd` - ArgoCD GitOps controller
--   `calico` - Calico CNI networking and security
--   `cilium` - Cilium CNI networking and security
 -   `crossplane` - Cloud native control plane
 -   `falco` - Runtime security
 -   `keycloak` - Keycloak identity and access management
@@ -454,14 +452,12 @@ See full cluster details (cluster info + kind config used):
 -   `pgadmin` - PostgreSQL admin UI
 -   `postgres` - CloudNativePG operator + cluster
 -   `prometheus` - Kube Prometheus Stack (Prometheus/Grafana/Alertmanager)
--   `redis-stack` - Redis Stack server
 -   `rook-ceph-cluster` - Rook Ceph cluster
 -   `rook-ceph-operator` - Rook Ceph operator
 -   `trivy` - Security scanner
 -   `valkey` - Valkey key-value store
--   `vault` - HashiCorp Vault server
 
-**Available ArgoCD apps** (27):
+**Available ArgoCD apps** (26):
 
 -   `certmanager` - Cert Manager for certificates
 -   `crossplane` - Crossplane control plane
@@ -484,12 +480,10 @@ See full cluster details (cluster info + kind config used):
 -   `pgadmin` - PgAdmin4 UI
 -   `postgres` - CloudNativePG operator + cluster
 -   `prometheus` - Kube Prometheus Stack (Grafana/Prometheus/Alertmanager)
--   `redis-stack` - Redis Stack server
 -   `rook-ceph-cluster` - Rook Ceph cluster
 -   `rook-ceph-operator` - Rook Ceph operator
 -   `trivy` - Trivy operator
 -   `valkey` - Valkey key-value store
--   `vault` - HashiCorp Vault server
 
 > Use tab completion to discover available components! Run `./completions/install-completion.sh` to enable it.
 
@@ -513,7 +507,6 @@ Common hostnames:
 
 -   ArgoCD admin password extracted from the initial secret and logged to the cluster info file.
 -   Generated cluster info files may contain credentials – treat the `clusters/` folder as sensitive if you reuse values.
--   Vault install auto-inits & unseals, writing `vault-init.json` (contains unseal keys + root token). Guard or delete this file if not just experimenting.
 
 ---
 
@@ -540,11 +533,11 @@ kubectl port-forward -n mongodb svc/mongodb-instance-svc 27017:27017
 mongosh "mongodb://appuser:SuperSecret@localhost:27017/appdb?replicaSet=mongodb-instance&directConnection=true"
 ```
 
-Access Vault:
+Access OpenBao:
 
 ```bash
-kubectl port-forward -n vault svc/vault 8200:8200
-open http://localhost:8200
+kubectl port-forward -n openbao svc/openbao 8201:8200
+open http://localhost:8201
 ```
 
 ---
@@ -601,7 +594,7 @@ rm clusters/clusterinfo-mycluster.txt clusters/kubeconfig-mycluster.config
 | ArgoCD UI not reachable               | Ensure ingress controller pods are Ready; `kubectl get pods -n ingress-nginx`       |
 | Talos multi-CP ingress not working    | Check HAProxy proxy container: `docker logs <cluster>-ingress-proxy`                |
 | Application stuck syncing             | Check ArgoCD `argocd app list` & pod logs in the target namespace                   |
-| Vault unseal problems                 | Re-run unseal using keys in `vault-init.json`                                       |
+| OpenBao unseal problems               | Check logs, ensure dev mode is active                                               |
 
 ---
 

@@ -67,11 +67,12 @@ function install_helm_nfs(){
 
 function install_helm_local_path_provisioner(){
     echo -e "$yellow Installing Local Path Provisioner"
-    helm repo add local-path-provisioner https://github.com/rancher/local-path-provisioner
     
-    # Install using the chart from the GitHub repo
+    # Install using OCI helm chart from GitHub Container Registry
+    # Alternative (raw manifest): kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.32/deploy/local-path-storage.yaml
     (helm upgrade --install local-path-provisioner \
-        https://github.com/rancher/local-path-provisioner/releases/download/v0.0.28/local-path-provisioner-0.0.28.tgz \
+        oci://ghcr.io/rancher/local-path-provisioner/charts/local-path-provisioner \
+        --version 0.0.32 \
         --namespace local-path-storage \
         --create-namespace \
         --set storageClass.defaultClass=true || { 
@@ -102,22 +103,6 @@ function install_helm_local_path_provisioner(){
     echo -e "      requests:"
     echo -e "        storage: 1Gi"
     echo -e "$yellow\nCheck storage class:$blue kubectl get storageclass"
-}
-
-function install_helm_redis_stack(){
-    # Add redis-stack helm repo and install redis-stack-server
-    helm_install_generic \
-        "redis-stack-server" \
-        "redis-stack" \
-        "https://redis-stack.github.io/helm-redis-stack" \
-        "redis-stack-server" \
-        "redis" \
-        "" \
-        "kubectl wait pods --for=condition=Ready --all -n redis --timeout=180s" \
-        "\nRedis Stack is ready to use\nTo access Redis CLI: kubectl exec -it -n redis deploy/redis-stack-server -- redis-cli\n"
-
-    echo -e "\nTo access Redis locally (port-forward), run: kubectl port-forward -n redis svc/redis-stack-server 6380:6379"
-    echo -e "Connect using redis-cli: redis-cli -h localhost -p 6380"
 }
 
 function install_helm_valkey(){
@@ -224,23 +209,6 @@ function install_helm_falco(){
     post_falco_installation
 }
 
-function install_helm_vault(){
-    echo -e "$yellow Installing Hashicorp Vault with helm"
-    
-    helm repo add hashicorp https://helm.releases.hashicorp.com
-    (helm install vault hashicorp/vault --namespace vault --create-namespace || 
-    { 
-        echo -e "$red 🛑 Could not install Hashicorp Vault into cluster ..."
-        die
-    }) & spinner
-
-    echo -e "$yellow ✅ Done installing Hashicorp Vault"
-
-    unseal_vault
-
-    show_vault_after_installation
-}
-
 function install_helm_openbao(){
     echo -e "$yellow Installing OpenBao"
 
@@ -268,49 +236,112 @@ function install_helm_openbao(){
 }
 
 function install_helm_mongodb_operator(){
-    echo -e "$yellow Installing Mongodb with helm"
+    echo -e "$yellow Installing MongoDB Kubernetes Operator (MCK) with helm"
     
-    helm repo add bitnami https://charts.bitnami.com/bitnami
-    (helm install mongodb bitnami/mongodb --namespace mongodb --create-namespace --values "$manifestDir/mongodb-values.yaml" || 
+    helm repo add mongodb https://mongodb.github.io/helm-charts
+    helm repo update
+    (helm upgrade --install mongodb-kubernetes-operator mongodb/mongodb-kubernetes \
+        --namespace mongodb \
+        --create-namespace \
+        --set operator.watchedResources='{mongodbcommunity}' || 
     { 
-        echo -e "$red 🛑 Could not install Mongodb into cluster ..."
+        echo -e "$red 🛑 Could not install MongoDB Kubernetes Operator into cluster ..."
         die
     }) & spinner
 
-    echo -e "$yellow ✅ Done installing Mongodb"
+    echo -e "$yellow ✅ Done installing MongoDB Kubernetes Operator"
 
-    echo -e "$yellow\n⏰ Waiting for Mongodb to be running"
+    echo -e "$yellow\n⏰ Waiting for MongoDB Operator to be running"
     sleep 10
-    (kubectl wait pods --for=condition=Ready --all -n mongodb --timeout=120s || 
+    (kubectl wait deployment -n mongodb mongodb-kubernetes-operator --for condition=Available=True --timeout=120s || 
     { 
-        echo -e "$red 🛑 Mongodb is not running, and is not ready to use ..."
+        echo -e "$red 🛑 MongoDB Operator is not running ..."
         die
     }) & spinner
 
-    show_mongodb_after_installation
+    show_mongodb_operator_after_installation_helm
 }
 
 function install_helm_mongodb_instance(){
-    echo -e "$yellow Installing Mongodb Instance with helm"
+    echo -e "$yellow Installing MongoDB Instance (MongoDBCommunity CR)"
     
-    helm repo add bitnami https://charts.bitnami.com/bitnami
-    (helm install mongodb-instance bitnami/mongodb --namespace mongodb-instance --create-namespace --values "$manifestDir/mongodb-values.yaml" || 
+    # Check if operator is installed
+    if ! kubectl get deployment -n mongodb mongodb-kubernetes-operator &>/dev/null; then
+        echo -e "$yellow MongoDB Kubernetes Operator not found. Installing it first..."
+        install_helm_mongodb_operator
+    fi
+    
+    # Create password secret
+    local mongo_password="SuperSecret"
+    kubectl create secret generic mongodb-instance-password \
+        --from-literal=password="$mongo_password" \
+        -n mongodb \
+        --dry-run=client -o yaml | kubectl apply -f - &>/dev/null
+    
+    # Apply MongoDBCommunity CR
+    echo -e "$yellow Applying MongoDBCommunity custom resource..."
+    cat <<EOF | kubectl apply -f -
+apiVersion: mongodbcommunity.mongodb.com/v1
+kind: MongoDBCommunity
+metadata:
+  name: mongodb-instance
+  namespace: mongodb
+spec:
+  members: 3
+  type: ReplicaSet
+  version: "8.0.16"
+  security:
+    authentication:
+      modes: ["SCRAM"]
+  users:
+    - name: appuser
+      db: admin
+      passwordSecretRef:
+        name: mongodb-instance-password
+      roles:
+        - name: clusterAdmin
+          db: admin
+        - name: userAdminAnyDatabase
+          db: admin
+        - name: readWriteAnyDatabase
+          db: admin
+      scramCredentialsSecretName: appuser-scram
+  additionalMongodConfig:
+    storage.wiredTiger.engineConfig.journalCompressor: zlib
+EOF
+    
+    echo -e "$yellow ✅ Done creating MongoDB Instance CR"
+
+    echo -e "$yellow\n⏰ Waiting for MongoDB Instance to be running"
+    sleep 15
+    (kubectl wait mongodbcommunity/mongodb-instance -n mongodb --for=jsonpath='{.status.phase}'=Running --timeout=300s || 
     { 
-        echo -e "$red 🛑 Could not install Mongodb Instance into cluster ..."
+        echo -e "$red 🛑 MongoDB Instance is not running ..."
         die
     }) & spinner
 
-    echo -e "$yellow ✅ Done installing Mongodb Instance"
+    show_mongodb_instance_after_installation_helm
+}
 
-    echo -e "$yellow\n⏰ Waiting for Mongodb Instance to be running"
-    sleep 10
-    (kubectl wait pods --for=condition=Ready --all -n mongodb-instance --timeout=120s || 
-    { 
-        echo -e "$red 🛑 Mongodb Instance is not running, and is not ready to use ..."
-        die
-    }) & spinner
+function show_mongodb_operator_after_installation_helm() {
+    echo -e "$yellow\nMongoDB Kubernetes Operator (MCK) is ready"
+    echo -e "$yellow\nTo create a MongoDB instance:$blue ./kl.sh install helm mongodb-instance"
+    echo -e "$yellow\nOr apply your own MongoDBCommunity CR"
+    echo -e "$yellow\nDocs: https://github.com/mongodb/mongodb-kubernetes/tree/master/docs/mongodbcommunity"
+    echo -e "$clear"
+}
 
-    show_mongodb_after_installation
+function show_mongodb_instance_after_installation_helm() {
+    echo -e "$yellow\nMongoDB Instance is ready to use"
+    echo -e "$yellow\nTo access MongoDB, port-forward the service:"
+    echo -e "$blue  kubectl port-forward -n mongodb svc/mongodb-instance-svc 27017:27017"
+    echo -e "$yellow\nConnect using mongosh:"
+    echo -e "$blue  mongosh \"mongodb://appuser:SuperSecret@localhost:27017/admin?directConnection=true\""
+    echo -e "$yellow\nCredentials:"
+    echo -e "$yellow  Username: appuser"
+    echo -e "$yellow  Password: SuperSecret"
+    echo -e "$yellow  Auth DB:  admin"
+    echo -e "$clear"
 }
 
 function install_helm_postgres(){
