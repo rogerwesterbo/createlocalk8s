@@ -100,8 +100,8 @@ Current date and time in Linux Mon Oct 13 23:29:08 CEST 2025
 -   **Multi-Provider Support**: Choose between kind and Talos providers (interactive or via `--provider` flag)
 -   Interactive cluster creation (name, control planes, workers, Kubernetes version, provider selection)
 -   Supported Kubernetes versions:
-    -   **kind**: v1.25.x → v1.34.x (see `scripts/variables.sh` for full list)
-    -   **talos**: v1.30.x → v1.34.x (see `scripts/variables.sh` for full list)
+    -   **kind**: v1.25.x → v1.35.x (see `scripts/variables.sh` for full list)
+    -   **talos**: Dynamically determined based on installed `talosctl` version (see [support matrix](https://docs.siderolabs.com/talos/v1.11/getting-started/support-matrix))
 -   **Organized cluster storage**: Each cluster gets its own directory under `clusters/<cluster-name>/`
 -   Automatic port mapping adjustment when multiple clusters run simultaneously (avoids 80/443 conflicts)
 -   Optional automatic ArgoCD + Nginx Ingress install during cluster creation
@@ -122,7 +122,7 @@ Current date and time in Linux Mon Oct 13 23:29:08 CEST 2025
 ### Kind Provider
 
 -   Fast cluster creation (~30 seconds)
--   Multiple Kubernetes versions supported (v1.25-v1.34)
+-   Multiple Kubernetes versions supported (v1.25-v1.35)
 -   Port mapping for ingress access
 -   Multi-cluster support on same host
 
@@ -295,7 +295,7 @@ Create a cluster (interactive prompts follow):
 During the prompts you can choose:
 
 -   **Provider** (kind or talos)
--   **Kubernetes version** (kind only - supports v1.25-v1.34; talos uses latest stable)
+-   **Kubernetes version** (kind: v1.25-v1.35; talos: based on installed `talosctl` version)
 -   **CNI** (Container Network Interface): default, cilium, or calico
 -   **Multus CNI** (optional add-on for multiple network interfaces per pod)
 -   Number of control planes & workers

@@ -310,10 +310,14 @@ EOF
     fi
 
     if [ "$argocd_installed" == "yes" ] && [ -n "$argocd_password" ]; then
+        local argocd_url="http://argocd.localtest.me"
+        if [ "$http_port" != "80" ]; then
+            argocd_url="http://argocd.localtest.me:$http_port"
+        fi
         cat >> "$cluster_info_file" <<EOF
 ArgoCD admin password: $argocd_password
-ArgoCD admin GUI port forwarding: kubectl port-forward -n argocd services/argocd-server 58080:443
-ArgoCD admin GUI URL: http://localhost:58080
+ArgoCD admin GUI URL: $argocd_url
+ArgoCD admin GUI fallback (port-forward): kubectl port-forward -n argocd services/argocd-server 58080:443 → http://localhost:58080
 EOF
     fi
 }

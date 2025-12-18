@@ -5,6 +5,15 @@ if [ -z "${openbao_app_yaml:-}" ]; then
     openbao_app_yaml="$apps_script_root/configs/apps/manifests/openbao-app.yaml"
 fi
 
+# Helper function to safely append to cluster_info_file
+# Only writes if the file path is set and valid
+function append_to_cluster_info() {
+    local message="$1"
+    if [ -n "${cluster_info_file:-}" ] && [ -f "$cluster_info_file" ]; then
+        echo "$message" >> "$cluster_info_file"
+    fi
+}
+
 function is_running_more_than_one_cluster() {
     local total_clusters=0
     local talos_count=0
@@ -83,7 +92,7 @@ function install_minio_application() {
 
     echo -e "$yellow ✅ Done installing Minio ArgoCD application"
 
-    echo "Minio application installed: yes" >> $cluster_info_file
+    append_to_cluster_info "Minio application installed: yes"
 
     post_minio_installation
 }
@@ -102,7 +111,7 @@ function install_nfs_application() {
 
     echo -e "$yellow ✅ Done installing NFS Subdirectory External Provisioner ArgoCD application"
 
-    echo "NFS Subdirectory External Provisioner application installed: yes" >> $cluster_info_file
+    append_to_cluster_info "NFS Subdirectory External Provisioner application installed: yes"
 }
 
 function install_local_path_provisioner_application() {
@@ -123,7 +132,7 @@ function install_local_path_provisioner_application() {
         die
     }) & spinner
 
-    echo "Local Path Provisioner application installed: yes" >> $cluster_info_file
+    append_to_cluster_info "Local Path Provisioner application installed: yes"
 
     echo -e "$yellow\nLocal Path Provisioner is ready to use"
     echo -e "$yellow\nStorageClass 'local-path' is available for PersistentVolumeClaims"
@@ -232,7 +241,7 @@ function install_nyancat_application(){
         die
     }) & spinner
 
-    echo "Nyancat argocd application installed: yes" >> $cluster_info_file
+    append_to_cluster_info "Nyancat argocd application installed: yes"
 
     echo -e "$yellow To access the Nyancat application:"
     local http_port
@@ -297,7 +306,7 @@ function install_opencost_application() {
 
     echo -e "$yellow ✅ Done installing OpenCost ArgoCD application"
 
-    echo "OpenCost argocd application installed: yes" >> $cluster_info_file
+    append_to_cluster_info "OpenCost argocd application installed: yes"
 
     echo -e "$yellow\nTo access the OpenCost dashboard, type: $red kubectl port-forward --namespace opencost service/opencost 9003 9090"
     echo -e "$yellow\nOpen the dashboard in your browser: http://localhost:9090"
@@ -313,7 +322,7 @@ function install_metallb_application() {
     }) & spinner
 
     echo -e "$yellow ✅ Done installing Metallb ArgoCD application"
-    echo "Metallb application installed: yes" >> $cluster_info_file
+    append_to_cluster_info "Metallb application installed: yes"
 }
 
 function install_kite_application() {
@@ -347,7 +356,7 @@ function install_kite_application() {
         die 
     }) & spinner
 
-    echo "Kite application installed: yes" >> $cluster_info_file
+    append_to_cluster_info "Kite application installed: yes"
 
     echo -e "$yellow ✅ Kite is ready to use"
     echo -e "$yellow\nTo access the Kite dashboard:"
@@ -390,7 +399,7 @@ function install_trivy_application() {
 
     echo -e "$yellow ✅ Done installing Trivy ArgoCD application "
 
-    echo "Trivy application installed: yes" >> $cluster_info_file
+    append_to_cluster_info "Trivy application installed: yes"
 }
 
 function install_falco_application() {
@@ -403,7 +412,7 @@ function install_falco_application() {
 
     echo -e "$yellow ✅ Done installing Falco ArgoCD application"
 
-    echo "Falco application installed: yes" >> $cluster_info_file
+    append_to_cluster_info "Falco application installed: yes"
 
     post_falco_installation
 }
@@ -441,7 +450,7 @@ function install_openbao_application() {
         die
     }) & spinner
 
-    echo "OpenBao application installed: yes" >> $cluster_info_file
+    append_to_cluster_info "OpenBao application installed: yes"
 
     echo -e "$yellow ✅ OpenBao is ready to use"
     echo -e "$yellow\nRoot token:$blue openbao-root"
@@ -602,7 +611,7 @@ function install_valkey_application() {
         die
     }) & spinner
 
-    echo "Valkey application installed: yes" >> $cluster_info_file
+    append_to_cluster_info "Valkey application installed: yes"
 
     echo -e "$yellow\nValkey is ready to use"
     echo -e "$yellow\nTo access Valkey CLI:$blue kubectl exec -it -n valkey statefulset/valkey-master -- valkey-cli"
@@ -626,7 +635,7 @@ function install_nats_application() {
         die 
     }) & spinner
 
-    echo "NATS application installed: yes" >> $cluster_info_file
+    append_to_cluster_info "NATS application installed: yes"
 
     echo -e "$yellow NATS ready."
     echo -e "$yellow Features: core, JetStream (mem 2Gi / file 1Gi), WebSocket:8080 (nats-ws.localtest.me), MQTT:1883, nats-box"
@@ -675,7 +684,7 @@ function install_metrics_server_application() {
         die 
     }) & spinner
 
-    echo "Metrics Server application installed: yes" >> $cluster_info_file
+    append_to_cluster_info "Metrics Server application installed: yes"
 
     echo -e "$yellow Metrics Server is ready to use"
     echo -e "$yellow Verify metrics are available:$blue kubectl top nodes"
@@ -803,7 +812,7 @@ EOF
         die 
     }) & spinner
 
-    echo "Keycloak application installed: yes" >> $cluster_info_file
+    append_to_cluster_info "Keycloak application installed: yes"
 
     echo -e "$yellow ✅ Keycloak is ready to use"
     
@@ -951,7 +960,7 @@ EOF
         die 
     }) & spinner
 
-    echo "Keycloak application installed: yes" >> $cluster_info_file
+    append_to_cluster_info "Keycloak application installed: yes"
 
     echo -e "$yellow ✅ Keycloak is ready to use"
     

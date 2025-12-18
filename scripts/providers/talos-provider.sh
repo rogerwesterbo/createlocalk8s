@@ -3,6 +3,62 @@
 # Talos Provider Implementation
 # Implements the provider interface for Talos Linux (running in Docker)
 
+# Get the installed talosctl version (major.minor)
+talos_get_version() {
+    local version
+    version=$(talosctl version --client 2>/dev/null | grep "Tag:" | awk '{print $2}' | sed 's/^v//')
+    if [ -z "$version" ]; then
+        echo ""
+        return 1
+    fi
+    # Return major.minor only
+    echo "$version" | cut -d. -f1,2
+}
+
+# Get supported Kubernetes versions for the installed talosctl version
+# Based on: https://docs.siderolabs.com/talos/v1.11/getting-started/support-matrix
+talos_get_supported_k8s_versions() {
+    local talos_version
+    talos_version=$(talos_get_version)
+    
+    if [ -z "$talos_version" ]; then
+        echo -e "${red}Could not determine talosctl version${clear}" >&2
+        return 1
+    fi
+    
+    # Talos version to Kubernetes version support matrix
+    # Use case statement to avoid associative array issues with version keys
+    local k8s_versions=""
+    case "$talos_version" in
+        "1.11") k8s_versions="1.34 1.33 1.32 1.31 1.30 1.29" ;;
+        "1.10") k8s_versions="1.33 1.32 1.31 1.30 1.29 1.28" ;;
+        "1.9")  k8s_versions="1.32 1.31 1.30 1.29 1.28 1.27" ;;
+        "1.8")  k8s_versions="1.31 1.30 1.29 1.28 1.27 1.26" ;;
+        *)
+            echo -e "${yellow}Warning: Talos version $talos_version not in support matrix, using latest known versions${clear}" >&2
+            k8s_versions="1.34 1.33 1.32 1.31 1.30 1.29"
+            ;;
+    esac
+    
+    echo "$k8s_versions"
+}
+
+# Populate talosk8sversions array dynamically based on installed talosctl
+talos_populate_k8s_versions() {
+    local k8s_versions
+    k8s_versions=$(talos_get_supported_k8s_versions)
+    
+    if [ -z "$k8s_versions" ]; then
+        return 1
+    fi
+    
+    # Convert space-separated string to array (works in both bash and zsh)
+    # shellcheck disable=SC2034
+    talosk8sversions=($k8s_versions)
+    
+    return 0
+}
+
 talos_check_prerequisites() {
     local missing=()
 

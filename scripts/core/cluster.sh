@@ -447,7 +447,23 @@ function get_cluster_parameter() {
             echo -e "$clear"
         fi
     else
-        # For Talos, let user specify a version from a list of supported versions.
+        # For Talos, dynamically get supported versions based on installed talosctl version
+        local talos_version
+        talos_version=$(talos_get_version)
+        
+        if [ -z "$talos_version" ]; then
+            echo -e "${red}Could not determine talosctl version. Is talosctl installed?${clear}"
+            die
+        fi
+        
+        echo -e "${yellow}Detected talosctl version: ${blue}v${talos_version}${clear}"
+        
+        # Populate talosk8sversions array based on installed talosctl version
+        talos_populate_k8s_versions || {
+            echo -e "${red}Could not determine supported Kubernetes versions for Talos${clear}"
+            die
+        }
+        
         local talosk8sversion_default="${talosk8sversions[0]}"
         
         # More robustly join the array for display.

@@ -7,16 +7,18 @@ K8s-local now supports multiple Kubernetes providers with a unified interface. A
 ## Supported Providers
 
 ### 1. kind (default)
-- **What**: Kubernetes in Docker
-- **Best for**: Quick local testing
-- **Boot time**: ~30 seconds
-- **Installation**: `brew install kind`
+
+-   **What**: Kubernetes in Docker
+-   **Best for**: Quick local testing
+-   **Boot time**: ~30 seconds
+-   **Installation**: `brew install kind`
 
 ### 2. talos
-- **What**: Talos Linux (immutable, API-driven Kubernetes)
-- **Best for**: Production-like local testing
-- **Boot time**: ~60 seconds
-- **Installation**: `brew install siderolabs/tap/talosctl`
+
+-   **What**: Talos Linux (immutable, API-driven Kubernetes)
+-   **Best for**: Production-like local testing
+-   **Boot time**: ~60 seconds
+-   **Installation**: `brew install siderolabs/tap/talosctl`
 
 ## Basic Usage
 
@@ -67,6 +69,7 @@ K8s-local now supports multiple Kubernetes providers with a unified interface. A
 These features work identically on **all providers**:
 
 ### Helm Installations
+
 ```bash
 # Works on kind or talos clusters
 ./kl.sh install helm argocd
@@ -75,6 +78,7 @@ These features work identically on **all providers**:
 ```
 
 ### ArgoCD Applications
+
 ```bash
 # Works on kind or talos clusters
 ./kl.sh install apps nyancat
@@ -83,6 +87,7 @@ These features work identically on **all providers**:
 ```
 
 ### Kubectl Operations
+
 ```bash
 # Get kubeconfig (works for any provider)
 ./kl.sh kubeconfig mycluster
@@ -111,28 +116,38 @@ clusters/
 ```
 
 **Benefits:**
-- All cluster files in one place
-- Easy to backup/restore entire cluster config
-- Clear separation between clusters
-- Simple cleanup (delete entire directory)
+
+-   All cluster files in one place
+-   Easy to backup/restore entire cluster config
+-   Clear separation between clusters
+-   Simple cleanup (delete entire directory)
 
 ## Provider-Specific Features
 
 ### kind-Specific
 
 **Fast Cluster Creation:**
+
 ```bash
 ./kl.sh create quick-test --provider kind
 # Ready in ~30 seconds
 ```
 
 **Multiple Kubernetes Versions:**
-- Supports v1.25 through v1.34
-- Specified during cluster creation
+
+-   Supports v1.25 through v1.35
+-   Specified during cluster creation
 
 ### talos-Specific
 
+**Multiple Kubernetes Versions:**
+
+-   Supported versions are dynamically determined based on installed `talosctl` version
+-   See [Talos support matrix](https://docs.siderolabs.com/talos/v1.11/getting-started/support-matrix) for version compatibility
+-   Specified during cluster creation
+
 **Access Talos API:**
+
 ```bash
 # Get node IPs
 docker ps --filter "name=mycluster-" --format "{{.Names}}: {{.Ports}}"
@@ -147,19 +162,21 @@ talosctl --talosconfig clusters/mycluster/talos/talosconfig \
 ```
 
 **Immutable Infrastructure:**
-- No SSH access to nodes
-- All configuration via Talos API
-- Minimal attack surface
+
+-   No SSH access to nodes
+-   All configuration via Talos API
+-   Minimal attack surface
 
 ## Cluster Metadata
 
 Each cluster stores its provider information in an organized directory structure (see "Cluster File Structure" section above for details).
 
 The cluster metadata includes:
-- Provider type (kind or talos)
-- Cluster configuration
-- Kubeconfig
-- Provider-specific configs
+
+-   Provider type (kind or talos)
+-   Cluster configuration
+-   Kubeconfig
+-   Provider-specific configs
 
 ## Multi-Cluster Scenarios
 
@@ -187,8 +204,9 @@ export KUBECONFIG=$(pwd)/clusters/staging/kubeconfig
 ### Port Mapping with Multiple Clusters
 
 When running multiple clusters:
-- First cluster: Uses ports 80/443
-- Additional clusters: Get random high ports (8080+)
+
+-   First cluster: Uses ports 80/443
+-   Additional clusters: Get random high ports (8080+)
 
 ```bash
 # Check ports in cluster info
@@ -199,6 +217,7 @@ cat clusters/mycluster/clusterinfo.txt | grep port
 ```
 
 Access apps with port:
+
 ```bash
 # First cluster
 http://argocd.localtest.me
@@ -225,25 +244,26 @@ You can easily switch between providers for testing:
 
 ## Comparison Table
 
-| Feature | kind | talos |
-|---------|------|-------|
-| Boot time | ~30s | ~60s |
-| Operating System | Generic container | Talos Linux |
-| Configuration | kind YAML | Talos machine config |
-| SSH access | Yes | No (API only) |
-| Immutable | No | Yes |
-| Security | Standard | Enhanced |
-| Best for | Quick testing | Production-like testing |
-| K8s versions | Selectable (v1.25-v1.34) | Latest stable only |
-| Version selection | Interactive prompt | Auto (no prompt) |
-| HA control plane | Yes | Yes |
-| Custom CNI | Limited | Full support |
+| Feature           | kind                     | talos                   |
+| ----------------- | ------------------------ | ----------------------- |
+| Boot time         | ~30s                     | ~60s                    |
+| Operating System  | Generic container        | Talos Linux             |
+| Configuration     | kind YAML                | Talos machine config    |
+| SSH access        | Yes                      | No (API only)           |
+| Immutable         | No                       | Yes                     |
+| Security          | Standard                 | Enhanced                |
+| Best for          | Quick testing            | Production-like testing |
+| K8s versions      | Selectable (v1.25-v1.34) | Latest stable only      |
+| Version selection | Interactive prompt       | Auto (no prompt)        |
+| HA control plane  | Yes                      | Yes                     |
+| Custom CNI        | Limited                  | Full support            |
 
 ## Troubleshooting
 
 ### kind Issues
 
 **Cluster won't start:**
+
 ```bash
 # Check Docker is running
 docker ps
@@ -259,6 +279,7 @@ kind delete cluster --name mycluster
 ### talos Issues
 
 **Talos nodes not ready:**
+
 ```bash
 # Check container status
 docker ps --filter "name=mycluster-"
@@ -273,6 +294,7 @@ talosctl --talosconfig clusters/mycluster/talos/talosconfig \
 ```
 
 **Can't access Kubernetes API:**
+
 ```bash
 # Verify kubeconfig
 export KUBECONFIG=$(pwd)/clusters/mycluster/kubeconfig
@@ -285,6 +307,7 @@ docker ps | grep controlplane
 ### General Issues
 
 **Provider not found:**
+
 ```bash
 # Verify provider tool is installed
 kind version          # for kind
@@ -296,6 +319,7 @@ brew install siderolabs/tap/talosctl
 ```
 
 **Kubeconfig issues:**
+
 ```bash
 # Regenerate kubeconfig
 ./kl.sh kubeconfig mycluster
@@ -332,10 +356,11 @@ talosctl --talosconfig clusters/mycluster/talos/talosconfig \
 The provider abstraction makes it easy to add new providers:
 
 **Potential additions:**
-- k3d (k3s in Docker)
-- minikube
-- microk8s
-- k0s
+
+-   k3d (k3s in Docker)
+-   minikube
+-   microk8s
+-   k0s
 
 Each would implement the same interface and work with all existing tools!
 
@@ -366,6 +391,7 @@ The multi-provider architecture gives you:
 ✅ **No Lock-in**: Switch providers anytime
 
 Start using it today:
+
 ```bash
 ./kl.sh create my-cluster --provider talos
 ```
