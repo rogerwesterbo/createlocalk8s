@@ -28,15 +28,16 @@ talos_get_supported_k8s_versions() {
     
     # Talos version to Kubernetes version support matrix
     # Use case statement to avoid associative array issues with version keys
+    # Note: Full patch versions are required (e.g., 1.34.1 not 1.34)
     local k8s_versions=""
     case "$talos_version" in
-        "1.11") k8s_versions="1.34 1.33 1.32 1.31 1.30 1.29" ;;
-        "1.10") k8s_versions="1.33 1.32 1.31 1.30 1.29 1.28" ;;
-        "1.9")  k8s_versions="1.32 1.31 1.30 1.29 1.28 1.27" ;;
-        "1.8")  k8s_versions="1.31 1.30 1.29 1.28 1.27 1.26" ;;
+        "1.11") k8s_versions="1.34.1 1.33.1 1.32.3 1.31.6 1.30.10 1.29.14" ;;
+        "1.10") k8s_versions="1.33.1 1.32.3 1.31.6 1.30.10 1.29.14 1.28.15" ;;
+        "1.9")  k8s_versions="1.32.3 1.31.6 1.30.10 1.29.14 1.28.15 1.27.16" ;;
+        "1.8")  k8s_versions="1.31.6 1.30.10 1.29.14 1.28.15 1.27.16 1.26.15" ;;
         *)
             echo -e "${yellow}Warning: Talos version $talos_version not in support matrix, using latest known versions${clear}" >&2
-            k8s_versions="1.34 1.33 1.32 1.31 1.30 1.29"
+            k8s_versions="1.34.1 1.33.1 1.32.3 1.31.6 1.30.10 1.29.14"
             ;;
     esac
     
@@ -170,7 +171,14 @@ EOF
     fi
 
     # Wait for cluster to be ready
-    create_cmd="$create_cmd --wait --wait-timeout 5m"
+    # When using custom CNI (cni: none), nodes won't become Ready until CNI is installed
+    # So we skip waiting for nodes to be ready in that case
+    if [ "$custom_cni" == "default" ]; then
+        create_cmd="$create_cmd --wait --wait-timeout 5m"
+    else
+        # Only wait for basic cluster bootstrap, not for nodes to be ready
+        create_cmd="$create_cmd --skip-k8s-node-readiness-check --wait --wait-timeout 5m"
+    fi
 
     # Create the cluster using talosctl
     echo -e "${yellow}Running: talosctl cluster create with $controlplane_count control plane(s) and $worker_count worker(s)${clear}"
