@@ -29,15 +29,17 @@ talos_get_supported_k8s_versions() {
     # Talos version to Kubernetes version support matrix
     # Use case statement to avoid associative array issues with version keys
     # Note: Full patch versions are required (e.g., 1.34.1 not 1.34)
+    # Based on: https://docs.siderolabs.com/talos/v1.12/getting-started/support-matrix
     local k8s_versions=""
     case "$talos_version" in
+        "1.12") k8s_versions="1.35.0 1.34.1 1.33.1 1.32.3 1.31.6 1.30.10" ;;
         "1.11") k8s_versions="1.34.1 1.33.1 1.32.3 1.31.6 1.30.10 1.29.14" ;;
         "1.10") k8s_versions="1.33.1 1.32.3 1.31.6 1.30.10 1.29.14 1.28.15" ;;
         "1.9")  k8s_versions="1.32.3 1.31.6 1.30.10 1.29.14 1.28.15 1.27.16" ;;
         "1.8")  k8s_versions="1.31.6 1.30.10 1.29.14 1.28.15 1.27.16 1.26.15" ;;
         *)
             echo -e "${yellow}Warning: Talos version $talos_version not in support matrix, using latest known versions${clear}" >&2
-            k8s_versions="1.34.1 1.33.1 1.32.3 1.31.6 1.30.10 1.29.14"
+            k8s_versions="1.35.0 1.34.1 1.33.1 1.32.3 1.31.6 1.30.10"
             ;;
     esac
     
