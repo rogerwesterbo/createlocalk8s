@@ -878,6 +878,36 @@ function install_multus_cni(){
     echo -e "$yellow            Independent of main CNI, can manage networks directly"
     echo -e "$clear"
     
+    # Check inotify limits for thick plugin (requires more file watchers)
+    if [ "$multus_type" == "thick" ]; then
+        local current_instances=$(cat /proc/sys/fs/inotify/max_user_instances 2>/dev/null || echo "0")
+        local required_instances=256
+        
+        if [ "$current_instances" -lt "$required_instances" ]; then
+            echo -e "$yellow"
+            echo -e "$yellow ⚠️  Thick Multus plugin requires higher inotify limits"
+            echo -e "$yellow    Current:  fs.inotify.max_user_instances = $current_instances"
+            echo -e "$yellow    Required: fs.inotify.max_user_instances >= $required_instances"
+            echo -e "$yellow"
+            echo -e "$yellow 🔧 Attempting to increase limits (requires sudo)..."
+            
+            if sudo sysctl -w fs.inotify.max_user_instances=512 >/dev/null 2>&1 && \
+               sudo sysctl -w fs.inotify.max_user_watches=1048576 >/dev/null 2>&1; then
+                echo -e "$green ✅ Inotify limits increased successfully"
+                echo -e "$yellow"
+                echo -e "$yellow 💡 To make permanent, run:"
+                echo -e "$blue    echo 'fs.inotify.max_user_instances = 512' | sudo tee -a /etc/sysctl.d/99-kind-multus.conf"
+                echo -e "$blue    echo 'fs.inotify.max_user_watches = 1048576' | sudo tee -a /etc/sysctl.d/99-kind-multus.conf"
+                echo -e "$clear"
+            else
+                echo -e "$red ❌ Could not increase inotify limits. Thick Multus may fail."
+                echo -e "$yellow    Manual fix: sudo sysctl -w fs.inotify.max_user_instances=512"
+                echo -e "$yellow    Or switch to thin plugin which has lower requirements."
+                echo -e "$clear"
+            fi
+        fi
+    fi
+    
     # Set manifest URL based on type
     local multus_manifest_url=""
     if [ "$multus_type" == "thick" ]; then
