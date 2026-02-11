@@ -400,15 +400,72 @@ function get_cluster_parameter() {
     # Validate cluster name is unique
     validate_cluster_not_exists "$cluster_name" "$provider"
 
+    # For Talos provider: Ask for backend selection first (affects control plane options)
+    talos_backend="docker"
+    talos_version=""
+    if [ "$provider" == "talos" ]; then
+        # Get talosctl version early (needed for backend selection info)
+        talos_version=$(talos_get_version)
+        
+        if [ -z "$talos_version" ]; then
+            echo -e "${red}Could not determine talosctl version. Is talosctl installed?${clear}"
+            die
+        fi
+        
+        echo -e "${yellow}Detected talosctl version: ${blue}v${talos_version}${clear}"
+        
+        local talos_major_minor
+        talos_major_minor=$(echo "$talos_version" | awk -F. '{print $1"."$2}')
+        
+        # Only show backend selection for v1.12+ (older versions don't have subcommands)
+        if [[ "$talos_major_minor" == "1.12" ]] || [[ "${talos_major_minor%%.*}" -gt 1 ]]; then
+            echo -e "$yellow"
+            echo -e "$yellow 🖥️  Talos Backend Selection$clear"
+            echo -e "$yellow   📌 docker (recommended): Fast startup, lightweight, runs in Docker containers$clear"
+            echo -e "$yellow      • Quick local testing and development$clear"
+            echo -e "$yellow      • Single control plane only$clear"
+            echo -e "$yellow"
+            echo -e "$yellow   📌 qemu: Full VM emulation, production-like environment$clear"
+            echo -e "$yellow      • Multiple control planes supported$clear"
+            echo -e "$yellow      • Requires QEMU installation$clear"
+            echo -e "$yellow      • Better for KubeVirt and disk operations$clear"
+            echo -e "$clear"
+            read -p "Select Talos backend (docker/qemu) (default: docker): " talos_backend_new
+            if [ "$talos_backend_new" == "qemu" ]; then
+                talos_backend="qemu"
+                echo -e "$yellow ✅ Using QEMU backend (full VM emulation)$clear"
+            else
+                talos_backend="docker"
+                echo -e "$yellow ✅ Using Docker backend (container-based)$clear"
+            fi
+            echo -e "$clear"
+        fi
+    fi
+
     # Get cluster parameters
-    read -p "Enter number of control planes (default: 1): " controlplane_number_new
-    if [ -n "$controlplane_number_new" ]; then
-        controlplane_number=$controlplane_number_new
-        echo -e "$yellow ✅ Control planes set to: $blue$controlplane_number"
-        echo -e "$clear"
-    else
-        echo -e "$yellow ✅ Using default control planes: $blue$controlplane_number"
-        echo -e "$clear"
+    # For Talos docker backend on v1.12+, skip control plane question (always 1)
+    local skip_controlplane_prompt=false
+    if [ "$provider" == "talos" ] && [ "$talos_backend" == "docker" ]; then
+        local talos_major_minor
+        talos_major_minor=$(echo "$talos_version" | awk -F. '{print $1"."$2}')
+        if [[ "$talos_major_minor" == "1.12" ]] || [[ "${talos_major_minor%%.*}" -gt 1 ]]; then
+            skip_controlplane_prompt=true
+            controlplane_number=1
+            echo -e "$yellow ✅ Control planes: ${blue}1${yellow} (Docker backend supports single control plane only)$clear"
+            echo -e "$clear"
+        fi
+    fi
+
+    if [ "$skip_controlplane_prompt" == "false" ]; then
+        read -p "Enter number of control planes (default: 1): " controlplane_number_new
+        if [ -n "$controlplane_number_new" ]; then
+            controlplane_number=$controlplane_number_new
+            echo -e "$yellow ✅ Control planes set to: $blue$controlplane_number"
+            echo -e "$clear"
+        else
+            echo -e "$yellow ✅ Using default control planes: $blue$controlplane_number"
+            echo -e "$clear"
+        fi
     fi
 
     read -p "Enter number of workers (default: 0): " worker_number_new
@@ -448,15 +505,7 @@ function get_cluster_parameter() {
         fi
     else
         # For Talos, dynamically get supported versions based on installed talosctl version
-        local talos_version
-        talos_version=$(talos_get_version)
-        
-        if [ -z "$talos_version" ]; then
-            echo -e "${red}Could not determine talosctl version. Is talosctl installed?${clear}"
-            die
-        fi
-        
-        echo -e "${yellow}Detected talosctl version: ${blue}v${talos_version}${clear}"
+        # Note: talos_version was already set earlier during backend selection
         
         # Populate talosk8sversions array based on installed talosctl version
         talos_populate_k8s_versions || {
@@ -625,6 +674,8 @@ function get_cluster_parameter() {
     echo -en "$blue $kindk8sversion"
 
     if [ "$provider" == "talos" ]; then
+        echo -en "$yellow\nBackend:"
+        echo -en "$blue $talos_backend"
         echo -en "$yellow\nMemory per node:"
         echo -en "$blue ${talos_memory}MB"
     fi
@@ -683,7 +734,7 @@ function create_cluster() {
     call_provider_function "$provider" "create_cluster" \
         "$cluster_name" "$config_file" "$kindk8sversion" \
         "$controlplane_number" "$worker_number" \
-        "$first_controlplane_port_http" "$first_controlplane_port_https" "$custom_cni" "${talos_memory:-4096}" || {
+        "$first_controlplane_port_http" "$first_controlplane_port_https" "$custom_cni" "${talos_memory:-4096}" "${talos_backend:-docker}" || {
         echo -e "${red} 🛑 Cluster creation failed${clear}"
         die
     }

@@ -102,10 +102,14 @@ talos_create_cluster() {
     local https_port="$7"
     local custom_cni="${8:-default}"
     local memory="${9:-4096}"
+    local backend="${10:-docker}"
 
     local cluster_dir="$clustersDir/$cluster_name"
     local talos_dir="$cluster_dir/talos"
     mkdir -p "$talos_dir"
+
+    # Save backend choice for reference
+    echo "$backend" > "$cluster_dir/backend.txt"
 
     # Generate Talos machine configuration files.
     # These are for reference and potential future use (e.g. adding nodes manually).
@@ -146,53 +150,159 @@ EOF
     }) & spinner
 
     echo -e "${yellow}\n⏰ Creating Talos cluster using talosctl${clear}"
+    echo -e "${yellow}   Backend: ${blue}$backend${clear}"
+
+    # Get talosctl version to determine command structure
+    local talos_version
+    talos_version=$(talos_get_version)
+    local talos_major_minor
+    talos_major_minor=$(echo "$talos_version" | awk -F. '{print $1"."$2}')
 
     # Build talosctl cluster create command
-    local create_cmd="talosctl cluster create"
-    create_cmd="$create_cmd --name $cluster_name"
-    # Dynamically set CIDR to avoid conflicts in multi-cluster setups
+    # v1.12+ uses subcommands (docker/qemu) with different flags
+    # v1.11 and earlier use direct flags on cluster create
+    local create_cmd=""
     local cluster_count
     cluster_count=$(talos_list_clusters | wc -l)
     local cidr_octet=$((5 + cluster_count))
-    create_cmd="$create_cmd --cidr 10.${cidr_octet}.0.0/24"
-    create_cmd="$create_cmd --controlplanes $controlplane_count"
-    create_cmd="$create_cmd --workers $worker_count"
-    create_cmd="$create_cmd --kubernetes-version $k8s_version"
-    create_cmd="$create_cmd --memory $memory"
-    create_cmd="$create_cmd --memory-workers $memory"
+    local actual_controlplane_count=$controlplane_count
 
-    # For single control plane: expose ports directly for hostNetwork mode
-    # For multi control plane: we'll use HAProxy proxy container to route to MetalLB
-    if [ "$controlplane_count" -eq 1 ]; then
-        create_cmd="$create_cmd --exposed-ports $http_port:80/tcp,$https_port:443/tcp"
-    fi
-
-    # Add CNI patch file if custom CNI is requested (file was created earlier)
-    if [ "$custom_cni" != "default" ] && [ -n "$cni_patch_file" ]; then
-        create_cmd="$create_cmd --config-patch @$cni_patch_file"
-    fi
-
-    # Wait for cluster to be ready
-    # When using custom CNI (cni: none), nodes won't become Ready until CNI is installed
-    # So we skip waiting for nodes to be ready in that case
-    if [ "$custom_cni" == "default" ]; then
-        create_cmd="$create_cmd --wait --wait-timeout 5m"
+    if [[ "$talos_major_minor" == "1.12" ]] || [[ "${talos_major_minor%%.*}" -gt 1 ]] || [[ "${talos_major_minor#*.}" -ge 12 && "${talos_major_minor%%.*}" -eq 1 ]]; then
+        # talosctl v1.12+ command structure - uses subcommands (docker/qemu)
+        
+        if [ "$backend" == "qemu" ]; then
+            # QEMU backend - full VM emulation, supports multiple control planes
+            create_cmd="talosctl cluster create qemu"
+            create_cmd="$create_cmd --name $cluster_name"
+            create_cmd="$create_cmd --cidr 10.${cidr_octet}.0.0/24"
+            create_cmd="$create_cmd --controlplanes $controlplane_count"
+            create_cmd="$create_cmd --workers $worker_count"
+            create_cmd="$create_cmd --kubernetes-version $k8s_version"
+            create_cmd="$create_cmd --memory-controlplanes ${memory}MB"
+            create_cmd="$create_cmd --memory-workers ${memory}MB"
+            # Add CNI patch file if custom CNI is requested
+            if [ "$custom_cni" != "default" ] && [ -n "$cni_patch_file" ]; then
+                create_cmd="$create_cmd --config-patch @$cni_patch_file"
+            fi
+            # QEMU requires a preset
+            create_cmd="$create_cmd --presets iso"
+        else
+            # Docker backend - lightweight containers
+            create_cmd="talosctl cluster create docker"
+            create_cmd="$create_cmd --name $cluster_name"
+            create_cmd="$create_cmd --subnet 10.${cidr_octet}.0.0/24"
+            
+            # Docker provider doesn't support --controlplanes in v1.12+, always creates 1
+            if [ "$controlplane_count" -gt 1 ]; then
+                echo -e "${yellow}⚠️  Notice: talosctl cluster create with Docker backend does not support multiple control planes${clear}"
+                echo -e "${yellow}   Creating cluster with 1 control plane (requested: $controlplane_count)${clear}"
+                echo -e "${yellow}   💡 Tip: Use QEMU backend for multiple control planes${clear}"
+                actual_controlplane_count=1
+            fi
+            
+            create_cmd="$create_cmd --workers $worker_count"
+            create_cmd="$create_cmd --kubernetes-version $k8s_version"
+            # Memory flags require unit suffix (MB or GB) in v1.12+
+            create_cmd="$create_cmd --memory-controlplanes ${memory}MB"
+            create_cmd="$create_cmd --memory-workers ${memory}MB"
+            # Expose ports for hostNetwork mode (only available in docker backend)
+            create_cmd="$create_cmd --exposed-ports $http_port:80/tcp,$https_port:443/tcp"
+            # Add CNI patch file if custom CNI is requested
+            if [ "$custom_cni" != "default" ] && [ -n "$cni_patch_file" ]; then
+                create_cmd="$create_cmd --config-patch @$cni_patch_file"
+            fi
+        fi
     else
-        # Only wait for basic cluster bootstrap, not for nodes to be ready
-        create_cmd="$create_cmd --skip-k8s-node-readiness-check --wait --wait-timeout 5m"
+        # talosctl v1.11 and earlier command structure (no subcommands)
+        create_cmd="talosctl cluster create"
+        create_cmd="$create_cmd --name $cluster_name"
+        create_cmd="$create_cmd --cidr 10.${cidr_octet}.0.0/24"
+        create_cmd="$create_cmd --controlplanes $controlplane_count"
+        create_cmd="$create_cmd --workers $worker_count"
+        create_cmd="$create_cmd --kubernetes-version $k8s_version"
+        create_cmd="$create_cmd --memory $memory"
+        create_cmd="$create_cmd --memory-workers $memory"
+        # Expose ports for single control plane
+        if [ "$controlplane_count" -eq 1 ]; then
+            create_cmd="$create_cmd --exposed-ports $http_port:80/tcp,$https_port:443/tcp"
+        fi
+        # Add CNI patch file if custom CNI is requested
+        if [ "$custom_cni" != "default" ] && [ -n "$cni_patch_file" ]; then
+            create_cmd="$create_cmd --config-patch @$cni_patch_file"
+        fi
+        # Wait flags available in older versions
+        if [ "$custom_cni" == "default" ]; then
+            create_cmd="$create_cmd --wait --wait-timeout 5m"
+        else
+            create_cmd="$create_cmd --skip-k8s-node-readiness-check --wait --wait-timeout 5m"
+        fi
     fi
 
     # Create the cluster using talosctl
-    echo -e "${yellow}Running: talosctl cluster create with $controlplane_count control plane(s) and $worker_count worker(s)${clear}"
+    echo -e "${yellow}Running: talosctl cluster create ($backend) with $actual_controlplane_count control plane(s) and $worker_count worker(s)${clear}"
 
     # print the command for debugging
     echo -e "${yellow}Command: $create_cmd${clear}"
 
-    ($create_cmd ||
-    {
-        echo -e "${red} 🛑 Could not create Talos cluster${clear}"
-        return 1
-    }) & spinner
+    # For v1.12+ docker backend with custom CNI, the command will hang waiting for nodes to be ready
+    # (since nodes need CNI to become ready). We use a timeout and check if containers are running.
+    local use_timeout=false
+    if [[ "$talos_major_minor" == "1.12" ]] || [[ "${talos_major_minor%%.*}" -gt 1 ]]; then
+        if [ "$backend" == "docker" ] && [ "$custom_cni" != "default" ]; then
+            use_timeout=true
+            echo -e "${yellow}ℹ️  Note: With custom CNI, nodes won't be Ready until CNI is installed${clear}"
+            echo -e "${yellow}   The cluster creation will proceed once bootstrap is complete...${clear}"
+        fi
+    fi
+
+    if [ "$use_timeout" == "true" ]; then
+        # Run with timeout - cluster will be created but waiting for nodes to be ready will timeout
+        # We consider it success if the controlplane container is running
+        (
+            # Start the command in background
+            $create_cmd &
+            local cmd_pid=$!
+            
+            # Wait for either completion or timeout (5 minutes for bootstrap)
+            local timeout_seconds=300
+            local elapsed=0
+            while kill -0 $cmd_pid 2>/dev/null; do
+                sleep 5
+                elapsed=$((elapsed + 5))
+                
+                # Check if controlplane is running (cluster is usable)
+                if docker ps --filter "name=${cluster_name}-controlplane-1" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -q "${cluster_name}-controlplane-1"; then
+                    # Check if we can get kubeconfig (API server is up)
+                    if talosctl kubeconfig /dev/null --cluster "$cluster_name" --nodes "127.0.0.1" 2>/dev/null; then
+                        echo -e "${green}✅ Cluster bootstrap complete, API server is ready${clear}"
+                        # Give it a few more seconds then kill the waiting process
+                        sleep 10
+                        kill $cmd_pid 2>/dev/null || true
+                        break
+                    fi
+                fi
+                
+                if [ $elapsed -ge $timeout_seconds ]; then
+                    echo -e "${yellow}⏱️  Timeout waiting for full readiness, checking cluster status...${clear}"
+                    kill $cmd_pid 2>/dev/null || true
+                    break
+                fi
+            done
+            wait $cmd_pid 2>/dev/null || true
+        )
+        
+        # Verify cluster was created successfully
+        if ! docker ps --filter "name=${cluster_name}-controlplane-1" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -q "${cluster_name}-controlplane-1"; then
+            echo -e "${red} 🛑 Could not create Talos cluster${clear}"
+            return 1
+        fi
+    else
+        ($create_cmd ||
+        {
+            echo -e "${red} 🛑 Could not create Talos cluster${clear}"
+            return 1
+        }) & spinner
+    fi
 
     # talosctl automatically generates configs, let's move them to our talos dir
     if [ -d "$HOME/.talos/clusters/$cluster_name" ]; then
