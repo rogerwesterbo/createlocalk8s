@@ -926,12 +926,12 @@ function install_multus_cni(){
     }) & spinner
 
     echo -e "$yellow\n⏰ Waiting for Multus CNI to be ready"
-    sleep 10
-    
+    sleep 20
+
     # Wait for Multus daemonset to be ready
-    (kubectl rollout status daemonset/kube-multus-ds -n kube-system --timeout=120s || { 
-        echo -e "$red 🛑 Multus CNI daemonset not ready ..."; 
-        die 
+    (kubectl rollout status daemonset/kube-multus-ds -n kube-system --timeout=300s || {
+        echo -e "$red 🛑 Multus CNI daemonset not ready ...";
+        die
     }) & spinner
 
     echo -e "$yellow ✅ Done installing Multus CNI"
