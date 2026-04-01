@@ -1,2 +1,5 @@
 clusters
 !clusters/.gitkeep
+controlplane.yaml
+worker.yaml
+talosconfig
