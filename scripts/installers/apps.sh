@@ -230,13 +230,26 @@ function install_nyancat_application(){
     }) & spinner
 
     echo -e "$yellow ✅ Done installing Nyan-cat ArgoCD application"
-    echo -e "$yellow ⏰ Waiting for Nyancat ArgoCD application to be ready"
-    sleep 10
-    (kubectl wait --namespace nyan-cat --for=condition=ready pod --selector=app.kubernetes.io/name=nyan-cat --timeout=90s || 
-    { 
-        echo -e "$red 
-        🛑 Could not install Nyan-cat ArgoCD application into cluster  ...
-        "
+    echo -e "$yellow ⏰ Waiting for ArgoCD to sync Nyan-cat application"
+
+    # Wait for the namespace to be created by ArgoCD sync before waiting for pods
+    local retries=30
+    while [ $retries -gt 0 ]; do
+        if kubectl get namespace nyan-cat &>/dev/null; then
+            break
+        fi
+        retries=$((retries - 1))
+        sleep 5
+    done
+
+    if ! kubectl get namespace nyan-cat &>/dev/null; then
+        echo -e "$red 🛑 Namespace nyan-cat was not created by ArgoCD in time"
+        die
+    fi
+
+    (kubectl wait --namespace nyan-cat --for=condition=ready pod --selector=app.kubernetes.io/name=nyan-cat --timeout=120s ||
+    {
+        echo -e "$red 🛑 Could not install Nyan-cat ArgoCD application into cluster ..."
         die
     }) & spinner
 

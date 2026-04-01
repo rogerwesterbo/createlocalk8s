@@ -35,21 +35,21 @@ function validate_cluster_not_exists() {
 
     # Check if cluster exists across ALL providers, not just the one being created
     local existing_provider=""
-    
+
     # Check kind clusters
     if command -v kind &> /dev/null; then
         if kind get clusters 2>/dev/null | grep -q "^${clusterName}$"; then
             existing_provider="kind"
         fi
     fi
-    
+
     # Check talos clusters (only if not already found in kind)
     if [ -z "$existing_provider" ] && command -v talosctl &> /dev/null; then
         if docker ps -a --filter "name=^${clusterName}-controlplane-1$" --format "{{.Names}}" 2>/dev/null | grep -q "^${clusterName}-controlplane-1$"; then
             existing_provider="talos"
         fi
     fi
-    
+
     # If cluster exists with any provider, show error
     if [ -n "$existing_provider" ]; then
         echo -e "${red}\n🛑 Cluster '${clusterName}' already exists (provider: ${existing_provider})${clear}"

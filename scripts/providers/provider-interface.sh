@@ -129,12 +129,19 @@ get_cluster_provider() {
 }
 
 # Set the provider for a cluster
+# Note: for talos provider, the cluster dir is created by talosctl cluster create --state
+# so we only mkdir here for non-talos providers
 set_cluster_provider() {
     local cluster_name="$1"
     local provider_name="$2"
     local cluster_dir="$clustersDir/$cluster_name"
-    mkdir -p "$cluster_dir"
-    echo "$provider_name" > "$cluster_dir/provider.txt"
+    if [ "$provider_name" != "talos" ]; then
+        mkdir -p "$cluster_dir"
+    fi
+    # For talos, provider.txt is written after talosctl creates the state dir
+    if [ -d "$cluster_dir" ]; then
+        echo "$provider_name" > "$cluster_dir/provider.txt"
+    fi
 }
 
 # Validate that all required provider functions are implemented

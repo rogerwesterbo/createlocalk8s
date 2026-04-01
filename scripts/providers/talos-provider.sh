@@ -117,7 +117,6 @@ talos_create_cluster() {
 
     local cluster_dir="$clustersDir/$cluster_name"
     local talos_dir="$cluster_dir/talos"
-    mkdir -p "$talos_dir"
 
     # QEMU backend requires root privileges - prompt before doing any work
     if [ "$backend" == "qemu" ]; then
@@ -131,22 +130,17 @@ talos_create_cluster() {
         fi
     fi
 
-    # Save backend choice for reference
-    echo "$backend" > "$cluster_dir/backend.txt"
+    # Clean up stale cluster directory from a previous failed run
+    # validate_cluster_not_exists already confirmed no running cluster exists
+    if [ -d "$cluster_dir" ]; then
+        echo -e "${yellow}⚠️  Removing stale cluster directory from previous failed run${clear}"
+        rm -rf "$cluster_dir"
+    fi
 
-    # Generate Talos machine configuration files.
-    # These are for reference and potential future use (e.g. adding nodes manually).
-    # talosctl cluster create will generate its own configs internally.
-    echo -e "${yellow}\n⏰ Generating Talos machine configuration${clear}"
-    # The endpoint needs to be the address of the first controlplane, reachable from other nodes.
-    # In the docker network created by talosctl, this will be the container name.
-    local endpoint_host
-    endpoint_host=$(echo "$cluster_name" | tr '[:upper:]' '[:lower:]')-controlplane-1
-    
-    # Create CNI patch file if custom CNI is requested (used by both gen config and cluster create)
+    # Create CNI patch in a temp file if custom CNI is requested (needed before cluster create)
     local cni_patch_file=""
     if [ "$custom_cni" != "default" ]; then
-        cni_patch_file="$talos_dir/cni-patch.yaml"
+        cni_patch_file=$(mktemp /tmp/talos-cni-patch.XXXXXX.yaml)
         cat > "$cni_patch_file" <<EOF
 cluster:
   network:
@@ -156,21 +150,6 @@ cluster:
     disabled: true
 EOF
     fi
-    
-    # Build talosctl gen config command with optional CNI flags
-    # Use --force to overwrite existing config files from previous attempts
-    local gen_config_cmd="talosctl gen config \"$cluster_name\" \"https://$endpoint_host:6443\" --kubernetes-version \"$k8s_version\" --additional-sans \"127.0.0.1\" --force"
-    
-    # Add CNI flags if custom CNI is requested
-    if [ "$custom_cni" != "default" ]; then
-        gen_config_cmd="$gen_config_cmd --config-patch @$cni_patch_file"
-    fi
-    
-    (cd "$talos_dir" && eval $gen_config_cmd >/dev/null ||
-    {
-        echo -e "${red} 🛑 Could not generate Talos config${clear}"
-        return 1
-    }) & spinner
 
     echo -e "${yellow}\n⏰ Creating Talos cluster using talosctl${clear}"
     echo -e "${yellow}   Backend: ${blue}$backend${clear}"
@@ -192,10 +171,11 @@ EOF
 
     if [[ "$talos_major_minor" == "1.12" ]] || [[ "${talos_major_minor%%.*}" -gt 1 ]] || [[ "${talos_major_minor#*.}" -ge 12 && "${talos_major_minor%%.*}" -eq 1 ]]; then
         # talosctl v1.12+ command structure - uses subcommands (docker/qemu)
-        
+
         if [ "$backend" == "qemu" ]; then
             create_cmd="sudo -E talosctl cluster create qemu"
             create_cmd="$create_cmd --name $cluster_name"
+            create_cmd="$create_cmd --state $clustersDir"
             create_cmd="$create_cmd --cidr 10.${cidr_octet}.0.0/24"
             create_cmd="$create_cmd --controlplanes $controlplane_count"
             create_cmd="$create_cmd --workers $worker_count"
@@ -212,8 +192,9 @@ EOF
             # Docker backend - lightweight containers
             create_cmd="talosctl cluster create docker"
             create_cmd="$create_cmd --name $cluster_name"
+            create_cmd="$create_cmd --state $clustersDir"
             create_cmd="$create_cmd --subnet 10.${cidr_octet}.0.0/24"
-            
+
             # Docker provider doesn't support --controlplanes in v1.12+, always creates 1
             if [ "$controlplane_count" -gt 1 ]; then
                 echo -e "${yellow}⚠️  Notice: talosctl cluster create with Docker backend does not support multiple control planes${clear}"
@@ -221,7 +202,7 @@ EOF
                 echo -e "${yellow}   💡 Tip: Use QEMU backend for multiple control planes${clear}"
                 actual_controlplane_count=1
             fi
-            
+
             create_cmd="$create_cmd --workers $worker_count"
             create_cmd="$create_cmd --kubernetes-version $k8s_version"
             # Memory flags require unit suffix (MB or GB) in v1.12+
@@ -238,6 +219,7 @@ EOF
         # talosctl v1.11 and earlier command structure (no subcommands)
         create_cmd="talosctl cluster create"
         create_cmd="$create_cmd --name $cluster_name"
+        create_cmd="$create_cmd --state $clustersDir"
         create_cmd="$create_cmd --cidr 10.${cidr_octet}.0.0/24"
         create_cmd="$create_cmd --controlplanes $controlplane_count"
         create_cmd="$create_cmd --workers $worker_count"
@@ -261,6 +243,7 @@ EOF
     fi
 
     # Create the cluster using talosctl
+    # talosctl cluster create --state creates the cluster state dir at $clustersDir/$cluster_name
     echo -e "${yellow}Running: talosctl cluster create ($backend) with $actual_controlplane_count control plane(s) and $worker_count worker(s)${clear}"
 
     # print the command for debugging
@@ -284,14 +267,14 @@ EOF
             # Start the command in background
             $create_cmd &
             local cmd_pid=$!
-            
+
             # Wait for either completion or timeout (5 minutes for bootstrap)
             local timeout_seconds=300
             local elapsed=0
             while kill -0 $cmd_pid 2>/dev/null; do
                 sleep 5
                 elapsed=$((elapsed + 5))
-                
+
                 # Check if controlplane is running (cluster is usable)
                 if docker ps --filter "name=${cluster_name}-controlplane-1" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -q "${cluster_name}-controlplane-1"; then
                     # Check if we can get kubeconfig (API server is up)
@@ -303,7 +286,7 @@ EOF
                         break
                     fi
                 fi
-                
+
                 if [ $elapsed -ge $timeout_seconds ]; then
                     echo -e "${yellow}⏱️  Timeout waiting for full readiness, checking cluster status...${clear}"
                     kill $cmd_pid 2>/dev/null || true
@@ -312,10 +295,11 @@ EOF
             done
             wait $cmd_pid 2>/dev/null || true
         )
-        
+
         # Verify cluster was created successfully
         if ! docker ps --filter "name=${cluster_name}-controlplane-1" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -q "${cluster_name}-controlplane-1"; then
             echo -e "${red} 🛑 Could not create Talos cluster${clear}"
+            [ -n "$cni_patch_file" ] && rm -f "$cni_patch_file"
             return 1
         fi
     else
@@ -326,6 +310,7 @@ EOF
             export KUBECONFIG="$cluster_dir/kubeconfig"
             $create_cmd || {
                 echo -e "${red} 🛑 Could not create Talos cluster${clear}"
+                [ -n "$cni_patch_file" ] && rm -f "$cni_patch_file"
                 return 1
             }
             # The file was created by root, fix ownership
@@ -339,34 +324,54 @@ EOF
         fi
     fi
 
-    # talosctl automatically generates configs, let's move them to our talos dir
-    if [ "$backend" == "qemu" ]; then
-        # With sudo, configs end up in /root/.talos/ - use sudo to check since normal user can't read /root/
-        if sudo test -d "/root/.talos/clusters/$cluster_name" 2>/dev/null; then
-            sudo cp "/root/.talos/clusters/$cluster_name/talosconfig" "$talos_dir/talosconfig" 2>/dev/null || true
+    # Clean up temp CNI patch file
+    [ -n "$cni_patch_file" ] && rm -f "$cni_patch_file"
+
+    # talosctl created the cluster state dir at $cluster_dir, now set up our subdirectories
+    mkdir -p "$talos_dir"
+
+    # Save provider and backend for reference
+    echo "talos" > "$cluster_dir/provider.txt"
+    echo "$backend" > "$cluster_dir/backend.txt"
+
+    # Copy CNI patch to talos dir for reference if custom CNI was used
+    if [ "$custom_cni" != "default" ]; then
+        cat > "$talos_dir/cni-patch.yaml" <<EOF
+cluster:
+  network:
+    cni:
+      name: none
+  proxy:
+    disabled: true
+EOF
+    fi
+
+    # Copy talosconfig from cluster state dir to talos subdir
+    if [ -f "$cluster_dir/talosconfig" ]; then
+        cp "$cluster_dir/talosconfig" "$talos_dir/talosconfig" 2>/dev/null || true
+        if [ "$backend" == "qemu" ]; then
             sudo chown "$(id -u):$(id -g)" "$talos_dir/talosconfig" 2>/dev/null || true
-        elif [ -d "$HOME/.talos/clusters/$cluster_name" ]; then
-            cp "$HOME/.talos/clusters/$cluster_name/talosconfig" "$talos_dir/talosconfig" 2>/dev/null || true
-        fi
-        # Verify talosconfig was copied successfully
-        if [ ! -f "$talos_dir/talosconfig" ]; then
-            echo -e "${yellow}⚠️  Could not copy talosconfig from talosctl state dir, checking alternative paths...${clear}"
-            # Try to find it anywhere under /root/.talos/
-            local found_talosconfig
-            found_talosconfig=$(sudo find /root/.talos -name "talosconfig" -path "*/$cluster_name/*" 2>/dev/null | head -1)
-            if [ -n "$found_talosconfig" ]; then
-                sudo cp "$found_talosconfig" "$talos_dir/talosconfig"
-                sudo chown "$(id -u):$(id -g)" "$talos_dir/talosconfig"
-                echo -e "${yellow}   Found and copied talosconfig from: $found_talosconfig${clear}"
-            else
-                echo -e "${red}⚠️  Warning: talosconfig not found - kubeconfig retrieval may fail${clear}"
-            fi
         fi
     else
-        if [ -d "$HOME/.talos/clusters/$cluster_name" ]; then
-            cp "$HOME/.talos/clusters/$cluster_name/talosconfig" "$talos_dir/talosconfig" 2>/dev/null || true
-        fi
+        # v1.12+ does not place talosconfig in the state dir; gen config below creates a reference copy
+        echo -e "${yellow}ℹ️  talosconfig not in state dir (expected for v1.12+ docker backend)${clear}"
     fi
+
+    # Generate Talos machine configuration files for reference and future use (e.g. adding nodes manually)
+    # talosctl cluster create generates its own configs internally, these are supplementary
+    echo -e "${yellow}\n⏰ Generating Talos machine configuration (for reference)${clear}"
+    local endpoint_host
+    endpoint_host=$(echo "$cluster_name" | tr '[:upper:]' '[:lower:]')-controlplane-1
+
+    local gen_config_cmd="talosctl gen config \"$cluster_name\" \"https://$endpoint_host:6443\" --kubernetes-version \"$k8s_version\" --additional-sans \"127.0.0.1\" --force"
+    if [ "$custom_cni" != "default" ]; then
+        gen_config_cmd="$gen_config_cmd --config-patch @$talos_dir/cni-patch.yaml"
+    fi
+
+    (cd "$talos_dir" && eval $gen_config_cmd >/dev/null ||
+    {
+        echo -e "${yellow}⚠️  Could not generate reference Talos config (non-fatal)${clear}"
+    }) & spinner
 
     # Get kubeconfig
     echo -e "${yellow}\n⏰ Retrieving kubeconfig${clear}"
@@ -383,11 +388,16 @@ EOF
             fi
         }
     else
-        (talos_get_kubeconfig "$cluster_name" "$cluster_dir/kubeconfig" "$backend" ||
-        {
-            echo -e "${red} 🛑 Could not retrieve kubeconfig${clear}"
-            return 1
-        }) & spinner
+        # talosctl cluster create (v1.12+) already writes the kubeconfig to the state dir
+        if [ -s "$cluster_dir/kubeconfig" ]; then
+            echo -e "${yellow} ✅ Kubeconfig already available from cluster creation${clear}"
+        else
+            (talos_get_kubeconfig "$cluster_name" "$cluster_dir/kubeconfig" "$backend" ||
+            {
+                echo -e "${red} 🛑 Could not retrieve kubeconfig${clear}"
+                return 1
+            }) & spinner
+        fi
     fi
 
     # Set the context
@@ -437,20 +447,18 @@ talos_delete_cluster() {
     if [ "$backend" == "qemu" ]; then
         # QEMU clusters were created with sudo, so destroy also needs sudo
         echo -e "${yellow}QEMU clusters require sudo to destroy VMs.${clear}"
-        if ! sudo -E talosctl cluster destroy --name "$cluster_name"; then
+        if ! sudo -E talosctl cluster destroy --name "$cluster_name" --state "$clustersDir"; then
             echo -e "${red} 🛑 talosctl cluster destroy failed.${clear}"
-            echo -e "${yellow}You can manually destroy with: sudo -E talosctl cluster destroy --name $cluster_name${clear}"
+            echo -e "${yellow}You can manually destroy with: sudo -E talosctl cluster destroy --name $cluster_name --state $clustersDir${clear}"
             # Check if QEMU processes are still running for this cluster
             if pgrep -f "qemu.*${cluster_name}" >/dev/null 2>&1; then
                 echo -e "${red} ⚠️  QEMU VMs for '${cluster_name}' are still running!${clear}"
             fi
             return 1
         fi
-        # Clean up root's talos config dir too
-        sudo rm -rf "/root/.talos/clusters/$cluster_name" 2>/dev/null || true
     else
         # Use talosctl to destroy the cluster (handles all containers and networking)
-        (talosctl cluster destroy --name "$cluster_name" ||
+        (talosctl cluster destroy --name "$cluster_name" --state "$clustersDir" ||
         {
             echo -e "${yellow} ⚠️  talosctl cluster destroy failed, attempting manual cleanup${clear}"
 
@@ -469,8 +477,8 @@ talos_delete_cluster() {
         }) & spinner
     fi
 
-    # Clean up talosctl stored configs
-    rm -rf "$HOME/.talos/clusters/$cluster_name" 2>/dev/null || true
+    # Clean up talosctl state dir (now under clustersDir)
+    # The cluster dir itself is cleaned by the caller in cluster.sh
 
     echo -e "${yellow} ✅ Talos cluster deleted${clear}"
     return 0
@@ -613,12 +621,21 @@ talos_get_kubeconfig() {
         sudo chown "$(id -u):$(id -g)" "$output_file" 2>/dev/null || true
     else
         # Docker backend: use 127.0.0.1 and find mapped ports
-        talosctl kubeconfig "$output_file" \
+
+        # If kubeconfig already exists with a valid localhost server URL, reuse it
+        # (talosctl cluster create in v1.12+ writes the kubeconfig during creation)
+        if [ -s "$output_file" ]; then
+            local existing_server
+            existing_server=$(KUBECONFIG="$output_file" kubectl config view -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null)
+            if [ -n "$existing_server" ] && [[ "$existing_server" == https://127.0.0.1:* ]]; then
+                return 0
+            fi
+        fi
+
+        if ! talosctl kubeconfig "$output_file" \
             --merge=false \
             --cluster "$cluster_name" \
-            --nodes "127.0.0.1" 2>/dev/null
-
-        if [ $? -ne 0 ]; then
+            --nodes "127.0.0.1" 2>/dev/null; then
             return 1
         fi
 
