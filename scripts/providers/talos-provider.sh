@@ -32,14 +32,14 @@ talos_get_supported_k8s_versions() {
     # Based on: https://www.talos.dev/v1.12/introduction/support-matrix/
     local k8s_versions=""
     case "$talos_version" in
-        "1.12") k8s_versions="1.35.2 1.34.1 1.33.1 1.32.3 1.31.6 1.30.10" ;;
+        "1.12") k8s_versions="1.35.3 1.34.1 1.33.1 1.32.3 1.31.6 1.30.10" ;;
         "1.11") k8s_versions="1.34.1 1.33.1 1.32.3 1.31.6 1.30.10 1.29.14" ;;
         "1.10") k8s_versions="1.33.1 1.32.3 1.31.6 1.30.10 1.29.14 1.28.15" ;;
         "1.9")  k8s_versions="1.32.3 1.31.6 1.30.10 1.29.14 1.28.15 1.27.16" ;;
         "1.8")  k8s_versions="1.31.6 1.30.10 1.29.14 1.28.15 1.27.16 1.26.15" ;;
         *)
             echo -e "${yellow}Warning: Talos version $talos_version not in support matrix, using latest known versions${clear}" >&2
-            k8s_versions="1.35.2 1.34.1 1.33.1 1.32.3 1.31.6 1.30.10"
+            k8s_versions="1.35.3 1.34.1 1.33.1 1.32.3 1.31.6 1.30.10"
             ;;
     esac
     
@@ -60,6 +60,17 @@ talos_populate_k8s_versions() {
     talosk8sversions=($k8s_versions)
     
     return 0
+}
+
+# Get the backend for an existing cluster (docker or qemu)
+talos_get_backend() {
+    local cluster_name="$1"
+    local backend_file="$clustersDir/$cluster_name/backend.txt"
+    if [ -f "$backend_file" ]; then
+        cat "$backend_file"
+    else
+        echo "docker"
+    fi
 }
 
 talos_check_prerequisites() {
@@ -107,6 +118,18 @@ talos_create_cluster() {
     local cluster_dir="$clustersDir/$cluster_name"
     local talos_dir="$cluster_dir/talos"
     mkdir -p "$talos_dir"
+
+    # QEMU backend requires root privileges - prompt before doing any work
+    if [ "$backend" == "qemu" ]; then
+        echo -e "${yellow}⚠️  QEMU backend requires root privileges (CNI networking and hardware virtualization)${clear}"
+        echo -e "${yellow}   The command will be run with: ${blue}sudo -E${clear}"
+        local use_sudo=""
+        read -r -p "$(echo -e "${yellow}   Do you want to proceed with sudo? (y/n): ${clear}")" use_sudo
+        if [[ "$use_sudo" != "y" && "$use_sudo" != "Y" ]]; then
+            echo -e "${yellow}   Switching to Docker backend instead...${clear}"
+            backend="docker"
+        fi
+    fi
 
     # Save backend choice for reference
     echo "$backend" > "$cluster_dir/backend.txt"
@@ -171,8 +194,7 @@ EOF
         # talosctl v1.12+ command structure - uses subcommands (docker/qemu)
         
         if [ "$backend" == "qemu" ]; then
-            # QEMU backend - full VM emulation, supports multiple control planes
-            create_cmd="talosctl cluster create qemu"
+            create_cmd="sudo -E talosctl cluster create qemu"
             create_cmd="$create_cmd --name $cluster_name"
             create_cmd="$create_cmd --cidr 10.${cidr_octet}.0.0/24"
             create_cmd="$create_cmd --controlplanes $controlplane_count"
@@ -297,25 +319,76 @@ EOF
             return 1
         fi
     else
-        ($create_cmd ||
-        {
-            echo -e "${red} 🛑 Could not create Talos cluster${clear}"
-            return 1
-        }) & spinner
+        if [[ "$create_cmd" == sudo* ]]; then
+            # Run without spinner when using sudo - spinner interferes with password prompt and output
+            # Export KUBECONFIG before sudo so talosctl writes kubeconfig to our cluster dir
+            # Note: prefix assignment (KUBECONFIG=... sudo -E ...) may be stripped by macOS sudoers env_reset
+            export KUBECONFIG="$cluster_dir/kubeconfig"
+            $create_cmd || {
+                echo -e "${red} 🛑 Could not create Talos cluster${clear}"
+                return 1
+            }
+            # The file was created by root, fix ownership
+            sudo chown "$(id -u):$(id -g)" "$cluster_dir/kubeconfig" 2>/dev/null || true
+        else
+            ($create_cmd ||
+            {
+                echo -e "${red} 🛑 Could not create Talos cluster${clear}"
+                return 1
+            }) & spinner
+        fi
     fi
 
     # talosctl automatically generates configs, let's move them to our talos dir
-    if [ -d "$HOME/.talos/clusters/$cluster_name" ]; then
-        cp "$HOME/.talos/clusters/$cluster_name/talosconfig" "$talos_dir/talosconfig" 2>/dev/null || true
+    if [ "$backend" == "qemu" ]; then
+        # With sudo, configs end up in /root/.talos/ - use sudo to check since normal user can't read /root/
+        if sudo test -d "/root/.talos/clusters/$cluster_name" 2>/dev/null; then
+            sudo cp "/root/.talos/clusters/$cluster_name/talosconfig" "$talos_dir/talosconfig" 2>/dev/null || true
+            sudo chown "$(id -u):$(id -g)" "$talos_dir/talosconfig" 2>/dev/null || true
+        elif [ -d "$HOME/.talos/clusters/$cluster_name" ]; then
+            cp "$HOME/.talos/clusters/$cluster_name/talosconfig" "$talos_dir/talosconfig" 2>/dev/null || true
+        fi
+        # Verify talosconfig was copied successfully
+        if [ ! -f "$talos_dir/talosconfig" ]; then
+            echo -e "${yellow}⚠️  Could not copy talosconfig from talosctl state dir, checking alternative paths...${clear}"
+            # Try to find it anywhere under /root/.talos/
+            local found_talosconfig
+            found_talosconfig=$(sudo find /root/.talos -name "talosconfig" -path "*/$cluster_name/*" 2>/dev/null | head -1)
+            if [ -n "$found_talosconfig" ]; then
+                sudo cp "$found_talosconfig" "$talos_dir/talosconfig"
+                sudo chown "$(id -u):$(id -g)" "$talos_dir/talosconfig"
+                echo -e "${yellow}   Found and copied talosconfig from: $found_talosconfig${clear}"
+            else
+                echo -e "${red}⚠️  Warning: talosconfig not found - kubeconfig retrieval may fail${clear}"
+            fi
+        fi
+    else
+        if [ -d "$HOME/.talos/clusters/$cluster_name" ]; then
+            cp "$HOME/.talos/clusters/$cluster_name/talosconfig" "$talos_dir/talosconfig" 2>/dev/null || true
+        fi
     fi
 
     # Get kubeconfig
     echo -e "${yellow}\n⏰ Retrieving kubeconfig${clear}"
-    (talos_get_kubeconfig "$cluster_name" "$cluster_dir/kubeconfig" ||
-    {
-        echo -e "${red} 🛑 Could not retrieve kubeconfig${clear}"
-        return 1
-    }) & spinner
+    if [ "$backend" == "qemu" ]; then
+        # For QEMU, always retrieve kubeconfig explicitly to ensure it's correct
+        # The KUBECONFIG env during create may not have been passed through sudo reliably
+        talos_get_kubeconfig "$cluster_name" "$cluster_dir/kubeconfig" "$backend" || {
+            # Fallback: check if the create command already wrote a kubeconfig
+            if [ -s "$cluster_dir/kubeconfig" ]; then
+                echo -e "${yellow}⚠️  Using kubeconfig written by cluster create command${clear}"
+            else
+                echo -e "${red} 🛑 Could not retrieve kubeconfig${clear}"
+                return 1
+            fi
+        }
+    else
+        (talos_get_kubeconfig "$cluster_name" "$cluster_dir/kubeconfig" "$backend" ||
+        {
+            echo -e "${red} 🛑 Could not retrieve kubeconfig${clear}"
+            return 1
+        }) & spinner
+    fi
 
     # Set the context
     export KUBECONFIG="$cluster_dir/kubeconfig"
@@ -346,35 +419,55 @@ EOF
 
 talos_delete_cluster() {
     local cluster_name="$1"
+    local backend
+    backend=$(talos_get_backend "$cluster_name")
 
     echo -e "${yellow}\n⏰ Deleting Talos cluster using talosctl${clear}"
 
-    # Clean up proxy container if it exists
-    local proxy_container="${cluster_name}-ingress-proxy"
-    if docker ps -a --filter "name=^${proxy_container}$" --format "{{.Names}}" | grep -q "^${proxy_container}$"; then
-        echo -e "${yellow}Removing ingress proxy container${clear}"
-        docker stop "$proxy_container" >/dev/null 2>&1 || true
-        docker rm "$proxy_container" >/dev/null 2>&1 || true
+    # Clean up proxy container if it exists (Docker backend only)
+    if [ "$backend" != "qemu" ]; then
+        local proxy_container="${cluster_name}-ingress-proxy"
+        if docker ps -a --filter "name=^${proxy_container}$" --format "{{.Names}}" | grep -q "^${proxy_container}$"; then
+            echo -e "${yellow}Removing ingress proxy container${clear}"
+            docker stop "$proxy_container" >/dev/null 2>&1 || true
+            docker rm "$proxy_container" >/dev/null 2>&1 || true
+        fi
     fi
 
-    # Use talosctl to destroy the cluster (handles all containers and networking)
-    (talosctl cluster destroy --name "$cluster_name" ||
-    {
-        echo -e "${yellow} ⚠️  talosctl cluster destroy failed, attempting manual cleanup${clear}"
-
-        # Fallback: manual cleanup if talosctl fails
-        local containers
-        containers=$(docker ps -a --filter "name=${cluster_name}-" --format "{{.Names}}")
-        if [ -n "$containers" ]; then
-            for container in $containers; do
-                echo -e "${yellow}Stopping and removing container: $container${clear}"
-                docker stop "$container" >/dev/null 2>&1 && docker rm "$container" >/dev/null 2>&1
-            done
+    if [ "$backend" == "qemu" ]; then
+        # QEMU clusters were created with sudo, so destroy also needs sudo
+        echo -e "${yellow}QEMU clusters require sudo to destroy VMs.${clear}"
+        if ! sudo -E talosctl cluster destroy --name "$cluster_name"; then
+            echo -e "${red} 🛑 talosctl cluster destroy failed.${clear}"
+            echo -e "${yellow}You can manually destroy with: sudo -E talosctl cluster destroy --name $cluster_name${clear}"
+            # Check if QEMU processes are still running for this cluster
+            if pgrep -f "qemu.*${cluster_name}" >/dev/null 2>&1; then
+                echo -e "${red} ⚠️  QEMU VMs for '${cluster_name}' are still running!${clear}"
+            fi
+            return 1
         fi
+        # Clean up root's talos config dir too
+        sudo rm -rf "/root/.talos/clusters/$cluster_name" 2>/dev/null || true
+    else
+        # Use talosctl to destroy the cluster (handles all containers and networking)
+        (talosctl cluster destroy --name "$cluster_name" ||
+        {
+            echo -e "${yellow} ⚠️  talosctl cluster destroy failed, attempting manual cleanup${clear}"
 
-        # Try to remove network
-        docker network rm "talos-${cluster_name}" >/dev/null 2>&1 || true
-    }) & spinner
+            # Fallback: manual cleanup if talosctl fails
+            local containers
+            containers=$(docker ps -a --filter "name=${cluster_name}-" --format "{{.Names}}")
+            if [ -n "$containers" ]; then
+                for container in $containers; do
+                    echo -e "${yellow}Stopping and removing container: $container${clear}"
+                    docker stop "$container" >/dev/null 2>&1 && docker rm "$container" >/dev/null 2>&1
+                done
+            fi
+
+            # Try to remove network
+            docker network rm "talos-${cluster_name}" >/dev/null 2>&1 || true
+        }) & spinner
+    fi
 
     # Clean up talosctl stored configs
     rm -rf "$HOME/.talos/clusters/$cluster_name" 2>/dev/null || true
@@ -384,8 +477,34 @@ talos_delete_cluster() {
 }
 
 talos_list_clusters() {
-    # List clusters by finding their control plane containers in Docker
-    docker ps -a --filter "name=-controlplane-1$" --format "{{.Names}}" 2>/dev/null | sed 's/-controlplane-1$//' | sort -u || true
+    # List clusters from both Docker containers and cluster directory (for QEMU)
+    local clusters=""
+    
+    # Docker-based clusters: find control plane containers
+    local docker_clusters
+    docker_clusters=$(docker ps -a --filter "name=-controlplane-1$" --format "{{.Names}}" 2>/dev/null | sed 's/-controlplane-1$//' || true)
+    if [ -n "$docker_clusters" ]; then
+        clusters="$docker_clusters"
+    fi
+    
+    # QEMU-based clusters: check cluster dirs with backend.txt == qemu
+    if [ -d "$clustersDir" ]; then
+        for dir in "$clustersDir"/*/; do
+            [ -d "$dir" ] || continue
+            local name
+            name=$(basename "$dir")
+            local backend_file="$dir/backend.txt"
+            if [ -f "$backend_file" ] && [ "$(cat "$backend_file")" == "qemu" ]; then
+                # Check if QEMU processes are still running for this cluster
+                if pgrep -f "qemu.*${name}" >/dev/null 2>&1; then
+                    clusters="$clusters
+$name"
+                fi
+            fi
+        done
+    fi
+    
+    echo "$clusters" | grep -v '^$' | sort -u || true
 }
 
 talos_validate_cluster_exists() {
@@ -396,9 +515,24 @@ talos_validate_cluster_exists() {
         exit 1
     fi
 
-    # Check if cluster exists by looking for its control plane container
-    local container_name="${cluster_name}-controlplane-1"
-    if ! docker ps -a --filter "name=^${container_name}$" --format "{{.Names}}" | grep -q "^${container_name}$"; then
+    local backend
+    backend=$(talos_get_backend "$cluster_name")
+
+    local found=false
+    if [ "$backend" == "qemu" ]; then
+        # QEMU cluster: check if the cluster dir exists with a backend.txt
+        if [ -f "$clustersDir/$cluster_name/backend.txt" ]; then
+            found=true
+        fi
+    else
+        # Docker cluster: check for the control plane container
+        local container_name="${cluster_name}-controlplane-1"
+        if docker ps -a --filter "name=^${container_name}$" --format "{{.Names}}" | grep -q "^${container_name}$"; then
+            found=true
+        fi
+    fi
+
+    if [ "$found" == "false" ]; then
         echo -e "${red}\n🛑 Talos cluster '${cluster_name}' not found${clear}"
         echo -e "${yellow}\nAvailable Talos clusters:${clear}"
         talos_list_clusters
@@ -414,9 +548,20 @@ talos_validate_cluster_not_exists() {
         exit 1
     fi
 
-    # Check if cluster already exists by looking for its control plane container
+    local exists=false
+
+    # Check Docker containers
     local container_name="${cluster_name}-controlplane-1"
-    if docker ps -a --filter "name=^${container_name}$" --format "{{.Names}}" | grep -q "^${container_name}$"; then
+    if docker ps -a --filter "name=^${container_name}$" --format "{{.Names}}" 2>/dev/null | grep -q "^${container_name}$"; then
+        exists=true
+    fi
+
+    # Check cluster dir with backend.txt (covers QEMU clusters)
+    if [ -f "$clustersDir/$cluster_name/backend.txt" ]; then
+        exists=true
+    fi
+
+    if [ "$exists" == "true" ]; then
         echo -e "${red}\n🛑 Talos cluster '${cluster_name}' already exists${clear}"
         echo -e "${yellow}\nPlease choose a different name or delete the existing cluster first:${clear}"
         echo -e "  ${blue}./kl.sh delete ${cluster_name}${clear}"
@@ -427,41 +572,70 @@ talos_validate_cluster_not_exists() {
 talos_get_kubeconfig() {
     local cluster_name="$1"
     local output_file="$2"
+    local backend="${3:-$(talos_get_backend "$cluster_name")}"
 
-    # Find the host port mapped to the Talos API (50000)
-    # local talos_api_port
-    # talos_api_port=$(docker port "${cluster_name}-controlplane-1" 50000/tcp | awk -F: '{print $2}')
+    if [ "$backend" == "qemu" ]; then
+        # QEMU backend: use the controlplane IP directly
+        # The talosconfig from sudo run has the correct endpoints
+        local talos_dir="$clustersDir/$cluster_name/talos"
+        local talosconfig="$talos_dir/talosconfig"
 
-    # if [ -z "$talos_api_port" ]; then
-    #     echo -e "${red} 🛑 Could not find mapped Talos API port for ${cluster_name}-controlplane-1. Kubeconfig retrieval might fail.${clear}" >&2
-    #     local node_addr="127.0.0.1"
-    # else
-    #     local node_addr="127.0.0.1:${talos_api_port}"
-    # fi
+        if [ ! -f "$talosconfig" ]; then
+            echo -e "${red} 🛑 Talosconfig not found at $talosconfig${clear}" >&2
+            return 1
+        fi
 
-    # talosctl can export kubeconfig directly by cluster name
-    talosctl kubeconfig "$output_file" \
-        --merge=true \
-        --cluster "$cluster_name" \
-        --nodes "127.0.0.1" 2>/dev/null
+        # Get the endpoint IP from the talosconfig
+        local endpoint_ip
+        endpoint_ip=$(yq '.contexts.*.endpoints[0]' "$talosconfig" 2>/dev/null | head -1)
+        if [ -z "$endpoint_ip" ] || [ "$endpoint_ip" == "null" ]; then
+            endpoint_ip="10.5.0.2"  # Default QEMU controlplane IP
+        fi
 
-    if [ $? -ne 0 ]; then
-        return 1
+        # Get the node IP (first controlplane)
+        local node_ip
+        node_ip=$(yq '.contexts.*.nodes[0]' "$talosconfig" 2>/dev/null | head -1)
+        if [ -z "$node_ip" ] || [ "$node_ip" == "null" ]; then
+            node_ip="$endpoint_ip"
+        fi
+
+        # QEMU network requires root access on macOS
+        echo -e "${yellow}   Retrieving kubeconfig from QEMU cluster (endpoint: $endpoint_ip, node: $node_ip)${clear}" >&2
+        if ! sudo -E talosctl kubeconfig "$output_file" \
+            --talosconfig "$talosconfig" \
+            --merge=false \
+            --nodes "$node_ip" \
+            --endpoints "$endpoint_ip"; then
+            echo -e "${red}   talosctl kubeconfig failed for QEMU backend${clear}" >&2
+            return 1
+        fi
+        # Fix ownership since file was created by root
+        sudo chown "$(id -u):$(id -g)" "$output_file" 2>/dev/null || true
+    else
+        # Docker backend: use 127.0.0.1 and find mapped ports
+        talosctl kubeconfig "$output_file" \
+            --merge=false \
+            --cluster "$cluster_name" \
+            --nodes "127.0.0.1" 2>/dev/null
+
+        if [ $? -ne 0 ]; then
+            return 1
+        fi
+
+        # Find the host port mapped to the Kubernetes API (6443)
+        local k8s_api_port
+        k8s_api_port=$(docker port "${cluster_name}-controlplane-1" 6443/tcp 2>/dev/null | awk -F: '{print $2}')
+
+        if [ -z "$k8s_api_port" ]; then
+            echo -e "${red} 🛑 Could not find mapped Kubernetes API port for ${cluster_name}-controlplane-1. Kubeconfig server URL cannot be updated.${clear}" >&2
+            return 1
+        fi
+
+        # Update the server URL in the kubeconfig to point to the host
+        KUBECONFIG="$output_file" kubectl config set-cluster "$cluster_name" --server="https://127.0.0.1:${k8s_api_port}" >/dev/null
     fi
 
-    # Find the host port mapped to the Kubernetes API (6443)
-    local k8s_api_port
-    k8s_api_port=$(docker port "${cluster_name}-controlplane-1" 6443/tcp | awk -F: '{print $2}')
-
-    if [ -z "$k8s_api_port" ]; then
-        echo -e "${red} 🛑 Could not find mapped Kubernetes API port for ${cluster_name}-controlplane-1. Kubeconfig server URL cannot be updated.${clear}" >&2
-        return 1
-    fi
-
-    # Update the server URL in the kubeconfig to point to the host
-    KUBECONFIG="$output_file" kubectl config set-cluster "$cluster_name" --server="https://127.0.0.1:${k8s_api_port}" >/dev/null
-
-    return $?
+    return 0
 }
 
 talos_get_cluster_context() {

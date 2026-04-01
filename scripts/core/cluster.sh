@@ -140,7 +140,30 @@ function list_clusters() {
 
     # Check talos clusters
     if command -v talosctl &> /dev/null; then
-        local talos_clusters=$(docker ps -a --filter "name=-controlplane-1$" --format "{{.Names}}" 2>/dev/null | sed 's/-controlplane-1$//' | sort -u)
+        local talos_clusters=""
+        
+        # Docker-based Talos clusters
+        local docker_talos
+        docker_talos=$(docker ps -a --filter "name=-controlplane-1$" --format "{{.Names}}" 2>/dev/null | sed 's/-controlplane-1$//' | sort -u)
+        if [ -n "$docker_talos" ]; then
+            talos_clusters="$docker_talos"
+        fi
+        
+        # QEMU-based Talos clusters (check cluster dirs with backend.txt == qemu)
+        if [ -d "$clustersDir" ]; then
+            for dir in "$clustersDir"/*/; do
+                [ -d "$dir" ] || continue
+                local name
+                name=$(basename "$dir")
+                local backend_file="$dir/backend.txt"
+                if [ -f "$backend_file" ] && [ "$(cat "$backend_file")" == "qemu" ]; then
+                    talos_clusters="$talos_clusters
+$name"
+                fi
+            done
+        fi
+        
+        talos_clusters=$(echo "$talos_clusters" | grep -v '^$' | sort -u)
         if [ -n "$talos_clusters" ]; then
             while IFS= read -r cluster; do
                 [ -z "$cluster" ] && continue
@@ -241,7 +264,10 @@ function delete_cluster() {
     load_provider "$provider" || exit 1
 
     # Use provider-specific delete function
-    call_provider_function "$provider" "delete_cluster" "$clusterName"
+    if ! call_provider_function "$provider" "delete_cluster" "$clusterName"; then
+        echo -e "$red 🛑 Cluster deletion failed. Cluster directory preserved so you can retry.$clear"
+        exit 1
+    fi
 
     echo -e "$yellow ✅ Done deleting cluster"
 
@@ -432,8 +458,37 @@ function get_cluster_parameter() {
             echo -e "$clear"
             read -p "Select Talos backend (docker/qemu) (default: docker): " talos_backend_new
             if [ "$talos_backend_new" == "qemu" ]; then
-                talos_backend="qemu"
-                echo -e "$yellow ✅ Using QEMU backend (full VM emulation)$clear"
+                # Check for QEMU binary before accepting the choice
+                local qemu_bin=""
+                if command -v qemu-system-aarch64 &>/dev/null; then
+                    qemu_bin="qemu-system-aarch64"
+                elif command -v qemu-system-x86_64 &>/dev/null; then
+                    qemu_bin="qemu-system-x86_64"
+                elif command -v qemu-kvm &>/dev/null; then
+                    qemu_bin="qemu-kvm"
+                fi
+
+                if [ -z "$qemu_bin" ]; then
+                    echo -e "${red}❌ QEMU is not installed. The QEMU backend requires a QEMU binary.${clear}"
+                    echo -e "${yellow}   Install QEMU for your platform:${clear}"
+                    echo -e "${yellow}   macOS:   ${blue}brew install qemu${clear}"
+                    echo -e "${yellow}   Ubuntu:  ${blue}sudo apt install qemu-system${clear}"
+                    echo -e "${yellow}   Fedora:  ${blue}sudo dnf install qemu-system-x86 qemu-system-aarch64${clear}"
+                    echo -e "${yellow}   Arch:    ${blue}sudo pacman -S qemu-full${clear}"
+                    echo ""
+                    local fallback_docker=""
+                    read -r -p "$(echo -e "${yellow}   Do you want to use the Docker backend instead? (y/n): ${clear}")" fallback_docker
+                    if [[ "$fallback_docker" == "y" || "$fallback_docker" == "Y" ]]; then
+                        talos_backend="docker"
+                        echo -e "$yellow ✅ Using Docker backend (container-based)$clear"
+                    else
+                        echo -e "${red}   Aborting cluster creation.${clear}"
+                        return 1
+                    fi
+                else
+                    talos_backend="qemu"
+                    echo -e "$yellow ✅ Using QEMU backend (full VM emulation)$clear"
+                fi
             else
                 talos_backend="docker"
                 echo -e "$yellow ✅ Using Docker backend (container-based)$clear"
