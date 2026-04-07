@@ -437,10 +437,9 @@ talos_delete_cluster() {
     # Clean up proxy container if it exists (Docker backend only)
     if [ "$backend" != "qemu" ]; then
         local proxy_container="${cluster_name}-ingress-proxy"
-        if docker ps -a --filter "name=^${proxy_container}$" --format "{{.Names}}" | grep -q "^${proxy_container}$"; then
+        if docker ps -a --filter "name=^${proxy_container}$" --format "{{.Names}}" 2>/dev/null | grep -q "^${proxy_container}$"; then
             echo -e "${yellow}Removing ingress proxy container${clear}"
-            docker stop "$proxy_container" >/dev/null 2>&1 || true
-            docker rm "$proxy_container" >/dev/null 2>&1 || true
+            docker rm -f "$proxy_container" >/dev/null 2>&1 || true
         fi
     fi
 
@@ -448,37 +447,57 @@ talos_delete_cluster() {
         # QEMU clusters were created with sudo, so destroy also needs sudo
         echo -e "${yellow}QEMU clusters require sudo to destroy VMs.${clear}"
         if ! sudo -E talosctl cluster destroy --name "$cluster_name" --state "$clustersDir"; then
-            echo -e "${red} 🛑 talosctl cluster destroy failed.${clear}"
-            echo -e "${yellow}You can manually destroy with: sudo -E talosctl cluster destroy --name $cluster_name --state $clustersDir${clear}"
-            # Check if QEMU processes are still running for this cluster
+            echo -e "${yellow} ⚠️  talosctl cluster destroy failed, attempting manual cleanup${clear}"
+            # Force kill orphaned QEMU processes for this cluster
             if pgrep -f "qemu.*${cluster_name}" >/dev/null 2>&1; then
-                echo -e "${red} ⚠️  QEMU VMs for '${cluster_name}' are still running!${clear}"
+                echo -e "${yellow}Killing orphaned QEMU VMs for '${cluster_name}'${clear}"
+                sudo pkill -f "qemu.*${cluster_name}" 2>/dev/null || true
             fi
-            return 1
         fi
     else
         # Use talosctl to destroy the cluster (handles all containers and networking)
-        (talosctl cluster destroy --name "$cluster_name" --state "$clustersDir" ||
-        {
-            echo -e "${yellow} ⚠️  talosctl cluster destroy failed, attempting manual cleanup${clear}"
+        (talosctl cluster destroy --name "$cluster_name" --state "$clustersDir" 2>/dev/null || true
 
-            # Fallback: manual cleanup if talosctl fails
-            local containers
-            containers=$(docker ps -a --filter "name=${cluster_name}-" --format "{{.Names}}")
-            if [ -n "$containers" ]; then
-                for container in $containers; do
-                    echo -e "${yellow}Stopping and removing container: $container${clear}"
-                    docker stop "$container" >/dev/null 2>&1 && docker rm "$container" >/dev/null 2>&1
-                done
-            fi
+        # Always do manual cleanup to catch orphaned resources that talosctl may miss
+        local containers
+        containers=$(docker ps -a --filter "name=${cluster_name}-" --format "{{.Names}}" 2>/dev/null)
+        if [ -n "$containers" ]; then
+            for container in $containers; do
+                echo -e "${yellow}Removing container: $container${clear}"
+                docker rm -f "$container" >/dev/null 2>&1 || true
+            done
+        fi
 
-            # Try to remove network
-            docker network rm "talos-${cluster_name}" >/dev/null 2>&1 || true
-        }) & spinner
+        # Remove network (talosctl uses the cluster name as the network name)
+        docker network rm "${cluster_name}" >/dev/null 2>&1 || true
+        docker network rm "talos-${cluster_name}" >/dev/null 2>&1 || true
+
+        # Remove any Docker volumes associated with the cluster
+        local volumes
+        volumes=$(docker volume ls --filter "name=${cluster_name}" --format "{{.Name}}" 2>/dev/null)
+        if [ -n "$volumes" ]; then
+            for volume in $volumes; do
+                docker volume rm "$volume" >/dev/null 2>&1 || true
+            done
+        fi
+        ) & spinner
     fi
 
-    # Clean up talosctl state dir (now under clustersDir)
-    # The cluster dir itself is cleaned by the caller in cluster.sh
+    # Clean up talosconfig contexts (removes stale entries like "viti", "viti-1", etc.)
+    # Note: awk handles the '*' prefix that marks the current context
+    if command -v talosctl &> /dev/null; then
+        local contexts
+        contexts=$(talosctl config contexts 2>/dev/null | awk '{if ($1 == "*") print $2; else print $1}' | grep -E "^${cluster_name}(-[0-9]+)?$" || true)
+        if [ -n "$contexts" ]; then
+            for ctx in $contexts; do
+                talosctl config context "" 2>/dev/null || true
+                yes | talosctl config remove "$ctx" 2>/dev/null || true
+            done
+        fi
+    fi
+
+    # Clean up cluster state directory (run after talosctl destroy which may recreate it)
+    rm -rf "${clustersDir:?}/${cluster_name:?}" 2>/dev/null
 
     echo -e "${yellow} ✅ Talos cluster deleted${clear}"
     return 0
@@ -535,7 +554,15 @@ talos_validate_cluster_exists() {
     else
         # Docker cluster: check for the control plane container
         local container_name="${cluster_name}-controlplane-1"
-        if docker ps -a --filter "name=^${container_name}$" --format "{{.Names}}" | grep -q "^${container_name}$"; then
+        if docker ps -a --filter "name=^${container_name}$" --format "{{.Names}}" 2>/dev/null | grep -q "^${container_name}$"; then
+            found=true
+        fi
+    fi
+
+    # Also consider cluster found if the cluster directory exists with talos artifacts
+    # (handles orphaned state where containers were removed but directory remains)
+    if [ "$found" == "false" ]; then
+        if [ -d "$clustersDir/$cluster_name/talos" ] || [ -f "$clustersDir/$cluster_name/backend.txt" ]; then
             found=true
         fi
     fi

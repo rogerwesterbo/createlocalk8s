@@ -44,9 +44,22 @@ function validate_cluster_not_exists() {
     fi
 
     # Check talos clusters (only if not already found in kind)
-    if [ -z "$existing_provider" ] && command -v talosctl &> /dev/null; then
-        if docker ps -a --filter "name=^${clusterName}-controlplane-1$" --format "{{.Names}}" 2>/dev/null | grep -q "^${clusterName}-controlplane-1$"; then
-            existing_provider="talos"
+    # Only check for actual running infrastructure (containers/VMs), not leftover directories
+    # from failed creation attempts - the provider's create function handles stale dir cleanup
+    if [ -z "$existing_provider" ]; then
+        # Check Docker containers matching talos naming convention
+        if command -v docker &> /dev/null; then
+            if docker ps -a --filter "name=^${clusterName}-controlplane-1$" --format "{{.Names}}" 2>/dev/null | grep -q "^${clusterName}-controlplane-1$"; then
+                existing_provider="talos"
+            fi
+        fi
+        # Check for running QEMU VMs
+        if [ -z "$existing_provider" ]; then
+            if [ -f "$clustersDir/$clusterName/backend.txt" ] && [ "$(cat "$clustersDir/$clusterName/backend.txt" 2>/dev/null)" == "qemu" ]; then
+                if pgrep -f "qemu.*${clusterName}" >/dev/null 2>&1; then
+                    existing_provider="talos"
+                fi
+            fi
         fi
     fi
 
@@ -149,14 +162,22 @@ function list_clusters() {
             talos_clusters="$docker_talos"
         fi
         
-        # QEMU-based Talos clusters (check cluster dirs with backend.txt == qemu)
+        # Talos clusters from cluster directories (QEMU or orphaned Docker clusters)
         if [ -d "$clustersDir" ]; then
             for dir in "$clustersDir"/*/; do
                 [ -d "$dir" ] || continue
                 local name
                 name=$(basename "$dir")
-                local backend_file="$dir/backend.txt"
-                if [ -f "$backend_file" ] && [ "$(cat "$backend_file")" == "qemu" ]; then
+                # Detect talos clusters by provider.txt, backend.txt, or talos/ subdir
+                local is_talos=false
+                if [ -f "$dir/provider.txt" ] && [ "$(cat "$dir/provider.txt")" == "talos" ]; then
+                    is_talos=true
+                elif [ -f "$dir/backend.txt" ]; then
+                    is_talos=true
+                elif [ -d "$dir/talos" ]; then
+                    is_talos=true
+                fi
+                if [ "$is_talos" == "true" ]; then
                     talos_clusters="$talos_clusters
 $name"
                 fi
@@ -272,14 +293,14 @@ function delete_cluster() {
     echo -e "$yellow ✅ Done deleting cluster"
 
     # Clean up cluster directory
-    rm -rf "$clustersDir/$clusterName" 2>/dev/null
-    
+    rm -rf "${clustersDir:?}/${clusterName:?}" 2>/dev/null
+
     # Also clean up old-style files for backward compatibility
-    rm -f "$clustersDir/$clusterName-provider.txt" 2>/dev/null
-    rm -f "$clustersDir/$clusterName-clusterinfo.txt" 2>/dev/null
-    rm -f "$clustersDir/$clusterName-config.yaml" 2>/dev/null
-    rm -f "$clustersDir/$clusterName-kube.config" 2>/dev/null
-    rm -rf "$clustersDir/$clusterName-talos" 2>/dev/null
+    rm -f "${clustersDir:?}/${clusterName:?}-provider.txt" 2>/dev/null
+    rm -f "${clustersDir:?}/${clusterName:?}-clusterinfo.txt" 2>/dev/null
+    rm -f "${clustersDir:?}/${clusterName:?}-config.yaml" 2>/dev/null
+    rm -f "${clustersDir:?}/${clusterName:?}-kube.config" 2>/dev/null
+    rm -rf "${clustersDir:?}/${clusterName:?}-talos" 2>/dev/null
 }
 
 function details_for_cluster() {

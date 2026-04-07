@@ -122,6 +122,23 @@ get_cluster_provider() {
         if [ -f "$old_provider_file" ]; then
             cat "$old_provider_file"
         else
+            # Auto-detect talos provider from various indicators (handles orphaned
+            # clusters where provider.txt was deleted but resources still exist)
+
+            # Check for Docker containers matching talos naming convention
+            if command -v docker &> /dev/null; then
+                if docker ps -a --filter "name=^${cluster_name}-controlplane-1$" --format "{{.Names}}" 2>/dev/null | grep -q "^${cluster_name}-controlplane-1$"; then
+                    echo "talos"
+                    return
+                fi
+            fi
+
+            # Check for cluster directory with talos artifacts (backend.txt or talos/ subdir)
+            if [ -f "$clustersDir/$cluster_name/backend.txt" ] || [ -d "$clustersDir/$cluster_name/talos" ]; then
+                echo "talos"
+                return
+            fi
+
             # Default to kind for backward compatibility
             echo "kind"
         fi
