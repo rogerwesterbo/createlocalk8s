@@ -622,14 +622,15 @@ function get_cluster_parameter() {
         fi
 
         # Ask for memory size (Talos only)
+        # Control plane always gets 4096MB (recommended minimum)
         talos_memory=4096
-        read -p "Enter memory size for Talos nodes in MB (default: 4096): " talos_memory_new
+        read -p "Enter memory size for Talos worker nodes in MB (default: 4096): " talos_memory_new
         if [ -n "$talos_memory_new" ]; then
             talos_memory=$talos_memory_new
-            echo -e "$yellow ✅ Memory per node set to: $blue${talos_memory}MB"
+            echo -e "$yellow ✅ Memory per worker node set to: $blue${talos_memory}MB"
             echo -e "$clear"
         else
-            echo -e "$yellow ✅ Using default memory per node: $blue${talos_memory}MB"
+            echo -e "$yellow ✅ Using default memory per worker node: $blue${talos_memory}MB"
             echo -e "$clear"
         fi
     fi
@@ -653,20 +654,27 @@ function get_cluster_parameter() {
     multus_type="thin"
     
     echo -e "$yellow Available CNI (Container Network Interface) options:$clear"
-    read -p "Use custom CNI? (default/cilium/calico) (default: default): " cni_choice
-    if [ "$cni_choice" == "cilium" ]; then
-        custom_cni="cilium"
-        echo -e "$yellow ✅ Will disable default CNI and allow Cilium installation"
-        echo -e "$clear"
-    elif [ "$cni_choice" == "calico" ]; then
-        custom_cni="calico"
-        echo -e "$yellow ✅ Will disable default CNI and allow Calico installation"
-        echo -e "$clear"
-    else
-        custom_cni="default"
-        echo -e "$yellow ✅ Using default CNI"
-        echo -e "$clear"
-    fi
+    while true; do
+        read -p "Use custom CNI? (default/cilium/calico) (default: default): " cni_choice
+        if [ "$cni_choice" == "cilium" ]; then
+            custom_cni="cilium"
+            echo -e "$yellow ✅ Will disable default CNI and allow Cilium installation"
+            echo -e "$clear"
+            break
+        elif [ "$cni_choice" == "calico" ]; then
+            custom_cni="calico"
+            echo -e "$yellow ✅ Will disable default CNI and allow Calico installation"
+            echo -e "$clear"
+            break
+        elif [ -z "$cni_choice" ] || [ "$cni_choice" == "default" ]; then
+            custom_cni="default"
+            echo -e "$yellow ✅ Using default CNI"
+            echo -e "$clear"
+            break
+        else
+            echo -e "${red} ❌ Invalid option '$cni_choice'. Please enter 'default', 'cilium', or 'calico'.${clear}"
+        fi
+    done
 
     # Ask about Multus CNI (only if Cilium or Calico is selected)
     if [ "$custom_cni" == "cilium" ] || [ "$custom_cni" == "calico" ]; then
@@ -675,8 +683,8 @@ function get_cluster_parameter() {
         echo -e "$yellow    Enables pods to have multiple network interfaces (SR-IOV, macvlan, bridge, etc.)$clear"
         echo -e "$yellow    Useful for: Network segmentation, high-performance networking, legacy apps$clear"
         echo -e "$clear"
-        read -p "Install Multus CNI? (yes/no) (default: no): " multus_choice
-        if [ "$multus_choice" == "yes" ]; then
+        read -p "Install Multus CNI? (y/yes | n/no) (default: no): " multus_choice
+        if [ "$multus_choice" == "yes" ] || [ "$multus_choice" == "y" ] || [ "$multus_choice" == "Y" ]; then
             install_multus="yes"
             echo -e "$yellow"
             echo -e "$yellow Choose Multus plugin type:$clear"
@@ -752,7 +760,9 @@ function get_cluster_parameter() {
     if [ "$provider" == "talos" ]; then
         echo -en "$yellow\nBackend:"
         echo -en "$blue $talos_backend"
-        echo -en "$yellow\nMemory per node:"
+        echo -en "$yellow\nMemory per control plane node:"
+        echo -en "$blue 4096MB"
+        echo -en "$yellow\nMemory per worker node:"
         echo -en "$blue ${talos_memory}MB"
     fi
 

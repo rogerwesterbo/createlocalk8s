@@ -32,7 +32,7 @@ talos_get_supported_k8s_versions() {
     # Based on: https://www.talos.dev/v1.12/introduction/support-matrix/
     local k8s_versions=""
     case "$talos_version" in
-        "1.12") k8s_versions="1.35.3 1.34.1 1.33.1 1.32.3 1.31.6 1.30.10" ;;
+        "1.12") k8s_versions="1.35.4 1.34.1 1.33.1 1.32.3 1.31.6 1.30.10" ;;
         "1.11") k8s_versions="1.34.1 1.33.1 1.32.3 1.31.6 1.30.10 1.29.14" ;;
         "1.10") k8s_versions="1.33.1 1.32.3 1.31.6 1.30.10 1.29.14 1.28.15" ;;
         "1.9")  k8s_versions="1.32.3 1.31.6 1.30.10 1.29.14 1.28.15 1.27.16" ;;
@@ -180,7 +180,7 @@ EOF
             create_cmd="$create_cmd --controlplanes $controlplane_count"
             create_cmd="$create_cmd --workers $worker_count"
             create_cmd="$create_cmd --kubernetes-version $k8s_version"
-            create_cmd="$create_cmd --memory-controlplanes ${memory}MB"
+            create_cmd="$create_cmd --memory-controlplanes 4096MB"
             create_cmd="$create_cmd --memory-workers ${memory}MB"
             # Add CNI patch file if custom CNI is requested
             if [ "$custom_cni" != "default" ] && [ -n "$cni_patch_file" ]; then
@@ -206,7 +206,7 @@ EOF
             create_cmd="$create_cmd --workers $worker_count"
             create_cmd="$create_cmd --kubernetes-version $k8s_version"
             # Memory flags require unit suffix (MB or GB) in v1.12+
-            create_cmd="$create_cmd --memory-controlplanes ${memory}MB"
+            create_cmd="$create_cmd --memory-controlplanes 4096MB"
             create_cmd="$create_cmd --memory-workers ${memory}MB"
             # Expose ports for hostNetwork mode (only available in docker backend)
             create_cmd="$create_cmd --exposed-ports $http_port:80/tcp,$https_port:443/tcp"
@@ -224,7 +224,7 @@ EOF
         create_cmd="$create_cmd --controlplanes $controlplane_count"
         create_cmd="$create_cmd --workers $worker_count"
         create_cmd="$create_cmd --kubernetes-version $k8s_version"
-        create_cmd="$create_cmd --memory $memory"
+        create_cmd="$create_cmd --memory 4096"
         create_cmd="$create_cmd --memory-workers $memory"
         # Expose ports for single control plane
         if [ "$controlplane_count" -eq 1 ]; then
