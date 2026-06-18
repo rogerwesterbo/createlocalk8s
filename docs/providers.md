@@ -143,7 +143,7 @@ clusters/
 **Multiple Kubernetes Versions:**
 
 -   Supported versions are dynamically determined based on installed `talosctl` version
--   See [Talos support matrix](https://docs.siderolabs.com/talos/v1.11/getting-started/support-matrix) for version compatibility
+-   See [Talos support matrix](https://docs.siderolabs.com/talos/v1.13/getting-started/support-matrix) for version compatibility
 -   Specified during cluster creation
 
 **Access Talos API:**

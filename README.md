@@ -101,7 +101,7 @@ Current date and time in Linux Mon Oct 13 23:29:08 CEST 2025
 -   Interactive cluster creation (name, control planes, workers, Kubernetes version, provider selection)
 -   Supported Kubernetes versions:
     -   **kind**: v1.25.x → v1.35.x (see `scripts/variables.sh` for full list)
-    -   **talos**: Dynamically determined based on installed `talosctl` version (see [support matrix](https://docs.siderolabs.com/talos/v1.11/getting-started/support-matrix))
+    -   **talos**: Dynamically determined based on installed `talosctl` version (see [support matrix](https://docs.siderolabs.com/talos/v1.13/getting-started/support-matrix))
 -   **Organized cluster storage**: Each cluster gets its own directory under `clusters/<cluster-name>/`
 -   Automatic port mapping adjustment when multiple clusters run simultaneously (avoids 80/443 conflicts)
 -   Optional automatic ArgoCD + Nginx Ingress install during cluster creation

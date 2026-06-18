@@ -465,7 +465,7 @@ function get_cluster_parameter() {
         talos_major_minor=$(echo "$talos_version" | awk -F. '{print $1"."$2}')
         
         # Only show backend selection for v1.12+ (older versions don't have subcommands)
-        if [[ "$talos_major_minor" == "1.12" ]] || [[ "${talos_major_minor%%.*}" -gt 1 ]]; then
+        if [[ "${talos_major_minor%%.*}" -gt 1 ]] || [[ "${talos_major_minor#*.}" -ge 12 && "${talos_major_minor%%.*}" -eq 1 ]]; then
             echo -e "$yellow"
             echo -e "$yellow 🖥️  Talos Backend Selection$clear"
             echo -e "$yellow   📌 docker (recommended): Fast startup, lightweight, runs in Docker containers$clear"
@@ -524,7 +524,7 @@ function get_cluster_parameter() {
     if [ "$provider" == "talos" ] && [ "$talos_backend" == "docker" ]; then
         local talos_major_minor
         talos_major_minor=$(echo "$talos_version" | awk -F. '{print $1"."$2}')
-        if [[ "$talos_major_minor" == "1.12" ]] || [[ "${talos_major_minor%%.*}" -gt 1 ]]; then
+        if [[ "${talos_major_minor%%.*}" -gt 1 ]] || [[ "${talos_major_minor#*.}" -ge 12 && "${talos_major_minor%%.*}" -eq 1 ]]; then
             skip_controlplane_prompt=true
             controlplane_number=1
             echo -e "$yellow ✅ Control planes: ${blue}1${yellow} (Docker backend supports single control plane only)$clear"

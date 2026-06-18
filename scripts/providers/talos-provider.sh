@@ -16,7 +16,7 @@ talos_get_version() {
 }
 
 # Get supported Kubernetes versions for the installed talosctl version
-# Based on: https://docs.siderolabs.com/talos/v1.11/getting-started/support-matrix
+# Based on: https://docs.siderolabs.com/talos/v1.13/getting-started/support-matrix
 talos_get_supported_k8s_versions() {
     local talos_version
     talos_version=$(talos_get_version)
@@ -29,9 +29,10 @@ talos_get_supported_k8s_versions() {
     # Talos version to Kubernetes version support matrix
     # Use case statement to avoid associative array issues with version keys
     # Note: Full patch versions are required (e.g., 1.34.1 not 1.34)
-    # Based on: https://www.talos.dev/v1.12/introduction/support-matrix/
+    # Based on: https://docs.siderolabs.com/talos/v1.13/getting-started/support-matrix
     local k8s_versions=""
     case "$talos_version" in
+        "1.13") k8s_versions="1.36.1 1.35.5 1.34.8 1.33.12 1.32.13 1.31.14" ;;
         "1.12") k8s_versions="1.35.4 1.34.1 1.33.1 1.32.3 1.31.6 1.30.10" ;;
         "1.11") k8s_versions="1.34.1 1.33.1 1.32.3 1.31.6 1.30.10 1.29.14" ;;
         "1.10") k8s_versions="1.33.1 1.32.3 1.31.6 1.30.10 1.29.14 1.28.15" ;;
@@ -39,7 +40,7 @@ talos_get_supported_k8s_versions() {
         "1.8")  k8s_versions="1.31.6 1.30.10 1.29.14 1.28.15 1.27.16 1.26.15" ;;
         *)
             echo -e "${yellow}Warning: Talos version $talos_version not in support matrix, using latest known versions${clear}" >&2
-            k8s_versions="1.35.3 1.34.1 1.33.1 1.32.3 1.31.6 1.30.10"
+            k8s_versions="1.36.1 1.35.5 1.34.8 1.33.12 1.32.13 1.31.14"
             ;;
     esac
     
@@ -252,7 +253,7 @@ EOF
     # For v1.12+ docker backend with custom CNI, the command will hang waiting for nodes to be ready
     # (since nodes need CNI to become ready). We use a timeout and check if containers are running.
     local use_timeout=false
-    if [[ "$talos_major_minor" == "1.12" ]] || [[ "${talos_major_minor%%.*}" -gt 1 ]]; then
+    if [[ "${talos_major_minor%%.*}" -gt 1 ]] || [[ "${talos_major_minor#*.}" -ge 12 && "${talos_major_minor%%.*}" -eq 1 ]]; then
         if [ "$backend" == "docker" ] && [ "$custom_cni" != "default" ]; then
             use_timeout=true
             echo -e "${yellow}ℹ️  Note: With custom CNI, nodes won't be Ready until CNI is installed${clear}"

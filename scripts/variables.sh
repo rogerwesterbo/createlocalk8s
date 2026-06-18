@@ -3,9 +3,10 @@
 # global variables
 
 kindk8sversions=(
-    "v1.35.0:kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f"
-    "v1.34.3:kindest/node:v1.34.3@sha256:08497ee19eace7b4b5348db5c6a1591d7752b164530a36f855cb0f2bdcbadd48"
-    "v1.33.7:kindest/node:v1.33.7@sha256:d26ef333bdb2cbe9862a0f7c3803ecc7b4303d8cea8e814b481b09949d353040"
+    "v1.36.1:kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5"
+    "v1.35.5:kindest/node:v1.35.5@sha256:ce977ae6d65918d0b58a5f8b5e940429c2ce42fa3a5619ec2bbc60b949c0ac95"
+    "v1.34.8:kindest/node:v1.34.8@sha256:02722c2dedddcfc00febf5d27fbeb9b7b2c14294c82109ff4a85d89ac9ba3256"
+    "v1.33.12:kindest/node:v1.33.12@sha256:3f5c8443c620245e4d355cfe09e96a91ead32ceaa569d3f1ca9edf0cb2fe2ff4"
     "v1.32.11:kindest/node:v1.32.11@sha256:5fc52d52a7b9574015299724bd68f183702956aa4a2116ae75a63cb574b35af8"
     "v1.31.14:kindest/node:v1.31.14@sha256:6f86cf509dbb42767b6e79debc3f2c32e4ee01386f0489b3b2be24b0a55aac2b"
     "v1.30.13:kindest/node:v1.30.13@sha256:397209b3d947d154f6641f2d0ce8d473732bd91c87d9575ade99049aa33cd648"
@@ -43,5 +44,5 @@ green='\033[0;32m'
 
 # Talos Kubernetes versions - dynamically populated based on installed talosctl version
 # See talos_populate_k8s_versions() in scripts/providers/talos-provider.sh
-# Support matrix: https://docs.siderolabs.com/talos/v1.11/getting-started/support-matrix
+# Support matrix: https://docs.siderolabs.com/talos/v1.13/getting-started/support-matrix
 talosk8sversions=()
