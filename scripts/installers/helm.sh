@@ -65,9 +65,46 @@ function install_helm_nfs(){
         ""
 }
 
+# kind ships Rancher's local-path-provisioner with every cluster: it is applied
+# with `kubectl apply` into the local-path-storage namespace (so it carries no
+# Helm ownership metadata) and backs the default "standard" StorageClass.
+#
+# The chart's ConfigMap (local-path-config) and Deployment (local-path-provisioner)
+# have exactly those names, so `helm upgrade --install` aborts with
+# "exists and cannot be imported into the current release: invalid ownership
+# metadata". Forcing it through would be wrong anyway: both copies watch the same
+# rancher.io/local-path provisioner and would race to provision each PVC, and the
+# chart's `local-path` class would become a second default, making class-less
+# PVCs ambiguous.
+#
+# So: install only when nothing is there, or when what is there is already ours.
+function local_path_provisioner_is_preinstalled() {
+    local managed_by
+    # Non-zero exit = no such deployment = nothing pre-installed.
+    managed_by=$(kubectl get deployment local-path-provisioner \
+        -n local-path-storage \
+        -o jsonpath='{.metadata.labels.app\.kubernetes\.io/managed-by}' 2>/dev/null) || return 1
+    # Present and Helm-managed = our own earlier release; upgrading it is fine.
+    [ "$managed_by" != "Helm" ]
+}
+
 function install_helm_local_path_provisioner(){
     echo -e "$yellow Installing Local Path Provisioner"
-    
+
+    if local_path_provisioner_is_preinstalled; then
+        local default_sc
+        default_sc=$(kubectl get storageclass \
+            -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}' 2>/dev/null)
+        echo -e "$green ✅ Local Path Provisioner is already running in this cluster — skipping"
+        echo -e "$yellow\nkind installs it with every cluster. It was applied with kubectl, not Helm, so the"
+        echo -e "$yellow chart cannot take it over, and a second copy would race with it for every PVC."
+        if [ -n "$default_sc" ]; then
+            echo -e "$yellow\nUse the existing default StorageClass:$blue $default_sc"
+        fi
+        echo -e "$yellow\nCheck storage class:$blue kubectl get storageclass"
+        return 0
+    fi
+
     # Install using OCI helm chart from GitHub Container Registry
     # Alternative (raw manifest): kubectl apply -f https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.32/deploy/local-path-storage.yaml
     (helm upgrade --install local-path-provisioner \
