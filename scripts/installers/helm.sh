@@ -601,7 +601,7 @@ function install_helm_kube_prometheus_stack(){
     (helm upgrade --install prometheus prometheus-community/kube-prometheus-stack \
         --namespace prometheus \
         --create-namespace \
-        --set prometheusOperator.admissionWebhooks.patch.podAnnotations."sidecar\.istio\.io/inject"="false" || { 
+        --set-string prometheusOperator.admissionWebhooks.patch.podAnnotations."sidecar\.istio\.io/inject"="false" || {
         echo -e "$red 🛑 Could not install Kube Prometheus Stack into cluster ..."; 
         die 
     }) & spinner
